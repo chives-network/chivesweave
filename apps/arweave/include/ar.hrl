@@ -12,7 +12,7 @@
 	-ifdef(DEBUG).
 		-define(NETWORK_NAME, "arweave.localtest").
 	-else.
-		-define(NETWORK_NAME, "arweave.N.1").
+		-define(NETWORK_NAME, "chivesweave.mainnet").
 	-endif.
 -endif.
 

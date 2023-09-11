@@ -18,7 +18,7 @@ A JSON array containing the network information for the current node.
 
 ```javascript
 {
-  "network": "arweave.N.1",
+  "network": "chivesweave.mainnet",
   "version": "3",
   "height": "2956",
   "blocks": "3495",

@@ -30,7 +30,7 @@
 start_link() ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
--if(?NETWORK_NAME == "arweave.N.1").
+-if(?NETWORK_NAME == "chivesweave.mainnet").
 write_full_block(#block{ height = 0 } = BShadow, TXs) ->
 	%% Genesis transactions are stored in data/genesis_txs; they are part of the repository.
 	write_full_block2(BShadow, TXs);

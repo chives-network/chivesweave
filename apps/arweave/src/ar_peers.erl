@@ -163,7 +163,7 @@ get_peer_performances(Peers) ->
 		#{},
 		Peers).
 
--if(?NETWORK_NAME == "arweave.N.1").
+-if(?NETWORK_NAME == "chivesweave.mainnet").
 get_trusted_peers() ->
 	{ok, Config} = application:get_env(arweave, config),
 	case Config#config.peers of

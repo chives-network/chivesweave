@@ -361,7 +361,7 @@ add_block(B, State) ->
 		false ->
 			{ok, State};
 		true ->
-			case B#block.height == 0 andalso ?NETWORK_NAME == "arweave.N.1" of
+			case B#block.height == 0 andalso ?NETWORK_NAME == "chivesweave.mainnet" of
 				true ->
 					ok;
 				false ->

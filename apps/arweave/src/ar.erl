@@ -578,7 +578,7 @@ start(Config) ->
 	case Config#config.init of
 		true ->
 			case ?NETWORK_NAME of
-				"arweave.N.1" ->
+				"chivesweave.mainnet" ->
 					io:format("~nCannot start a new network with the mainnet name! "
 							"Use ./bin/start-localnet ... when running from sources "
 							"or compile via ./rebar3 as localnet tar and use "

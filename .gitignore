@@ -29,3 +29,4 @@ ebin
 metrics_master
 metrics_slave
 release/output
+mainnet_data_dir

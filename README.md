@@ -37,48 +37,41 @@ sudo apt install libssl-dev libgmp-dev libsqlite3-dev make cmake gcc g++
 
 On some systems you might need to install `libncurses-dev`.
 
+Install the Erlang:
+
+```sh
+sudo apt remove erlang
+wget https://packages.erlang-solutions.com/erlang-solutions_2.0_all.deb
+sudo dpkg -i erlang-solutions_2.0_all.deb
+sudo apt update
+sudo apt install erlang
+```
+
 Download the repo:
 
 ```sh
 git clone --recursive https://github.com/chives-network/chivesweave
-cd arweave
+cd chivesweave
 ```
 
 Increase the [open file
 limits](https://docs.arweave.org/info/mining/mining-guide#preparation-file-descriptors-limit).
 
-Run in the development mode:
-
-```sh
-./arweave-server peer 188.166.200.45 peer 188.166.192.169 peer 163.47.11.64 peer 139.59.51.59 peer 138.197.232.192
-```
-
 Make a production build:
 
 ```sh
-./rebar3 as prod tar
+./rebar3 as mainnet tar
+rm -rf mainnet_data_dir
+mkdir mainnet_data_dir
+./bin/create-wallet mainnet_data_dir
 ```
+You will get your wallet and address.
 
-You will then find the gzipped tarball at `_build/prod/rel/arweave/arweave-x.y.z.tar.gz`.
-
-### Testnet
-
-To make a testnet build, run:
+You will then find the gzipped tarball at `_build/mainnet/rel/arweave/arweave-x.y.z.tar.gz`.
 
 ```sh
-./rebar3 as testnet tar
+_build/mainnet/rel/arweave/bin/start mine data_dir mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] 
 ```
-
-The tarball is created at `_build/testnet/rel/arweave/arweave-x.y.z.tar.gz`.
-
-You can join the public testnet now:
-
-```
-./bin/start peer testnet-1.arweave.net peer testnet-2.arweave.net peer testnet-3.arweave.net
-```
-
-We recommend you do not use your mainnet mining address on testnet. Also, do not join the
-testnet from the mainnet machine.
 
 ### Starting New Weave
 

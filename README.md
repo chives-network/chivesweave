@@ -40,8 +40,8 @@ On some systems you might need to install `libncurses-dev`.
 Download the repo:
 
 ```sh
-$ git clone --recursive https://github.com/ArweaveTeam/arweave.git
-$ cd arweave
+git clone --recursive https://github.com/chives-network/chivesweave
+cd arweave
 ```
 
 Increase the [open file
@@ -56,7 +56,7 @@ Run in the development mode:
 Make a production build:
 
 ```sh
-$ ./rebar3 as prod tar
+./rebar3 as prod tar
 ```
 
 You will then find the gzipped tarball at `_build/prod/rel/arweave/arweave-x.y.z.tar.gz`.
@@ -66,7 +66,7 @@ You will then find the gzipped tarball at `_build/prod/rel/arweave/arweave-x.y.z
 To make a testnet build, run:
 
 ```sh
-$ ./rebar3 as testnet tar
+./rebar3 as testnet tar
 ```
 
 The tarball is created at `_build/testnet/rel/arweave/arweave-x.y.z.tar.gz`.
@@ -97,7 +97,7 @@ create a wallet:
 and run:
 
 ```sh
-$ ./bin/start-localnet init data_dir <your-data-dir> mining_addr <your-mining-addr>
+./bin/start-localnet init data_dir <your-data-dir> mining_addr <your-mining-addr>
 storage_module 0,<your-mining-addr> mine
 ```
 
@@ -122,19 +122,19 @@ Make sure to have the build requirements installed.
 Clone the repo and initialize the Git submodules:
 
 ```sh
-$ git clone --recursive https://github.com/ArweaveTeam/arweave.git
+git clone --recursive https://github.com/chives-network/chivesweave
 ```
 
 ## Running the tests
 
 ```sh
-$ bin/test
+bin/test
 ```
 
 ## Running a shell
 
 ```sh
-$ bin/shell
+bin/shell
 ```
 
 `bin/test` and `bin/shell` launch two connected Erlang VMs in distributed mode. The master VM runs an HTTP server on the port 1984. The slave VM uses the port 1983. The data folders are `data_test_master` and `data_test_slave` respectively. The tests that do not depend on two VMs are run against the master VM.

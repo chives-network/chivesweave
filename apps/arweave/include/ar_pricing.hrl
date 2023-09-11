@@ -63,7 +63,7 @@ end).
 	-ifdef(FORKS_RESET).
 		-define(PRICE_2_6_TRANSITION_START, 0).
 	-else.
-		-define(PRICE_2_6_TRANSITION_START, (30 * 24 * 75)). % ~75 days.
+		-define(PRICE_2_6_TRANSITION_START, (0)). % ~75 days.
 	-endif.
 -endif.
 
@@ -80,7 +80,7 @@ end).
 		-define(PRICE_2_6_TRANSITION_BLOCKS, 0).
 	-else.
 		-ifndef(PRICE_2_6_TRANSITION_BLOCKS).
-			-define(PRICE_2_6_TRANSITION_BLOCKS, (30 * 24 * 12 * 30)). % ~12 months.
+			-define(PRICE_2_6_TRANSITION_BLOCKS, (0)). % ~12 months.
 		-endif.
 	-endif.
 -endif.
@@ -91,7 +91,7 @@ end).
 	-ifdef(FORKS_RESET).
 		-define(PRICE_2_6_8_TRANSITION_START, 0).
 	-else.
-		-define(PRICE_2_6_8_TRANSITION_START, (30 * 24 * 30 * 4)). % ~4 months;
+		-define(PRICE_2_6_8_TRANSITION_START, (0)). % ~4 months;
 	-endif.
 -endif.
 
@@ -102,7 +102,7 @@ end).
 		-define(PRICE_2_6_8_TRANSITION_BLOCKS, 0).
 	-else.
 		-ifndef(PRICE_2_6_8_TRANSITION_BLOCKS).
-			-define(PRICE_2_6_8_TRANSITION_BLOCKS, (30 * 24 * 30 * 18)). % ~18 months.
+			-define(PRICE_2_6_8_TRANSITION_BLOCKS, (0)). % ~18 months.
 		-endif.
 	-endif.
 -endif.

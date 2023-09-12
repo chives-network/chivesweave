@@ -1,0 +1,3 @@
+[submodule "lib/RandomX"]
+	path = apps/chivesweave/lib/RandomX
+	url = https://github.com/chives-network/RandomX

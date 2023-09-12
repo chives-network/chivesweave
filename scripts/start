@@ -14,18 +14,18 @@ else
 fi
 
 export ERL_EPMD_ADDRESS=127.0.0.1
-export NODE_NAME='arweave@127.0.0.1'
+export NODE_NAME='chivesweave@127.0.0.1'
 
 while true; do
     echo Launching Erlang Virtual Machine...
     if
-        "bin/arweave" foreground +MBas aobf +MBlmbcs 512 +Ktrue +A20 +SDio20 +sbwtvery_long +sbwtdcpuvery_long +sbwtdiovery_long +swtvery_low +swtdcpuvery_low +swtdiovery_low +Bi -run ar main $RANDOMX_JIT "$@"
+        "bin/chivesweave" foreground +MBas aobf +MBlmbcs 512 +Ktrue +A20 +SDio20 +sbwtvery_long +sbwtdcpuvery_long +sbwtdiovery_long +swtvery_low +swtdcpuvery_low +swtdiovery_low +Bi -run ar main $RANDOMX_JIT "$@"
     then
-        echo "Arweave Heartbeat: Server terminated safely."
+        echo "Chivesweave Heartbeat: Server terminated safely."
         exit 0
     else
-        echo "Arweave Heartbeat: The Arweave server has terminated. It will restart in 15 seconds."
-        echo "Arweave Heartbeat: If you would like to avoid this, press control+c to kill the server."
+        echo "Chivesweave Heartbeat: The Chivesweave server has terminated. It will restart in 15 seconds."
+        echo "Chivesweave Heartbeat: If you would like to avoid this, press control+c to kill the server."
         sleep 15
     fi
 done

@@ -2,9 +2,9 @@
 
 let
   inherit (lib) literalExpression filterAttrs isAttrs isList mkEnableOption mkIf mkOption types;
-  cfg = config.services.arweave;
-  defaultUser = "arweave";
-  arweavePkg = pkgs.callPackage ./arweave.nix { inherit pkgs; };
+  cfg = config.services.chivesweave;
+  defaultUser = "chivesweave";
+  arweavePkg = pkgs.callPackage ./chivesweave.nix { inherit pkgs; };
   filterTopLevelNulls = set:
     let
       isNotNull = value: value != null;
@@ -59,10 +59,10 @@ let
     }));
 in
 {
-  options.services.arweave = {
+  options.services.chivesweave = {
 
     enable = mkEnableOption ''
-      Enable arweave node as systemd service
+      Enable chivesweave node as systemd service
     '';
 
     peer = mkOption {
@@ -95,24 +95,24 @@ in
     package = mkOption {
       type = types.package;
       default = arweavePkg;
-      defaultText = literalExpression "pkgs.arweave";
-      example = literalExpression "pkgs.arweave";
+      defaultText = literalExpression "pkgs.chivesweave";
+      example = literalExpression "pkgs.chivesweave";
       description = ''
-        The Arweave expression to use
+        The Chivesweave expression to use
       '';
     };
 
     dataDir = mkOption {
       type = types.path;
-      default = "/arweave-data";
+      default = "/chivesweave-data";
       description = ''
-        Data directory path for arweave node.
+        Data directory path for chivesweave node.
       '';
     };
 
     logDir = mkOption {
       type = types.path;
-      default = "/var/lib/arweave/logs";
+      default = "/var/lib/chivesweave/logs";
       description = ''
         Logging directory path.
       '';
@@ -129,7 +129,7 @@ in
 
     metricsDir = mkOption {
       type = types.path;
-      default = "/var/lib/arweave/metrics";
+      default = "/var/lib/chivesweave/metrics";
       description = ''
         Directory path for node metric outputs
       '';
@@ -150,19 +150,19 @@ in
     user = mkOption {
       type = types.str;
       default = defaultUser;
-      description = "Run Arweave Node under this user.";
+      description = "Run Chivesweave Node under this user.";
     };
 
     group = mkOption {
       type = types.str;
       default = "users";
-      description = "Run Arweave Node under this group.";
+      description = "Run Chivesweave Node under this group.";
     };
 
     transactionBlacklists = mkOption {
       type = types.listOf types.str;
       default = [ ];
-      example = [ "/user/arweave/blacklist.txt" ];
+      example = [ "/user/chivesweave/blacklist.txt" ];
       description = ''
         List of paths to textfiles containing blacklisted txids and/or byte ranges
       '';
@@ -180,7 +180,7 @@ in
     transactionWhitelists = mkOption {
       type = types.listOf types.str;
       default = [ ];
-      example = [ "/user/arweave/whitelist.txt" ];
+      example = [ "/user/chivesweave/whitelist.txt" ];
       description = ''
         List of paths to textfiles containing whitelisted txids
       '';
@@ -371,44 +371,44 @@ in
       type = types.path;
       default = generatedConfigFile;
       internal = true;
-      description = "The generated Arweave config file";
+      description = "The generated Chivesweave config file";
     };
 
   };
 
   config = mkIf cfg.enable (
-    let screen-watchdog = pkgs.writeScriptBin "arweave-watch-screen" ''
+    let screen-watchdog = pkgs.writeScriptBin "chivesweave-watch-screen" ''
           #!${pkgs.bash}/bin/bash
           while true
           do
-            if ! ${pkgs.screen}/bin/screen -ls | grep -E -q "[0-9]\.arweave"; then
+            if ! ${pkgs.screen}/bin/screen -ls | grep -E -q "[0-9]\.chivesweave"; then
               echo "arweace screen socket not detected, starting..."
-              ${pkgs.screen}/bin/screen -dmS arweave -L -Logfile /var/lib/arweave/logs/arweave@screen-session.txt &
+              ${pkgs.screen}/bin/screen -dmS chivesweave -L -Logfile /var/lib/chivesweave/logs/chivesweave@screen-session.txt &
             fi
             sleep 1
           done
         '';
 
-        arweave-service-pre-start = pkgs.writeScriptBin "arweave-pre-start" ''
+        chivesweave-service-pre-start = pkgs.writeScriptBin "chivesweave-pre-start" ''
           #!${pkgs.bash}/bin/bash
-          # wait for screen socket for S-arweave to appear
-          until [ "$(${pkgs.screen}/bin/screen -ls | grep 'S-arweave')" ]
+          # wait for screen socket for S-chivesweave to appear
+          until [ "$(${pkgs.screen}/bin/screen -ls | grep 'S-chivesweave')" ]
           do
             sleep 1
           done
           exit 0
         '';
 
-        arweave-service-start =
+        chivesweave-service-start =
           let
             command = "${cfg.package}/bin/start-nix config_file ${cfg.configFile}";
             peers = "${builtins.concatStringsSep " " (builtins.concatMap (p: ["peer" p]) cfg.peer)}";
             vdf-peers = "${builtins.concatStringsSep " " (builtins.concatMap (p: ["vdf_client_peer" p]) cfg.vdfClientPeer)}";
             vdf-server-peers = "${builtins.concatStringsSep " " (builtins.concatMap (p: ["vdf_server_trusted_peer" p]) cfg.vdfServerTrustedPeer)}";
-          in pkgs.writeScriptBin "arweave-start" ''
+          in pkgs.writeScriptBin "chivesweave-start" ''
           #!${pkgs.bash}/bin/bash
-          ${pkgs.screen}/bin/screen -S arweave -p 0 -X stuff "^C^M" || true
-          ${pkgs.screen}/bin/screen -S arweave -p 0 -X stuff '${command} ${peers} ${vdf-peers} ${vdf-server-peers}^M'
+          ${pkgs.screen}/bin/screen -S chivesweave -p 0 -X stuff "^C^M" || true
+          ${pkgs.screen}/bin/screen -S chivesweave -p 0 -X stuff '${command} ${peers} ${vdf-peers} ${vdf-server-peers}^M'
           sleep 5
           until [[ "$(${pkgs.procps}/bin/ps -C epmd &> /dev/null)" -ne 0 ]]
           do
@@ -416,12 +416,12 @@ in
           done
         '';
 
-        arweave-service-stop = pkgs.writeScriptBin "arweave-stop" ''
+        chivesweave-service-stop = pkgs.writeScriptBin "chivesweave-stop" ''
           #!${pkgs.bash}/bin/bash
           ${cfg.package}/bin/stop-nix || true
         '';
 
-        arweave-service-stop-post = pkgs.writeScriptBin "arweave-stop-post" ''
+        chivesweave-service-stop-post = pkgs.writeScriptBin "chivesweave-stop-post" ''
           #!${pkgs.bash}/bin/bash
           # wait for empd to die, otherwise kill it
           counter=0
@@ -437,7 +437,7 @@ in
 
     in {
 
-      systemd.services.arweave-screen = {
+      systemd.services.chivesweave-screen = {
         description = "A Service for starting Screen process";
         after = [ "network.target" ];
         environment = {};
@@ -448,13 +448,13 @@ in
           Type = "simple";
           WorkingDirectory = "${cfg.package}";
           ExecStartPre = "${pkgs.bash}/bin/bash -c '${pkgs.procps}/bin/pkill screen || true; ${pkgs.screen}/bin/screen -wipe || true; sleep 1'";
-          ExecStart = "${screen-watchdog}/bin/arweave-watch-screen";
+          ExecStart = "${screen-watchdog}/bin/chivesweave-watch-screen";
         };
       };
 
-      systemd.services.arweave = {
-        description = "Arweave Node Service";
-        after = [ "arweave-screen.service" ];
+      systemd.services.chivesweave = {
+        description = "Chivesweave Node Service";
+        after = [ "chivesweave-screen.service" ];
         environment = {};
         wantedBy = [ "multi-user.target" ];
         serviceConfig = {
@@ -463,10 +463,10 @@ in
           WorkingDirectory = "${cfg.package}";
           Type = "simple";
           TimeoutStopSec = 30;
-          ExecStartPre = "${arweave-service-pre-start}/bin/arweave-pre-start";
-          ExecStart = "${arweave-service-start}/bin/arweave-start";
-          ExecStop = "${arweave-service-stop}/bin/arweave-stop";
-          ExecStopPost = "${arweave-service-stop-post}/bin/arweave-stop-post";
+          ExecStartPre = "${chivesweave-service-pre-start}/bin/chivesweave-pre-start";
+          ExecStart = "${chivesweave-service-start}/bin/chivesweave-start";
+          ExecStop = "${chivesweave-service-stop}/bin/chivesweave-stop";
+          ExecStopPost = "${chivesweave-service-stop-post}/bin/chivesweave-stop-post";
         };
       };
     });

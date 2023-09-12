@@ -2,7 +2,7 @@
 
 ## **Warning** only use it if you really really know what you are doing.
 
-These HTTP endpoints are only available if the `internal_api_secret` startup option is set when `arweave-server` is started.
+These HTTP endpoints are only available if the `internal_api_secret` startup option is set when `chivesweave-server` is started.
 
 ## Generate a wallet and receive its access code
 

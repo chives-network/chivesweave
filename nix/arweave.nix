@@ -311,8 +311,8 @@ let
         -noshell \
         -config config/sys.config \
         -name stopper@127.0.0.1 \
-        -setcookie arweave \
-        -s ar shutdown arweave@127.0.0.1 -s init stop
+        -setcookie chivesweave \
+        -s ar shutdown chivesweave@127.0.0.1 -s init stop
     '';
   };
 
@@ -382,7 +382,7 @@ let
 
 in beamPackages.rebar3Relx {
 
-  pname = "arweave";
+  pname = "chivesweave";
   version = "2.6.0";
   src = gitignoreSource ../.;
   profile = "prod";
@@ -428,16 +428,16 @@ in beamPackages.rebar3Relx {
   ];
 
   postConfigure = ''
-    rm -rf apps/arweave/lib/RandomX
-    mkdir -p apps/arweave/lib/RandomX
-    cp -rf ${randomx}/* apps/arweave/lib/RandomX
+    rm -rf apps/chivesweave/lib/RandomX
+    mkdir -p apps/chivesweave/lib/RandomX
+    cp -rf ${randomx}/* apps/chivesweave/lib/RandomX
     cp -rf ${jiffy}/lib/erlang/lib/* apps/jiffy
     cp -rf ${graphql}/lib/erlang/lib/* apps/graphql
   '';
 
   postPatch = ''
     sed -i -e 's|-arch x86_64|-arch ${pkgs.stdenv.targetPlatform.linuxArch}|g' \
-      apps/arweave/c_src/Makefile \
+      apps/chivesweave/c_src/Makefile \
       apps/ar_sqlite3/c_src/Makefile
 
     sed -i -e 's|{b64fast,.*|{b64fast, "0.2.2"},|g' rebar.config
@@ -445,7 +445,7 @@ in beamPackages.rebar3Relx {
   '';
 
   installPhase = ''
-    mkdir $out; cp -rf ./_build/prod/rel/arweave/* $out
+    mkdir $out; cp -rf ./_build/prod/rel/chivesweave/* $out
     cp ${startScript.outPath} $out/bin/start-nix
     cp ${startScriptForeground.outPath} $out/bin/start-nix-foreground
     cp ${stopScript.outPath} $out/bin/stop-nix

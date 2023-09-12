@@ -1,4 +1,4 @@
-# Arweave HTTP Interface Documentation
+# Chivesweave HTTP Interface Documentation
 
 You can run this HTTP interface using Postman [![Postman](https://run.pstmn.io/button.svg)](https://app.getpostman.com/run-collection/8af0090f2db84e979b69) or you can find the documentation [here](https://documenter.getpostman.com/view/5500657/RWgm2g1r).
 
@@ -677,9 +677,9 @@ xhr.send(post);
 
 # Contact
 
-If you have questions or comments on the Arweave HTTP interface you can get in touch by
-finding us on [Twitter](https://twitter.com/ArweaveTeam/), [Reddit](https://www.reddit.com/r/arweave), [Discord](https://discord.gg/2ZpV8nM) or by emailing us at team@arweave.org.
+If you have questions or comments on the Chivesweave HTTP interface you can get in touch by
+finding us on [Twitter](https://twitter.com/ArweaveTeam/), [Reddit](https://www.reddit.com/r/chivesweave), [Discord](https://discord.gg/2ZpV8nM) or by emailing us at team@chivesweave.org.
 
 # License
-The Arweave project is released under GNU General Public License v2.0.
+The Chivesweave project is released under GNU General Public License v2.0.
 See [LICENSE](LICENSE.md) for full license conditions.

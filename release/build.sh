@@ -31,7 +31,7 @@ else
   GIT_TAG="N.$VERSION"
 fi
 
-BASE_IMAGES=("arweave-base:18.04" "arweave-base:20.04" "arweave-base:22.04" "")
+BASE_IMAGES=("chivesweave-base:18.04" "chivesweave-base:20.04" "chivesweave-base:22.04" "")
 LINUX_VERSIONS=("ubuntu18" "ubuntu20" "ubuntu22" "rocky9")
 BASE_DOCKERFILES=("Dockerfile.base.ubuntu18.04" "Dockerfile.base.ubuntu20.04" "Dockerfile.base.ubuntu22.04" "")
 
@@ -71,8 +71,8 @@ done
 
 for i in "${!LINUX_VERSIONS[@]}"; do
     LINUX_VERSION=${LINUX_VERSIONS[$i]}
-    IMAGE_NAME="arweave:$VERSION-$LINUX_VERSION"
-    OUTPUT_FILE="./output/arweave-$VERSION.$LINUX_VERSION-x86_64.tar.gz"
+    IMAGE_NAME="chivesweave:$VERSION-$LINUX_VERSION"
+    OUTPUT_FILE="./output/chivesweave-$VERSION.$LINUX_VERSION-x86_64.tar.gz"
 
     DOCKERFILE="Dockerfile.ubuntu"
     if [ "$LINUX_VERSION" == "rocky9" ]; then
@@ -96,9 +96,9 @@ for i in "${!LINUX_VERSIONS[@]}"; do
     echo "Renaming output file..."
 
     # Rename the output file
-    run_cmd "mv './output/arweave.tar.gz' '$OUTPUT_FILE'"
+    run_cmd "mv './output/chivesweave.tar.gz' '$OUTPUT_FILE'"
 done
 
 if [ $PRE_RELEASE -eq 0 ]; then
-  run_cmd "cp './output/arweave-$VERSION.ubuntu22-x86_64.tar.gz' './output/arweave-$VERSION.linux-x86_64.tar.gz'"
+  run_cmd "cp './output/chivesweave-$VERSION.ubuntu22-x86_64.tar.gz' './output/chivesweave-$VERSION.linux-x86_64.tar.gz'"
 fi

@@ -1,7 +1,7 @@
 
-# Arweave Transaction Blacklists
+# Chivesweave Transaction Blacklists
 
-To support the freedom of individual participants in the network to control what content they store, and to allow the network as a whole to democratically reject content that is widely reviled, the Arweave software provides a blacklisting system.
+To support the freedom of individual participants in the network to control what content they store, and to allow the network as a whole to democratically reject content that is widely reviled, the Chivesweave software provides a blacklisting system.
 Each node maintains an (optional) blacklist containing the identifiers of transactions with data it doesn't wish to store.
 
 These blacklists can be built by individuals or collaboratively, or can be imported from other sources.

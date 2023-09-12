@@ -1,4 +1,4 @@
-name: "Arweave Tests"
+name: "Chivesweave Tests"
 on:
   push:
     branches: ["**"]
@@ -20,5 +20,5 @@ jobs:
         run: epmd -daemon
       - name: CommonTest Suite
         run: rebar3 ct --cover --sname=master@localhost
-      - name: Run Arweave Tests
+      - name: Run Chivesweave Tests
         run: ./bin/test

@@ -4,7 +4,7 @@ set -e
 
 SCRIPT_DIR="$(dirname "$0")"
 
-PRIV_DIR="$(cd $SCRIPT_DIR/../apps/arweave/priv && pwd -P)"
+PRIV_DIR="$(cd $SCRIPT_DIR/../apps/chivesweave/priv && pwd -P)"
 
 CERT_FILE="$PRIV_DIR/tls/cert.pem"
 KEY_FILE="$PRIV_DIR/tls/key.pem"

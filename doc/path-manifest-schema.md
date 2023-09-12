@@ -4,7 +4,7 @@ Path manifests are JSON objects with the following keys.
 
 | Field            | Mandatory? | Type   | Description |
 | ---------------- | ---------- | ------ | ----------- |
-| `manifest`       | ✓          | string | The manifest type identifier, this MUST be `arweave/paths`. |
+| `manifest`       | ✓          | string | The manifest type identifier, this MUST be `chivesweave/paths`. |
 | `version`        | ✓          | string | The manifest specification version, currently "0.1.0". This will be updated with future updates according to [semver](https://semver.org). |
 | `index`          |            | object | The behavior gateways SHOULD follow when the manifest is accessed directly. When defined, `index` MUST contain a member describing the behavior to adopt. Currently, the only supported behavior is `path`. `index` MAY be be omitted, in which case gateways SHOULD serve a listing of all paths. |
 | `index.path`     |            | string | The default path to load. If defined, the field MUST reference a key in the `paths` object (it MUST NOT reference a transaction ID directly). |
@@ -13,13 +13,13 @@ Path manifests are JSON objects with the following keys.
 
 A path manifest transaction MUST NOT contain any data other than this JSON object.
 
-The `Content-Type` tag for manifest files MUST be `application/x.arweave-manifest+json`, users MAY add other arbitrary user defined tags.
+The `Content-Type` tag for manifest files MUST be `application/x.chivesweave-manifest+json`, users MAY add other arbitrary user defined tags.
 
 **Example manifest**
 
 ```json
 {
-  "manifest": "arweave/paths",
+  "manifest": "chivesweave/paths",
   "version": "0.1.0",
   "index": {
     "path": "index.html"

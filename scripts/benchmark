@@ -19,4 +19,4 @@ if [ -d benchmark ]; then
     mv -i benchmark benchmark.old;
 fi
 
-"bin/arweave" foreground -run ar main $RANDOMX_JIT init mine data_dir benchmark
+"bin/chivesweave" foreground -run ar main $RANDOMX_JIT init mine data_dir benchmark

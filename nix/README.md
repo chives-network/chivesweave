@@ -1,13 +1,13 @@
-## Building Arweave in Nix
+## Building Chivesweave in Nix
 
-Easiest way to import arweave as systemd service, is via flakes
+Easiest way to import chivesweave as systemd service, is via flakes
 
 ```nix
 {
-  inputs.arweave.url = "github:ArweaveTeam/arweave";
-  outputs = { self, nixpkgs, arweave }: {
+  inputs.chivesweave.url = "github:ArweaveTeam/chivesweave";
+  outputs = { self, nixpkgs, chivesweave }: {
     nixosSystem = nixpkgs.lib.nixosSystem {
-      modules = [ arweave.nixosModules."x86_64-linux".arweave ];
+      modules = [ chivesweave.nixosModules."x86_64-linux".chivesweave ];
     };
   }
 ```
@@ -16,24 +16,24 @@ In non nixos system, the package derivation can be accessed and used as standalo
 
 ```nix
 {
-  inputs.arweave.url = "github:ArweaveTeam/arweave";
-  outputs = { self, nixpkgs, arweave }:
+  inputs.chivesweave.url = "github:ArweaveTeam/chivesweave";
+  outputs = { self, nixpkgs, chivesweave }:
     let
       system = "x86_64-linux";
-      pkgs = import nixpkgs { inherit system; overlays = [ arweave.overlay ]; };
+      pkgs = import nixpkgs { inherit system; overlays = [ chivesweave.overlay ]; };
     in {
       # your flake here...
-      # pkgs.arweave should exist
+      # pkgs.chivesweave should exist
     }
 ```
 
-Module extraArgs are also a good way to access pkgs.arweave for overrides if needed
+Module extraArgs are also a good way to access pkgs.chivesweave for overrides if needed
 
 
 ```nix
 {
-  inputs.arweave.url = "github:ArweaveTeam/arweave";
-  outputs = { self, nixpkgs, arweave }:
+  inputs.chivesweave.url = "github:ArweaveTeam/chivesweave";
+  outputs = { self, nixpkgs, chivesweave }:
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
@@ -41,21 +41,21 @@ Module extraArgs are also a good way to access pkgs.arweave for overrides if nee
      in {
         nixosSystem = nixpkgs.lib.nixosSystem {
          inherit extraArgs system;
-         modules = [ arweave.nixosModules."${system}".arweave ];
+         modules = [ chivesweave.nixosModules."${system}".chivesweave ];
         };
      };
   }
 ```
 
-## Using services.arweave
+## Using services.chivesweave
 
-In your configuration.nix you can enable arweave node as service.
+In your configuration.nix you can enable chivesweave node as service.
 Note that this is limited to nixos the operating system (as opposed to just nix the package manager).
 
 ```nix
 {
   config = {
-    services.arweave = {
+    services.chivesweave = {
       enable = true;
       peer = [
         "188.166.200.45"
@@ -68,20 +68,20 @@ Note that this is limited to nixos the operating system (as opposed to just nix 
 }
 ```
 
-<!--  Generated in nix repl: (builtins.toJSON (builtins.mapAttrs (k: v: if (builtins.typeOf v == "set" && builtins.hasAttr "_type" v && v._type == "option") then {option = k; defaultValue = if (builtins.typeOf v == "set") then if (builtins.hasAttr "defaultText" v) then v.defaultText.text else v.default else v; description = if (builtins.typeOf v == "set") then v.description else v; } else {}) (import ./module.nix (pkgs // {arweave = {};})).options.services.arweave)) -->
+<!--  Generated in nix repl: (builtins.toJSON (builtins.mapAttrs (k: v: if (builtins.typeOf v == "set" && builtins.hasAttr "_type" v && v._type == "option") then {option = k; defaultValue = if (builtins.typeOf v == "set") then if (builtins.hasAttr "defaultText" v) then v.defaultText.text else v.default else v; description = if (builtins.typeOf v == "set") then v.description else v; } else {}) (import ./module.nix (pkgs // {chivesweave = {};})).options.services.chivesweave)) -->
 
 _A schema of the available options as json_
 
 ```json
 {
   "dataDir": {
-    "defaultValue": "/arweave-data",
-    "description": "Data directory path for arweave node.\n",
+    "defaultValue": "/chivesweave-data",
+    "description": "Data directory path for chivesweave node.\n",
     "option": "dataDir"
   },
   "enable": {
     "defaultValue": false,
-    "description": "Whether to enable Enable arweave node as systemd service\n.",
+    "description": "Whether to enable Enable chivesweave node as systemd service\n.",
     "option": "enable"
   },
   "featuresDisable": {
@@ -91,7 +91,7 @@ _A schema of the available options as json_
   },
   "group": {
     "defaultValue": "users",
-    "description": "Run Arweave Node under this group.",
+    "description": "Run Chivesweave Node under this group.",
     "option": "group"
   },
   "headerSyncJobs": {
@@ -145,13 +145,13 @@ _A schema of the available options as json_
     "option": "maxParallelWalletListRequests"
   },
   "metricsDir": {
-    "defaultValue": "/var/lib/arweave/metrics",
+    "defaultValue": "/var/lib/chivesweave/metrics",
     "description": "Directory path for node metric outputs\n",
     "option": "metricsDir"
   },
   "package": {
-    "defaultValue": "pkgs.arweave",
-    "description": "The Arweave expression to use\n",
+    "defaultValue": "pkgs.chivesweave",
+    "description": "The Chivesweave expression to use\n",
     "option": "package"
   },
   "peer": {
@@ -170,8 +170,8 @@ _A schema of the available options as json_
     "option": "transactionWhitelists"
   },
   "user": {
-    "defaultValue": "arweave",
-    "description": "Run Arweave Node under this user.",
+    "defaultValue": "chivesweave",
+    "description": "Run Chivesweave Node under this user.",
     "option": "user"
   }
 }

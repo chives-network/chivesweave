@@ -1,16 +1,16 @@
-# Arweave Gateway Setup Guide
+# Chivesweave Gateway Setup Guide
 
 ### Certificate files
 
 Assuming the gateway will run under the domain name `gateway.example`, you will need to acquire a  certificate valid for both `gateway.example` and the wildcard `*.gateway.example`. This certificate's files should be installed at the following location:
 
-- `apps/arweave/priv/tls/cert.pem` for the certificate file
-- `apps/arweave/priv/tls/key.pem` for this certificate's key file
+- `apps/chivesweave/priv/tls/cert.pem` for the certificate file
+- `apps/chivesweave/priv/tls/key.pem` for this certificate's key file
 
 In order to allow the gateway to serve transactions under custom domain names, additional files need to be installed. For example, for a given domain name `custom.domain.example`, a certificate for that domain should be acquired and its files installed at the following location:
 
-- `apps/arweave/priv/tls/custom.domain.example/cert.pem` for the certificate file
-- `apps/arweave/priv/tls/custom.domain.example/key.pem` for this certificate's key file
+- `apps/chivesweave/priv/tls/custom.domain.example/cert.pem` for the certificate file
+- `apps/chivesweave/priv/tls/custom.domain.example/key.pem` for this certificate's key file
 
 ### Custom domain DNS records
 
@@ -26,7 +26,7 @@ For example, with `gateway.example` as the gateway's main domain name:
 
 Command line flag:
 ```
-./arweave-server gateway gateway.example
+./chivesweave-server gateway gateway.example
 ```
 
 Configuration field:
@@ -43,7 +43,7 @@ For example, given the custom domain names `custom1.domain.example` and `custom2
 
 Command line flag:
 ```
-./arweave-server gateway gateway.example custom_domain custom1.domain.example custom_domain custom2.domain.example
+./chivesweave-server gateway gateway.example custom_domain custom1.domain.example custom_domain custom2.domain.example
 ```
 
 Configuration field:

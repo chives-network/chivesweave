@@ -5,6 +5,6 @@ set -e
 SCRIPT_DIR="$(dirname "$0")"
 
 export ERL_EPMD_ADDRESS=127.0.0.1
-export NODE_NAME='arweave@127.0.0.1'
+export NODE_NAME='chivesweave@127.0.0.1'
 
-"$SCRIPT_DIR/arweave" stop
+"$SCRIPT_DIR/chivesweave" stop

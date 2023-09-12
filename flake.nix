@@ -1,5 +1,5 @@
 {
-  description = "The Arweave server and App Developer Toolkit.";
+  description = "The Chivesweave server and App Developer Toolkit.";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -13,18 +13,18 @@
   outputs = { self, nixpkgs, utils, ... }: utils.lib.eachDefaultSystem (system:
     let
       pkgs = import nixpkgs { inherit system; };
-      arweave = pkgs.callPackage ./nix/arweave.nix { inherit pkgs; };
+      chivesweave = pkgs.callPackage ./nix/chivesweave.nix { inherit pkgs; };
     in {
       packages = utils.lib.flattenTree {
-        inherit arweave;
+        inherit chivesweave;
       };
 
-      nixosModules.arweave = {
+      nixosModules.chivesweave = {
         imports = [ ./nix/module.nix ];
-        nixpkgs.overlays = [ (prev: final: { inherit arweave; }) ];
+        nixpkgs.overlays = [ (prev: final: { inherit chivesweave; }) ];
       };
 
-      defaultPackage = self.packages."${system}".arweave;
+      defaultPackage = self.packages."${system}".chivesweave;
 
     });
 

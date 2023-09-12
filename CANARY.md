@@ -1,11 +1,11 @@
-# Arweave Team Warrant Canary
+# Chivesweave Team Warrant Canary
 
-- The Arweave Team has not been contacted by any law enforcement officials regarding the project.
+- The Chivesweave Team has not been contacted by any law enforcement officials regarding the project.
 
-- The Arweave Team has not been asked to break the encryption of the system by any party.
+- The Chivesweave Team has not been asked to break the encryption of the system by any party.
 
-- The Arweave Team has not been asked to reveal the identities of any backers.
+- The Chivesweave Team has not been asked to reveal the identities of any backers.
 
-- The Arweave Team is not in any way under duress.
+- The Chivesweave Team is not in any way under duress.
 
 Last update: 11 October 2021.

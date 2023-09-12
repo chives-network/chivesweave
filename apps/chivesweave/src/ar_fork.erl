@@ -15,7 +15,7 @@ height_1_6() ->
 	0.
 -else.
 height_1_6() ->
-	160.
+	0.
 -endif.
 
 -ifdef(FORKS_RESET).
@@ -23,7 +23,7 @@ height_1_7() ->
 	0.
 -else.
 height_1_7() ->
-	170. % Targeting 2019-07-08 UTC
+	0. % Targeting 2019-07-08 UTC
 -endif.
 
 -ifdef(FORKS_RESET).
@@ -31,7 +31,7 @@ height_1_8() ->
 	0.
 -else.
 height_1_8() ->
-	180. % Targeting 2019-08-29 UTC
+	0. % Targeting 2019-08-29 UTC
 -endif.
 
 -ifdef(FORKS_RESET).
@@ -39,7 +39,7 @@ height_1_9() ->
 	0.
 -else.
 height_1_9() ->
-	190. % Targeting 2019-11-04 UTC
+	0. % Targeting 2019-11-04 UTC
 -endif.
 
 -ifdef(FORKS_RESET).
@@ -47,7 +47,7 @@ height_2_0() ->
 	0.
 -else.
 height_2_0() ->
-	200. % Targeting 2020-04-09 10:00 UTC
+	0. % Targeting 2020-04-09 10:00 UTC
 -endif.
 
 -ifdef(FORKS_RESET).
@@ -55,7 +55,7 @@ height_2_2() ->
 	0.
 -else.
 height_2_2() ->
-	220. % Targeting 2020-10-21 13:00 UTC
+	0. % Targeting 2020-10-21 13:00 UTC
 -endif.
 
 -ifdef(FORKS_RESET).
@@ -63,7 +63,7 @@ height_2_3() ->
 	0.
 -else.
 height_2_3() ->
-	230. % Targeting 2020-12-21 11:00 UTC
+	0. % Targeting 2020-12-21 11:00 UTC
 -endif.
 
 -ifdef(FORKS_RESET).
@@ -71,7 +71,7 @@ height_2_4() ->
 	0.
 -else.
 height_2_4() ->
-	240. % Targeting 2021-02-24 11:50 UTC
+	0. % Targeting 2021-02-24 11:50 UTC
 -endif.
 
 -ifdef(FORKS_RESET).
@@ -79,7 +79,7 @@ height_2_5() ->
 	0.
 -else.
 height_2_5() ->
-	250.
+	0.
 -endif.
 
 -ifdef(FORKS_RESET).
@@ -91,7 +91,7 @@ height_2_6() ->
 			0.
 	-else.
 		height_2_6() ->
-			260. % Targeting 2023-03-06 14:00 UTC
+			0. % Targeting 2023-03-06 14:00 UTC
 	-endif.
 -endif.
 
@@ -104,6 +104,6 @@ height_2_6_8() ->
 			0.
 	-else.
 		height_2_6_8() ->
-			268. % Targeting 2023-05-30 16:00 UTC
+			0. % Targeting 2023-05-30 16:00 UTC
 	-endif.
 -endif.

@@ -92,7 +92,7 @@ init([]) ->
 			{false, true} ->
 				Config2 = Config#config{ init = false },
 				application:set_env(chivesweave, config, Config2),
-				InitialBalance = ?AR(1000000000000),
+				InitialBalance = ?AR(55000000),
 				[B0] = ar_weave:init([{Config#config.mining_addr, InitialBalance, <<>>}],
 						ar_retarget:switch_to_linear_diff(Config#config.diff)),
 				RootHash0 = B0#block.wallet_list,

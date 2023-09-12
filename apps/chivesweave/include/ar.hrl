@@ -38,7 +38,7 @@
 -else.
 %%% FORK INDEX
 %%% @deprecated Fork heights from 1.7 on are defined in the ar_fork module.
--define(FORK_1_6, 160).
+-define(FORK_1_6, 0).
 -endif.
 
 %% The hashing algorithm used to calculate wallet addresses.
@@ -634,7 +634,7 @@
 -define(OK(Tuple), begin (case (Tuple) of {ok, SuccessValue} -> (SuccessValue) end) end).
 
 %% The messages to be stored inside the genesis block.
--define(GENESIS_BLOCK_MESSAGES, []).
+-define(GENESIS_BLOCK_MESSAGES, ["Thanks you Sam Williams"]).
 
 %% Minimum number of characters for internal API secret. Used in the optional HTTP API
 %% for signing transactions.

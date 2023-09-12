@@ -38,7 +38,7 @@
 -else.
 %% The threshold was determined on the mainnet at the 2.5 fork block. The chunks
 %% submitted after the threshold must adhere to stricter validation rules.
--define(STRICT_DATA_SPLIT_THRESHOLD, 30607159107830).
+-define(STRICT_DATA_SPLIT_THRESHOLD, 30607159167830).
 -endif.
 
 %% Recall bytes are only picked from the subspace up to the size

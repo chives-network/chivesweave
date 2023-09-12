@@ -4,7 +4,7 @@ Easiest way to import chivesweave as systemd service, is via flakes
 
 ```nix
 {
-  inputs.chivesweave.url = "github:ArweaveTeam/chivesweave";
+  inputs.chivesweave.url = "github:chives-network/chivesweave";
   outputs = { self, nixpkgs, chivesweave }: {
     nixosSystem = nixpkgs.lib.nixosSystem {
       modules = [ chivesweave.nixosModules."x86_64-linux".chivesweave ];
@@ -16,7 +16,7 @@ In non nixos system, the package derivation can be accessed and used as standalo
 
 ```nix
 {
-  inputs.chivesweave.url = "github:ArweaveTeam/chivesweave";
+  inputs.chivesweave.url = "github:chives-network/chivesweave";
   outputs = { self, nixpkgs, chivesweave }:
     let
       system = "x86_64-linux";
@@ -32,7 +32,7 @@ Module extraArgs are also a good way to access pkgs.chivesweave for overrides if
 
 ```nix
 {
-  inputs.chivesweave.url = "github:ArweaveTeam/chivesweave";
+  inputs.chivesweave.url = "github:chives-network/chivesweave";
   outputs = { self, nixpkgs, chivesweave }:
     let
       system = "x86_64-linux";

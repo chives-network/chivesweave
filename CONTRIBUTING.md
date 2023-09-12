@@ -8,7 +8,7 @@ This is a quick overview for what you should know when contributing to this Git 
 
 ## Workflow
 
- 1. Fork the main Git repo `https://github.com/ArweaveTeam/chivesweave.git`
+ 1. Fork the main Git repo `https://github.com/chives-network/chivesweave.git`
  2. Branch out from `master`.
  3. Add your changes.
  4. Run the tests (see above).

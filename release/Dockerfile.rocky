@@ -43,7 +43,7 @@ VOLUME /output
 
 # The build steps are executed every time
 CMD set -x && \
-    git clone --recursive https://github.com/ArweaveTeam/chivesweave.git && \
+    git clone --recursive https://github.com/chives-network/chivesweave.git && \
     cd chivesweave && \
     git fetch --all && \
     git pull --force && \

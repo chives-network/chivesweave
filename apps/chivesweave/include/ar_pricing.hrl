@@ -63,7 +63,7 @@ end).
 	-ifdef(FORKS_RESET).
 		-define(PRICE_2_6_TRANSITION_START, 0).
 	-else.
-		-define(PRICE_2_6_TRANSITION_START, (1)). % ~75 days.
+		-define(PRICE_2_6_TRANSITION_START, (260)). % ~75 days.
 	-endif.
 -endif.
 
@@ -80,7 +80,7 @@ end).
 		-define(PRICE_2_6_TRANSITION_BLOCKS, 0).
 	-else.
 		-ifndef(PRICE_2_6_TRANSITION_BLOCKS).
-			-define(PRICE_2_6_TRANSITION_BLOCKS, (2)). % ~12 months.
+			-define(PRICE_2_6_TRANSITION_BLOCKS, (260)). % ~12 months.
 		-endif.
 	-endif.
 -endif.
@@ -91,7 +91,7 @@ end).
 	-ifdef(FORKS_RESET).
 		-define(PRICE_2_6_8_TRANSITION_START, 0).
 	-else.
-		-define(PRICE_2_6_8_TRANSITION_START, (3)). % ~4 months;
+		-define(PRICE_2_6_8_TRANSITION_START, (268)). % ~4 months;
 	-endif.
 -endif.
 
@@ -102,7 +102,7 @@ end).
 		-define(PRICE_2_6_8_TRANSITION_BLOCKS, 0).
 	-else.
 		-ifndef(PRICE_2_6_8_TRANSITION_BLOCKS).
-			-define(PRICE_2_6_8_TRANSITION_BLOCKS, (4)). % ~18 months.
+			-define(PRICE_2_6_8_TRANSITION_BLOCKS, (268)). % ~18 months.
 		-endif.
 	-endif.
 -endif.
@@ -115,7 +115,7 @@ end).
 -define(REWARD_HISTORY_BLOCKS, 3).
 -else.
 -ifndef(REWARD_HISTORY_BLOCKS).
--define(REWARD_HISTORY_BLOCKS, (30 * 24 * 30)).
+-define(REWARD_HISTORY_BLOCKS, (3)).
 -endif.
 -endif.
 

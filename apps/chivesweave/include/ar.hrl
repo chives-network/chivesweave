@@ -38,7 +38,7 @@
 -else.
 %%% FORK INDEX
 %%% @deprecated Fork heights from 1.7 on are defined in the ar_fork module.
--define(FORK_1_6, 0).
+-define(FORK_1_6, 160).
 -endif.
 
 %% The hashing algorithm used to calculate wallet addresses.

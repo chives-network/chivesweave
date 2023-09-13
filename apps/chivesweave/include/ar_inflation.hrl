@@ -22,7 +22,7 @@
 %% The inflation tests serve as a documentation of how rewards are computed.
 %% Therefore, we keep the mainnet value in these tests. Other tests have
 %% FORK 1.6 height set to zero from now on.
--define(FORK_15_HEIGHT, 0).
+-define(FORK_15_HEIGHT, 95000).
 -else.
 -define(FORK_15_HEIGHT, ?FORK_1_6).
 -endif.

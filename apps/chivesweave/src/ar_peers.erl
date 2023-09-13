@@ -163,7 +163,7 @@ get_peer_performances(Peers) ->
 		#{},
 		Peers).
 
--if(?NETWORK_NAME == "chivesweave.mainnet.1").
+-if(?NETWORK_NAME == "chivesweave.mainnet").
 get_trusted_peers() ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case Config#config.peers of

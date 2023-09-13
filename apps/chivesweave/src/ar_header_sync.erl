@@ -363,7 +363,7 @@ add_block(B, State) ->
 		true ->
 			case B#block.height == 0 andalso ?NETWORK_NAME == "chivesweave.mainnet" of
 				true ->
-					ar_data_sync:add_block(B, B#block.size_tagged_txs);
+					ok;
 				false ->
 					ar_data_sync:add_block(B, B#block.size_tagged_txs)
 			end,

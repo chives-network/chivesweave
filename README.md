@@ -152,12 +152,12 @@ You can find documentation regarding our HTTP interface [here](http_iface_docs.m
 # Contact
 
 If you have questions or comments about Chivesweave you can get in touch by
-finding us on [Twitter](https://twitter.com/ArweaveTeam/), [Reddit](https://www.reddit.com/r/chivesweave), [Discord](https://discord.gg/DjAFMJc) or by
+finding us on [Twitter](https://twitter.com/chivesweave/), [Reddit](https://www.reddit.com/r/chivesweave), [Discord](https://discord.gg/8KrtgBRjZn) or by
 emailing us at team@chivesweave.org.
 
 
 For more information about the Chivesweave project visit [https://www.chivesweave.org](https://www.chivesweave.org/)
-or have a look at our [yellow paper](https://yellow-paper.chivesweave.dev).
+or have a look at our [yellow paper](https://yellow-paper.chivesweave.org).
 
 # License
 

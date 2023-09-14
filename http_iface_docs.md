@@ -678,7 +678,7 @@ xhr.send(post);
 # Contact
 
 If you have questions or comments on the Chivesweave HTTP interface you can get in touch by
-finding us on [Twitter](https://twitter.com/Chives-network/), [Reddit](https://www.reddit.com/r/Chives-network), [Discord](https://discord.gg/2ZpV8nM) or by emailing us at team@chivesweave.org.
+finding us on [Twitter](https://twitter.com/Chives-network/), [Reddit](https://www.reddit.com/r/Chives-network), [Discord](https://discord.gg/8KrtgBRjZn) or by emailing us at team@chivesweave.org.
 
 # License
 The Chivesweave project is released under GNU General Public License v2.0.

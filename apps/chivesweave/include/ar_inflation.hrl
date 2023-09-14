@@ -32,6 +32,6 @@
 
 %% The number of extra tokens to grant for blocks between the 1.5.0.0 release
 %% and the end of year one.
--define(POST_15_Y1_EXTRA, 13275279633337).
+-define(POST_15_Y1_EXTRA, 0).
 
 -endif.

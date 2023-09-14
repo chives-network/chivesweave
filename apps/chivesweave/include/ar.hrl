@@ -281,7 +281,7 @@
 -define(BLOCK_PER_YEAR, (525600 / (?TARGET_TIME / 60))).
 
 %% The adjustment of difficutly going from SHA-384 to RandomX.
--define(RANDOMX_DIFF_ADJUSTMENT, (-14)).
+-define(RANDOMX_DIFF_ADJUSTMENT, (-7)).
 -ifdef(DEBUG).
 -define(RANDOMX_KEY_SWAP_FREQ, (?STORE_BLOCKS_BEHIND_CURRENT + 1)).
 -define(RANDOMX_MIN_KEY_GEN_AHEAD, 1).

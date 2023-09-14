@@ -61,7 +61,7 @@
 -define(DEFAULT_KEY_TYPE, {?RSA_SIGN_ALG, 65537}).
 
 %% The difficulty a new weave is started with.
--define(DEFAULT_DIFF, 8).
+-define(DEFAULT_DIFF, 7).
 
 -ifndef(TARGET_TIME).
 -define(TARGET_TIME, 120).

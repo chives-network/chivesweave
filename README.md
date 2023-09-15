@@ -108,7 +108,6 @@ You can find documentation regarding our HTTP interface [here](http_iface_docs.m
 If you have questions or comments about Chivesweave you can get in touch by
 finding us on [Twitter](https://twitter.com/chivesweave/), [Reddit](https://www.reddit.com/r/chivesweave), [Discord](https://discord.gg/8KrtgBRjZn).
 
-
 For more information about the Chivesweave project visit [https://www.chivesweave.org](https://www.chivesweave.org/).
 
 # License

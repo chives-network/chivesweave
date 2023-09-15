@@ -37,7 +37,7 @@ sudo apt install libssl-dev libgmp-dev libsqlite3-dev make cmake gcc g++
 
 On some systems you might need to install `libncurses-dev`.
 
-Step 1: Install the Erlang:
+Step 1: Install the Erlang using the commands one by one:
 
 ```sh
 sudo apt remove erlang
@@ -57,7 +57,7 @@ cd chivesweave
 Increase the [open file
 limits](https://docs.arweave.org/info/mining/mining-guide#preparation-file-descriptors-limit).
 
-Make a production build:
+Make a mainnet build:
 
 ```sh
 ./rebar3 as mainnet tar
@@ -69,13 +69,13 @@ You will get your wallet and address.
 You will then find the gzipped tarball at `_build/mainnet/rel/chivesweave/chivesweave-x.y.z.tar.gz`.
 
 ```sh
-_build/mainnet/rel/chivesweave/bin/start mine data_dir mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] peer node1.chivesweave.net peer node2.chivesweave.net
+./_build/mainnet/rel/chivesweave/bin/start mine data_dir mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] peer node1.chivesweave.net peer node2.chivesweave.net
 ```
 
 If you have small disk free space, you can use this command to start mine job:
 
 ```sh
-_build/mainnet/rel/chivesweave/bin/start mine data_dir mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] max_disk_pool_buffer_mb 10000 peer node1.chivesweave.net peer node2.chivesweave.net
+./_build/mainnet/rel/chivesweave/bin/start mine data_dir mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] max_disk_pool_buffer_mb 10000 peer node1.chivesweave.net peer node2.chivesweave.net
 ```
 
 If you want to execute mine in the background:
@@ -87,13 +87,13 @@ nohup _build/mainnet/rel/chivesweave/bin/start mine data_dir mainnet_data_dir mi
 View the logs:
 
 ```sh
-_build/mainnet/rel/chivesweave/bin/logs -f
+./_build/mainnet/rel/chivesweave/bin/logs -f
 ```
 
 Stop the node:
 
 ```sh
-_build/mainnet/rel/chivesweave/bin/stop
+./_build/mainnet/rel/chivesweave/bin/stop
 ```
 
 As with mainnet peers, each peer must be run in its own physical or virtual environment (e.g. on its own machine or in its own container or virtual machine). If you try to run two nodes within the same environment you will get an error like `Protocol 'inet_tcp': the name chivesweave@127.0.0.1 seems to be in use by another Erlang node`

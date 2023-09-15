@@ -45,6 +45,7 @@ wget https://packages.erlang-solutions.com/erlang-solutions_2.0_all.deb
 sudo dpkg -i erlang-solutions_2.0_all.deb
 sudo apt update
 sudo apt install erlang
+
 ```
 
 Step 2: Download the repo:
@@ -52,6 +53,7 @@ Step 2: Download the repo:
 ```sh
 git clone --recursive https://github.com/chives-network/chivesweave
 cd chivesweave
+
 ```
 
 Increase the [open file
@@ -63,6 +65,7 @@ Make a mainnet build:
 ./rebar3 as mainnet tar
 mkdir mainnet_data_dir
 ./bin/create-wallet mainnet_data_dir
+
 ```
 You will get your wallet and address.
 
@@ -70,30 +73,35 @@ You will then find the gzipped tarball at `_build/mainnet/rel/chivesweave/chives
 
 ```sh
 ./_build/mainnet/rel/chivesweave/bin/start mine data_dir mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] peer node1.chivesweave.net peer node2.chivesweave.net
+
 ```
 
 If you have small disk free space, you can use this command to start mine job:
 
 ```sh
 ./_build/mainnet/rel/chivesweave/bin/start mine data_dir mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] max_disk_pool_buffer_mb 10000 peer node1.chivesweave.net peer node2.chivesweave.net
+
 ```
 
 If you want to execute mine in the background:
 
 ```sh
 nohup _build/mainnet/rel/chivesweave/bin/start mine data_dir mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] max_disk_pool_buffer_mb 10000 peer node1.chivesweave.net peer node2.chivesweave.net > output.log 2>&1 &
+
 ```
 
 View the logs:
 
 ```sh
 ./_build/mainnet/rel/chivesweave/bin/logs -f
+
 ```
 
 Stop the node:
 
 ```sh
 ./_build/mainnet/rel/chivesweave/bin/stop
+
 ```
 
 As with mainnet peers, each peer must be run in its own physical or virtual environment (e.g. on its own machine or in its own container or virtual machine). If you try to run two nodes within the same environment you will get an error like `Protocol 'inet_tcp': the name chivesweave@127.0.0.1 seems to be in use by another Erlang node`

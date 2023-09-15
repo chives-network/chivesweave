@@ -64,7 +64,7 @@ Make a mainnet build:
 ```sh
 ./rebar3 as mainnet tar
 mkdir mainnet_data_dir
-./bin/create-wallet mainnet_data_dir
+./_build/mainnet/rel/chivesweave/bin/create-wallet mainnet_data_dir
 
 ```
 You will get your wallet and address.

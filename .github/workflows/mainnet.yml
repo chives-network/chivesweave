@@ -1,4 +1,4 @@
-name: "Chivesweave"
+name: "Chivesweave Mainnet Packaging"
 on:
   push:
     branches: [ "master" ]
@@ -11,6 +11,8 @@ jobs:
       image: erlang:22.0.7
     steps:
     - uses: actions/checkout@v3
+    - name: Install linux dependencies
+      run: sudo apt install libssl-dev libgmp-dev libsqlite3-dev make cmake gcc g++
     - name: Compile
       run: ./rebar3 as mainnet tar
     - name: Run tests

@@ -679,7 +679,7 @@ set_mining_address(#config{ mining_addr = Addr }) ->
 			ar:console("~nThe mining key for the address ~s was not found."
 				" Make sure you placed the file in [data_dir]/~s (the node is looking for"
 				" [data_dir]/~s/[mining_addr].json or "
-				"[data_dir]/~s/arweave_keyfile_[mining_addr].json file)."
+				"[data_dir]/~s/chivesweave_keyfile_[mining_addr].json file)."
 				" Do not specify \"mining_addr\" if you want one to be generated.~n~n",
 				[ar_util:encode(Addr), ?WALLET_DIR, ?WALLET_DIR, ?WALLET_DIR]),
 			erlang:halt();

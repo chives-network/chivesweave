@@ -8,11 +8,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-
+      
       - name: Set up Erlang environment
-        uses: erlef/setup-erlang@v1
+        uses: erlef/setup-beam@v1
         with:
-          otp-version: 24.0  # 指定所需的 Erlang/OTP 版本
+          otp-version: "24.3"
+          rebar3-version: "3.20.0"
 
       - name: Install CMake and g++
         run: |

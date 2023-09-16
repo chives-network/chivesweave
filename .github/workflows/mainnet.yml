@@ -10,13 +10,19 @@ jobs:
     container:
       image: erlang:22.0.7
     steps:
-    - uses: actions/checkout@v3
+    - name: Clone repository
+      uses: actions/checkout@v2.3.4
+      with:
+        submodules: "recursive"
+    - uses: erlef/setup-beam@v1
+      with:
+        otp-version: "24.3"
+        rebar3-version: "3.20.0"
     - name: Install linux dependencies
-      run: |
-        apt update
-        apt install libssl-dev libgmp-dev libsqlite3-dev make cmake gcc g++
-    - name: Compile
+      run: sudo apt install libssl-dev libgmp-dev libsqlite3-dev make cmake gcc g++
+    - name: Start empd
+      run: epmd -daemon
+    - name: Make the mainnet package
       run: ./rebar3 as mainnet tar
     - name: Run tests
       run: ./bin/test
-

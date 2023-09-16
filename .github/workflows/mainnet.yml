@@ -12,7 +12,9 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Install linux dependencies
-      run: sudo apt install libssl-dev libgmp-dev libsqlite3-dev make cmake gcc g++
+      run: |
+        sudo apt-get update
+        sudo apt-get install libssl-dev libgmp-dev libsqlite3-dev make cmake gcc g++
     - name: Compile
       run: ./rebar3 as mainnet tar
     - name: Run tests

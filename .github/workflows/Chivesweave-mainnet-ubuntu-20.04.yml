@@ -1,4 +1,4 @@
-name: "Chivesweave Mainnet Packaging"
+name: "Mainnet ubuntu-20.04"
 on:
   push:
     branches: [ "master" ]

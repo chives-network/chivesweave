@@ -11,8 +11,6 @@ jobs:
       image: erlang:22.0.7
     steps:
     - uses: actions/checkout@v3
-      with:
-        submodules: "recursive"
     - name: Compile
       run: ./rebar3 as mainnet tar
     - name: Run tests

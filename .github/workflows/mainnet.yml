@@ -16,12 +16,9 @@ jobs:
         with:
           otp-version: "24.3"
           rebar3-version: "3.20.0"
-
-      - name: Install CMake and g++
-        run: |
-          sudo apt-get update
-          sudo apt-get install cmake g++
           
-      - name: rebar3 mainnet
-        run: |
-          ./rebar3 as mainnet tar
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: test
+          path: ${{ github.workspace }}/bin/

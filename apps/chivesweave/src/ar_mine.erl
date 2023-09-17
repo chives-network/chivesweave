@@ -887,7 +887,7 @@ spora_solution_hash_with_entropy(PrevH, Timestamp, H0, Chunk, Entropy, Height) -
 min_randomx_difficulty() -> 1.
 -else.
 min_randomx_difficulty() -> min_sha384_difficulty() + ?RANDOMX_DIFF_ADJUSTMENT.
-min_sha384_difficulty() -> 8.
+min_sha384_difficulty() -> 6.
 -endif.
 
 min_spora_difficulty(Height) ->

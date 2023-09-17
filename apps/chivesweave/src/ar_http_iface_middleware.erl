@@ -2186,6 +2186,7 @@ return_info(Req) ->
 					},
 					{blocks, BlockCount},
 					{peers, prometheus_gauge:value(arweave_peer_count)},
+					{time, integer_to_binary(os:system_time(second))},
 					{queue_length,
 						element(
 							2,

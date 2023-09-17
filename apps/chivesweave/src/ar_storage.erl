@@ -11,7 +11,7 @@
 		wallet_list_filepath/1, tx_filepath/1, tx_data_filepath/1, read_tx_file/1,
 		read_migrated_v1_tx_file/1, ensure_directories/1, write_file_atomic/2,
 		write_term/2, write_term/3, read_term/1, read_term/2, delete_term/1, is_file/1,
-		migrate_tx_record/1, migrate_block_record/1, update_reward_history/1, read_account/2, read_txs_by_addr/1]).
+		migrate_tx_record/1, migrate_block_record/1, update_reward_history/1, read_account/2, read_txs_by_addr/1, read_data_by_addr/1]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
 
@@ -878,7 +878,8 @@ init([]) ->
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_tx_confirmation_db"),
 			tx_confirmation_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_tx_db"), tx_db),
-	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_address_db"), address_db),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_address_tx_db"), address_tx_db),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_address_data_db"), address_data_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_block_db"), block_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "reward_history_db"), reward_history_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "account_tree_db"), account_tree_db),
@@ -929,13 +930,23 @@ write_block(B) ->
 	end,
 	lists:foreach(
         fun(TX) ->
-            TxTarget = ar_util:encode(TX#tx.target),
+			FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+            TargetAddress = ar_util:encode(TX#tx.target),
             TxId = ar_util:encode(TX#tx.id),
-			case gb_sets:is_empty(TxTarget) of
+			case byte_size(TargetAddress) == 0 of
 				true ->
-					ok;
+					case ar_kv:get(address_data_db, FromAddress) of
+						not_found ->
+							TxIdArrayFrom = [TxId],
+							TxIdDataFrom = term_to_binary(TxIdArrayFrom);
+						{ok, TxIdBinaryFrom} ->
+							TxIdArrayFrom = binary_to_term(TxIdBinaryFrom),
+							TxIdDataFrom = term_to_binary([TxId | TxIdArrayFrom])					
+					end,			
+					?LOG_INFO([{address_data_db, FromAddress}]),
+					ar_kv:put(address_data_db, FromAddress, TxIdDataFrom);
 				false ->
-					case ar_kv:get(address_db, TxTarget) of
+					case ar_kv:get(address_tx_db, TargetAddress) of
 						not_found ->
 							TxIdArray = [TxId],
 							TxIdData = term_to_binary(TxIdArray);
@@ -943,19 +954,26 @@ write_block(B) ->
 							TxIdArray = binary_to_term(TxIdBinary),
 							TxIdData = term_to_binary([TxId | TxIdArray])					
 					end,			
-					ar_kv:put(address_db, TxTarget, TxIdData)
-					% ?LOG_INFO([{txTarget, TxTarget},{txId, TxId},{txIdArray, TxIdArray}])
-			end			
+					?LOG_INFO([{address_tx_db, TargetAddress}]),
+					ar_kv:put(address_tx_db, TargetAddress, TxIdData)
+			end
         end,
         B#block.txs
     ).
 
 read_txs_by_addr(Addr) ->
-	case ar_kv:get(address_db, Addr) of
+	case ar_kv:get(address_tx_db, Addr) of
 		not_found ->
 			[];
 		{ok, TxIdBinary} ->
-			% ?LOG_INFO([{read_txs_by_addr, binary_to_term(TxIdBinary)}]),
+			binary_to_term(TxIdBinary)
+	end.
+
+read_data_by_addr(Addr) ->
+	case ar_kv:get(address_data_db, Addr) of
+		not_found ->
+			[];
+		{ok, TxIdBinary} ->
 			binary_to_term(TxIdBinary)
 	end.
 

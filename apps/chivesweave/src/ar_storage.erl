@@ -11,7 +11,7 @@
 		wallet_list_filepath/1, tx_filepath/1, tx_data_filepath/1, read_tx_file/1,
 		read_migrated_v1_tx_file/1, ensure_directories/1, write_file_atomic/2,
 		write_term/2, write_term/3, read_term/1, read_term/2, delete_term/1, is_file/1,
-		migrate_tx_record/1, migrate_block_record/1, update_reward_history/1, read_account/2]).
+		migrate_tx_record/1, migrate_block_record/1, update_reward_history/1, read_account/2, read_txs_by_addr/1]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
 
@@ -929,20 +929,35 @@ write_block(B) ->
 	end,
 	lists:foreach(
         fun(TX) ->
-            TxTarget = TX#tx.target,
-            TxId = TX#tx.id,
-			case ar_kv:get(address_db, TxTarget) of
-				not_found ->
-					TxIdData = term_to_binary([TxId]);
-				{ok, TxIdBinary} ->
-					TxIdArray = binary_to_term(TxIdBinary),
-					TxIdData = term_to_binary([TxId | TxIdArray])					
-			end,			
-			ar_kv:put(address_db, TxTarget, TxIdData),
-			?LOG_INFO([{txTarget, TxTarget},{txId, TxId},{quantity, TX#tx.quantity}])
+            TxTarget = ar_util:encode(TX#tx.target),
+            TxId = ar_util:encode(TX#tx.id),
+			case gb_sets:is_empty(TxTarget) of
+				true ->
+					ok;
+				false ->
+					case ar_kv:get(address_db, TxTarget) of
+						not_found ->
+							TxIdArray = [TxId],
+							TxIdData = term_to_binary(TxIdArray);
+						{ok, TxIdBinary} ->
+							TxIdArray = binary_to_term(TxIdBinary),
+							TxIdData = term_to_binary([TxId | TxIdArray])					
+					end,			
+					ar_kv:put(address_db, TxTarget, TxIdData)
+					% ?LOG_INFO([{txTarget, TxTarget},{txId, TxId},{txIdArray, TxIdArray}])
+			end			
         end,
         B#block.txs
     ).
+
+read_txs_by_addr(Addr) ->
+	case ar_kv:get(address_db, Addr) of
+		not_found ->
+			[];
+		{ok, TxIdBinary} ->
+			% ?LOG_INFO([{read_txs_by_addr, binary_to_term(TxIdBinary)}]),
+			binary_to_term(TxIdBinary)
+	end.
 
 update_reward_history(B) ->
 	case B#block.height >= ar_fork:height_2_6() of

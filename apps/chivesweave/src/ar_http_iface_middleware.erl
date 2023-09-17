@@ -1085,7 +1085,7 @@ handle(<<"GET">>, [<<"wallet">>, Addr, <<"txs">>], Req, _Pid) ->
 	case lists:member(serve_wallet_txs, Config#config.enable) of
 		true ->
 			ar_semaphore:acquire(arql_semaphore(Req), 5000),
-			{Status, Headers, Body} = handle_get_wallet_txs(Addr, none),
+			{Status, Headers, Body} = handle_get_wallet_txs(Addr),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1099,7 +1099,7 @@ handle(<<"GET">>, [<<"wallet">>, Addr, <<"txs">>, EarliestTX], Req, _Pid) ->
 	case lists:member(serve_wallet_txs, Config#config.enable) of
 		true ->
 			ar_semaphore:acquire(arql_semaphore(Req), 5000),
-			{Status, Headers, Body} = handle_get_wallet_txs(Addr, ar_util:decode(EarliestTX)),
+			{Status, Headers, Body} = handle_get_wallet_txs(Addr),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1630,23 +1630,17 @@ estimate_tx_fee_v2(Size, Addr) ->
 	Args = {Size2, PricePerGiBMinute, KryderPlusRateMultiplier, Addr, Accounts, Height + 1},
 	ar_tx:get_tx_fee2(Args).
 
-handle_get_wallet_txs(Addr, EarliestTXID) ->
+handle_get_wallet_txs(Addr) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->
 			{400, #{}, <<"Invalid address.">>};
 		{ok, _} ->
-			case catch ar_arql_db:select_txs_by_addr([{from, [Addr]}]) of
-				TXMaps when is_list(TXMaps) ->
-					TXIDs = lists:map(
-						fun(#{ id := ID }) -> ar_util:decode(ID) end,
-						TXMaps
-					),
-					?LOG_INFO([{event, Addr},{select_txs_by_addr, TXMaps}]),
-					RecentTXIDs = get_wallet_txs(EarliestTXID, TXIDs),
-					EncodedTXIDs = lists:map(fun ar_util:encode/1, RecentTXIDs),
-					{200, #{}, ar_serialize:jsonify(EncodedTXIDs)};
-				{'EXIT', {timeout, {gen_server, call, [ar_arql_db, _]}}} ->
-					{503, #{}, <<"ArQL unavailable.">>}
+			case ar_storage:read_txs_by_addr(Addr) of
+				not_found ->
+					{404, #{}, []};
+				Res ->
+					% ?LOG_INFO([{handle_get_wallet_txs, Addr},{res, Res}]),
+					{200, #{}, Res}
 			end
 	end.
 

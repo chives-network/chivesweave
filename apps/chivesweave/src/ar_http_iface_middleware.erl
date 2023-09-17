@@ -1635,12 +1635,13 @@ handle_get_wallet_txs(Addr, EarliestTXID) ->
 		{error, invalid} ->
 			{400, #{}, <<"Invalid address.">>};
 		{ok, _} ->
-			case catch ar_arql_db:select_txs_by([{from, [Addr]}]) of
+			case catch ar_arql_db:select_txs_by_addr([{from, [Addr]}]) of
 				TXMaps when is_list(TXMaps) ->
 					TXIDs = lists:map(
 						fun(#{ id := ID }) -> ar_util:decode(ID) end,
 						TXMaps
 					),
+					?LOG_INFO([{event, Addr},{select_txs_by_addr, TXMaps}]),
 					RecentTXIDs = get_wallet_txs(EarliestTXID, TXIDs),
 					EncodedTXIDs = lists:map(fun ar_util:encode/1, RecentTXIDs),
 					{200, #{}, ar_serialize:jsonify(EncodedTXIDs)};

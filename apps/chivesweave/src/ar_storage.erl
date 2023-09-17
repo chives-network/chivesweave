@@ -878,6 +878,7 @@ init([]) ->
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_tx_confirmation_db"),
 			tx_confirmation_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_tx_db"), tx_db),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_address_db"), address_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_block_db"), block_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "reward_history_db"), reward_history_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "account_tree_db"), account_tree_db),
@@ -925,7 +926,23 @@ write_block(B) ->
 			update_reward_history(B);
 		Error ->
 			Error
-	end.
+	end,
+	lists:foreach(
+        fun(TX) ->
+            TxTarget = TX#tx.target,
+            TxId = TX#tx.id,
+			case ar_kv:get(address_db, TxTarget) of
+				not_found ->
+					TxIdData = term_to_binary([TxId]);
+				{ok, TxIdBinary} ->
+					TxIdArray = binary_to_term(TxIdBinary),
+					TxIdData = term_to_binary([TxId | TxIdArray])					
+			end,			
+			ar_kv:put(address_db, TxTarget, TxIdData),
+			?LOG_INFO([{txTarget, TxTarget},{txId, TxId},{quantity, TX#tx.quantity}])
+        end,
+        B#block.txs
+    ).
 
 update_reward_history(B) ->
 	case B#block.height >= ar_fork:height_2_6() of

@@ -25,11 +25,11 @@ calculate(Height) ->
 calculate2(Height) when Height =< ?FORK_15_HEIGHT ->
 	pre_15_calculate(Height);
 calculate2(Height) when Height =< ?BLOCKS_PER_YEAR ->
-    calculate_base_pre_fork_2_5(Height);
+    calculate_base(Height);
 calculate2(Height) ->
 	case Height >= ar_fork:height_2_5() of
 		true ->
-			calculate_base_pre_fork_2_5(Height);
+			calculate_base(Height);
 		false ->
 			calculate_base_pre_fork_2_5(Height)
 	end.

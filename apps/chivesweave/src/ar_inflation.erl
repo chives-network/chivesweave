@@ -25,11 +25,11 @@ calculate(Height) ->
 calculate2(Height) when Height =< ?FORK_15_HEIGHT ->
 	pre_15_calculate(Height);
 calculate2(Height) when Height =< ?BLOCKS_PER_YEAR ->
-    calculate_base(Height) + ?POST_15_Y1_EXTRA;
+    calculate_base_pre_fork_2_5(Height);
 calculate2(Height) ->
 	case Height >= ar_fork:height_2_5() of
 		true ->
-			calculate_base(Height);
+			calculate_base_pre_fork_2_5(Height);
 		false ->
 			calculate_base_pre_fork_2_5(Height)
 	end.
@@ -66,7 +66,7 @@ calculate_base(Height) ->
 	?GENESIS_TOKENS
 		* ?WINSTON_PER_AR
 		* EXDivisor
-		* 2
+		* 1
 		* Ln2Dividend
 		div (
 			10
@@ -78,7 +78,7 @@ calculate_base(Height) ->
 calculate_base_pre_fork_2_5(Height) ->
 	?WINSTON_PER_AR
 		* (
-			0.2
+			0.1
 			* ?GENESIS_TOKENS
 			* math:pow(2, -(Height) / ?BLOCK_PER_YEAR)
 			* math:log(2)

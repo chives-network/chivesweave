@@ -130,6 +130,7 @@ calculate_difficulty(OldDiff, TS, Last, Height) ->
 			MaxDiff = ?MAX_DIFF,
 			MinDiff = ar_mine:min_difficulty(Height),
 			DiffInverse = (MaxDiff - OldDiff) * ActualTime div TargetTime,
+			?LOG_INFO([{calculate_difficulty_diff_new_130, MaxDiff - DiffInverse},{diffInverse, DiffInverse}]),
 			between(
 				MaxDiff - DiffInverse,
 				MinDiff,

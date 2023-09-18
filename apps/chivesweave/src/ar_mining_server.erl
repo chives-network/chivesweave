@@ -184,6 +184,7 @@ handle_cast(report_performance, #state{ io_threads = IOThreads, session = Sessio
 			))),
 	Now = erlang:monotonic_time(millisecond),
 	VdfSpeed = vdf_speed(Now),
+	?LOG_INFO([{partitions, Partitions}]), 
 	{IOList, MaxPartitionTime, PartitionsSum, MaxCurrentTime, CurrentsSum} =
 		lists:foldr(
 			fun({Partition, StoreID}, {Acc1, Acc2, Acc3, Acc4, Acc5} = Acc) ->
@@ -204,7 +205,8 @@ handle_cast(report_performance, #state{ io_threads = IOThreads, session = Sessio
 						Optimal = optimal_performance(StoreID, VdfSpeed),
 						?LOG_INFO([{event, mining_partition_performance_report},
 								{partition, Partition}, {avg, PartitionAvg},
-								{current, CurrentAvg}]),
+								{current, CurrentAvg},
+								{vdfSpeed, VdfSpeed}]),
 						case Optimal of
 							undefined ->
 								{[io_lib:format("Partition ~B avg: ~.2f MiB/s, "
@@ -215,8 +217,8 @@ handle_cast(report_performance, #state{ io_threads = IOThreads, session = Sessio
 							_ ->
 								{[io_lib:format("Partition ~B avg: ~.2f MiB/s, "
 										"current: ~.2f MiB/s, "
-										"optimum: ~.2f MiB/s, ~.2f MiB/s (full weave).~n",
-									[Partition, PartitionAvg, CurrentAvg, Optimal / 2, Optimal]) | Acc1],
+										"optimum: ~.2f MiB/s, ~.2f MiB/s, VdfSpeed: ~s (full weave).~n",
+									[Partition, PartitionAvg, CurrentAvg, Optimal / 2, Optimal, VdfSpeed]) | Acc1],
 									max(Acc2, PartitionTimeLapse), Acc3 + PartitionTotal,
 									max(Acc4, CurrentTimeLapse), Acc5 + CurrentTotal}
 						end
@@ -229,9 +231,14 @@ handle_cast(report_performance, #state{ io_threads = IOThreads, session = Sessio
 		true ->
 			TotalAvg = PartitionsSum / MaxPartitionTime / 4,
 			TotalCurrent = CurrentsSum / MaxCurrentTime / 4,
-			?LOG_INFO([{event, mining_performance_report}, {total_avg_mibps, TotalAvg},
-					{total_avg_hps, TotalAvg * 4}, {total_current_mibps, TotalCurrent},
-					{total_current_hps, TotalCurrent * 4}]),
+			?LOG_INFO([{event, mining_performance_report}, 
+					{total_avg_mibps, TotalAvg},
+					{total_avg_hps, TotalAvg * 4}, 
+					{total_current_mibps, TotalCurrent},
+					{total_current_hps, TotalCurrent * 4},
+					{currentsSum, CurrentsSum},
+					{maxCurrentTime, MaxCurrentTime},
+					{vdfSpeed, VdfSpeed}]),
 			Str =
 				case VdfSpeed of
 					undefined ->

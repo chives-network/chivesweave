@@ -943,7 +943,6 @@ write_block(B) ->
 							TxIdArrayFrom = binary_to_term(TxIdBinaryFrom),
 							TxIdDataFrom = term_to_binary([TxId | TxIdArrayFrom])					
 					end,			
-					?LOG_INFO([{address_data_db, FromAddress}]),
 					ar_kv:put(address_data_db, FromAddress, TxIdDataFrom);
 				false ->
 					case ar_kv:get(address_tx_db, TargetAddress) of
@@ -954,7 +953,6 @@ write_block(B) ->
 							TxIdArray = binary_to_term(TxIdBinary),
 							TxIdData = term_to_binary([TxId | TxIdArray])					
 					end,			
-					?LOG_INFO([{address_tx_db, TargetAddress}]),
 					ar_kv:put(address_tx_db, TargetAddress, TxIdData)
 			end
         end,

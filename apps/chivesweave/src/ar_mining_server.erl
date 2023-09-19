@@ -804,10 +804,7 @@ handle_task({computed_output, Args}, State) ->
 		case {CurrentStartIntervalNumber, CurrentNextSeed, CurrentPartitionUpperBound}
 				== {StartIntervalNumber, NextSeed, PartitionUpperBound} of
 			true ->
-				?LOG_INFO([{currentStartIntervalNumber,CurrentStartIntervalNumber},
-					{currentNextSeed,CurrentNextSeed},
-					{currentPartitionUpperBound,CurrentPartitionUpperBound}
-				]),
+				?LOG_INFO([{currentStartIntervalNumber,CurrentStartIntervalNumber},{currentPartitionUpperBound,CurrentPartitionUpperBound}]),
 				Session;
 			false ->
 				ar:console("Starting new mining session. Upper bound: ~B, entropy nonce: ~s, "
@@ -959,7 +956,7 @@ handle_task({mining_thread_computed_h1, {H0, PartitionNumber, Nonce, NonceLimite
 			State2 = State#state{ session = Session2 },
 			{noreply, prepare_solution(Args, State2)};
 		false ->
-			?LOG_INFO([{diff,Diff},{h1,H1},{mining_thread_computed_h1_962,binary:decode_unsigned(H1, big)}]),
+			?LOG_INFO([{mine_process_h1,round(binary:decode_unsigned(H1, big)*10000/Diff)/10000}]),
 			case maps:take({CorrelationRef, Nonce}, Map) of
 				{do_not_cache, Map2} ->
 					ets:update_counter(?MODULE, chunk_cache_size, {2, -1}),
@@ -1012,7 +1009,7 @@ handle_task({mining_thread_computed_h2, {H0, PartitionNumber, Nonce, NonceLimite
 					Chunk1, Chunk2, H2, Preimage, Ref},
 			{noreply, prepare_solution(Args, State)};
 		false ->
-			?LOG_INFO([{diff,Diff},{h2,H2},{mining_thread_computed_h2_1015,binary:decode_unsigned(H2, big)}]),
+			?LOG_INFO([{mine_process_h2,round(binary:decode_unsigned(H2, big)*10000/Diff)/10000}]),
 			{noreply, State}
 	end;
 handle_task({mining_thread_computed_h2, _Args}, State) ->

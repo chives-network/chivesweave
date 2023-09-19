@@ -8,7 +8,7 @@
 
 %% An approximation of the natural logarithm of 2,
 %% expressed as a decimal fraction, with the precision of math:log.
--define(LN2, {6931471805599453, 10000000000000000}).
+-define(LN2, {1, 1}).
 
 %% The precision of computing the natural exponent as a decimal fraction,
 %% expressed as the maximal power of the argument in the Taylor series.

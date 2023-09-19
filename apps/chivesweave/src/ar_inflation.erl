@@ -66,7 +66,7 @@ calculate_base(Height) ->
 	?GENESIS_TOKENS
 		* ?WINSTON_PER_AR
 		* EXDivisor
-		* 2
+		* 1
 		* Ln2Dividend
 		div (
 			10

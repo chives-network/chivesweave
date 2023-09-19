@@ -31,7 +31,7 @@ calculate2(Height) ->
 		true ->
 			calculate_base(Height);
 		false ->
-			calculate_base_pre_fork_2_5(Height)
+			calculate_base(Height)
 	end.
 
 %% @doc Calculate the value used in the ?POST_15_Y1_EXTRA macro.
@@ -66,7 +66,7 @@ calculate_base(Height) ->
 	?GENESIS_TOKENS
 		* ?WINSTON_PER_AR
 		* EXDivisor
-		* 1
+		* 2
 		* Ln2Dividend
 		div (
 			10

@@ -11,7 +11,7 @@
 		wallet_list_filepath/1, tx_filepath/1, tx_data_filepath/1, read_tx_file/1,
 		read_migrated_v1_tx_file/1, ensure_directories/1, write_file_atomic/2,
 		write_term/2, write_term/3, read_term/1, read_term/2, delete_term/1, is_file/1,
-		migrate_tx_record/1, migrate_block_record/1, update_reward_history/1, read_account/2, read_txs_by_addr/1, read_data_by_addr/1]).
+		migrate_tx_record/1, migrate_block_record/1, update_reward_history/1, read_account/2, read_txs_by_addr/1, read_data_by_addr/1, take_first_n_chars/2]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
 
@@ -883,6 +883,18 @@ init([]) ->
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_block_db"), block_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "reward_history_db"), reward_history_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "account_tree_db"), account_tree_db),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "explorer_block"), explorer_block),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "explorer_tx"), explorer_tx),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "explorer_address_richlist"), explorer_address_richlist),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "explorer_token"), explorer_token),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "explorer_contract"), explorer_contract),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "statistics_transaction"), statistics_transaction),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "statistics_network"), statistics_network),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "statistics_data"), statistics_data),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "statistics_block"), statistics_block),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "statistics_address"), statistics_address),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "statistics_contract"), statistics_contract),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "statistics_token"), statistics_token),
 	ets:insert(?MODULE, [{same_disk_storage_modules_total_size,
 			get_same_disk_storage_modules_total_size()}]),
 	{ok, #state{}}.
@@ -928,13 +940,22 @@ write_block(B) ->
 		Error ->
 			Error
 	end,
+	
+	%%% Make block data for explorer
+	BlockBin = term_to_binary([B#block.height, ar_util:encode(B#block.indep_hash), B#block.reward_addr, B#block.reward, B#block.timestamp, length(B#block.txs), B#block.weave_size, B#block.block_size]),
+	ar_kv:put(explorer_block, list_to_binary(integer_to_list(B#block.height)), BlockBin),
+
+	TotalTxReward = 0,
 	lists:foreach(
         fun(TX) ->
 			FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
             TargetAddress = ar_util:encode(TX#tx.target),
             TxId = ar_util:encode(TX#tx.id),
+            Reward = TX#tx.reward,
+            Quantity = TX#tx.quantity,
 			case byte_size(TargetAddress) == 0 of
 				true ->
+					%%% address_data_db
 					case ar_kv:get(address_data_db, FromAddress) of
 						not_found ->
 							TxIdArrayFrom = [TxId],
@@ -943,8 +964,21 @@ write_block(B) ->
 							TxIdArrayFrom = binary_to_term(TxIdBinaryFrom),
 							TxIdDataFrom = term_to_binary([TxId | TxIdArrayFrom])					
 					end,			
-					ar_kv:put(address_data_db, FromAddress, TxIdDataFrom);
+					ar_kv:put(address_data_db, FromAddress, TxIdDataFrom),
+					%%% explorer_address_richlist
+					case ar_kv:get(explorer_address_richlist, FromAddress) of
+						not_found ->
+							AddressRichListElement = [0-Reward,1,Reward,0],
+							AddressRichListElementBin = term_to_binary(AddressRichListElement),
+							ar_kv:put(explorer_address_richlist, FromAddress, AddressRichListElementBin);
+						{ok, AddressRichListElementResult} ->
+							[Balance, TxNumber, SendAmount, ReceiveAmount] = binary_to_term(AddressRichListElementResult),
+							AddressRichListElementNew = [Balance-Reward, TxNumber+1, SendAmount+Reward, ReceiveAmount],
+							AddressRichListElementNewBin = term_to_binary(AddressRichListElementNew),	
+							ar_kv:put(explorer_address_richlist, FromAddress, AddressRichListElementNewBin)				
+					end;
 				false ->
+					%%% address_data_db
 					case ar_kv:get(address_tx_db, TargetAddress) of
 						not_found ->
 							TxIdArray = [TxId],
@@ -953,11 +987,83 @@ write_block(B) ->
 							TxIdArray = binary_to_term(TxIdBinary),
 							TxIdData = term_to_binary([TxId | TxIdArray])					
 					end,			
-					ar_kv:put(address_tx_db, TargetAddress, TxIdData)
+					ar_kv:put(address_tx_db, TargetAddress, TxIdData),
+					%%% explorer_address_richlist Send
+					case ar_kv:get(explorer_address_richlist, FromAddress) of
+						not_found ->
+							AddressRichListElement1 = [0-Reward-Quantity,1,Reward+Quantity,0],
+							AddressRichListElementBin1 = term_to_binary(AddressRichListElement1),
+							ar_kv:put(explorer_address_richlist, FromAddress, AddressRichListElementBin1);
+						{ok, AddressRichListElementResult1} ->
+							[Balance1, TxNumber1, SendAmount1, ReceiveAmount1] = binary_to_term(AddressRichListElementResult1),
+							AddressRichListElementNew1 = [Balance1-Reward-Quantity, TxNumber1+1, SendAmount1+Reward+Quantity, ReceiveAmount1],
+							AddressRichListElementNewBin = term_to_binary(AddressRichListElementNew1),
+							ar_kv:put(explorer_address_richlist, FromAddress, AddressRichListElementNewBin)				
+					end,
+					%%% explorer_address_richlist Receive
+					case ar_kv:get(explorer_address_richlist, TargetAddress) of
+						not_found ->
+							AddressRichListElement2 = [Quantity,1,0,Quantity],
+							AddressRichListElementBin2 = term_to_binary(AddressRichListElement2),
+							ar_kv:put(explorer_address_richlist, TargetAddress, AddressRichListElementBin2);
+						{ok, AddressRichListElementResult2} ->
+							[Balance2, TxNumber2, SendAmount2, ReceiveAmount2] = binary_to_term(AddressRichListElementResult2),
+							AddressRichListElementNew2 = [Balance2+Quantity, TxNumber2+1, SendAmount2, ReceiveAmount2+Quantity],
+							AddressRichListElementNewBin2 = term_to_binary(AddressRichListElementNew2),	
+							ar_kv:put(explorer_address_richlist, TargetAddress, AddressRichListElementNewBin2)				
+					end
+			end,
+			%%% Make block data for explorer
+			TxBin = term_to_binary({TxId,FromAddress,TargetAddress,TX#tx.data_size,Reward,B#block.height,B#block.timestamp,TX#tx.tags}),
+			ar_kv:put(explorer_tx, TxId, TxBin),
+			%%% statistics_transaction
+			DateString = ar_util:encode(take_first_n_chars(calendar:system_time_to_rfc3339(B#block.timestamp), 10)),
+			case ar_kv:get(statistics_transaction, DateString) of
+				not_found ->
+					StatisticsTxElement = [1,1,1,Reward,Reward,Reward,Reward,Quantity,Quantity,0,0,0,0],
+					StatisticsTxElementBin = term_to_binary(StatisticsTxElement),
+					ar_kv:put(statistics_transaction, DateString, StatisticsTxElementBin);
+				{ok, StatisticsTxElementBinResult} ->
+					[Transactions,Cumulative_Transactions,TPS,Transaction_Fees,Cumulative_Fees,Avg_Tx_Fee,Max_Tx_Fee,Trade_Volume,Cumulative_Trade_Volume,Native_Transfers,Native_Interactions,Native_Senders,Native_Receivers] = binary_to_term(StatisticsTxElementBinResult),
+					case Max_Tx_Fee>Reward of 
+						true ->
+							Max_Tx_Fee_New = Max_Tx_Fee;
+						false ->
+							Max_Tx_Fee_New = Reward
+					end,
+					StatisticsTxElementBin2 = term_to_binary([Transactions+1,Cumulative_Transactions+1,round(Transactions/86400),Reward,Cumulative_Fees+Reward,round((Cumulative_Fees+Reward)/(Transactions+1)),Max_Tx_Fee_New,Quantity,Cumulative_Trade_Volume+Quantity,Native_Transfers,Native_Interactions,Native_Senders,Native_Receivers]),
+					ar_kv:put(statistics_transaction, DateString, StatisticsTxElementBin2)				
 			end
         end,
         B#block.txs
-    ).
+    ),
+
+	%%% statistics_network
+	TodayDate = ar_util:encode(take_first_n_chars(calendar:system_time_to_rfc3339(B#block.timestamp), 10)),
+	case ar_kv:get(statistics_network, TodayDate) of
+		not_found ->
+			StatisticsNetwork = {0,0,0,0,0,0,0,0,0,0},
+			StatisticsNetworkBin = term_to_binary(StatisticsNetwork);
+		{ok, StatisticsNetworkResult} ->
+			{Weave_Size,Weave_Size_Growth,Cumulative_Endowment,Avg_Endowment_Growth,Endowment_Growth,Avg_Pending_Txs,Avg_Pending_Size,Node_Count,Cumulative_Difficulty,Difficulty} = binary_to_term(StatisticsNetworkResult),
+			StatisticsNetworkBin = term_to_binary({Weave_Size+B#block.weave_size,Weave_Size_Growth+B#block.weave_size,Cumulative_Endowment+B#block.reward_pool,Avg_Endowment_Growth+B#block.reward_pool,Endowment_Growth+B#block.reward_pool,Avg_Pending_Txs,Avg_Pending_Size,Node_Count,Cumulative_Difficulty+B#block.cumulative_diff,Difficulty+B#block.cumulative_diff})					
+	end,
+	ar_kv:put(statistics_network, TodayDate, StatisticsNetworkBin),
+
+	%%% statistics_data
+	TodayDataDate = ar_util:encode(take_first_n_chars(calendar:system_time_to_rfc3339(B#block.timestamp), 10)),
+	case ar_kv:get(statistics_data, TodayDataDate) of
+		not_found ->
+			StatisticsData = {0,0,0,0,0,0,0,{},{}},
+			StatisticsDataBin = term_to_binary(StatisticsData);
+		{ok, StatisticsDataResult} ->
+			{Data_Uploaded,Storage_Cost,Data_Size,Data_Fees,Cumulative_Data_Fees,Fees_Towards_Data_Upload,Data_Uploaders,Content_Type,Content_Type_Tx} = binary_to_term(StatisticsDataResult),
+			StatisticsDataBin = term_to_binary({Data_Uploaded+B#block.weave_size,Storage_Cost,Data_Size+B#block.weave_size,Data_Fees+TotalTxReward,Cumulative_Data_Fees+TotalTxReward,Fees_Towards_Data_Upload,Data_Uploaders+1,Content_Type,Content_Type_Tx})					
+	end,
+	ar_kv:put(statistics_data, TodayDataDate, StatisticsDataBin).
+
+take_first_n_chars(Str, N) when is_list(Str), is_integer(N), N >= 0 ->
+    lists:sublist(Str, 1, min(length(Str), N)).
 
 read_txs_by_addr(Addr) ->
 	case ar_kv:get(address_tx_db, Addr) of

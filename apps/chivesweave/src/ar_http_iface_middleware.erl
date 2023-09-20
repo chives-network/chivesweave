@@ -1078,6 +1078,18 @@ handle(<<"GET">>, [<<"tx_anchor">>], Req, _Pid) ->
 			{200, #{}, ar_util:encode(SuggestedAnchor), Req}
 	end;
 
+%% Return a list of Block infor, used for block explorer.
+handle(<<"GET">>, [<<"blocklist">>, FromHeight, BlockNumber], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_wallet_data, Config#config.enable) of
+		true ->
+			ar_semaphore:acquire(arql_semaphore(Req), 5000),
+			{Status, Headers, Body} = handle_get_blocklist_data(FromHeight,BlockNumber),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
 %% Return transaction identifiers (hashes) for the wallet specified via wallet_address.
 %% GET request to endpoint /wallet/{wallet_address}/txs.
 handle(<<"GET">>, [<<"wallet">>, Addr, <<"txs">>], Req, _Pid) ->
@@ -1123,16 +1135,11 @@ handle(<<"GET">>, [<<"wallet">>, Addr, <<"txs">>, EarliestTX], Req, _Pid) ->
 %% GET request to endpoint /wallet/{wallet_address}/deposits.
 handle(<<"GET">>, [<<"wallet">>, Addr, <<"deposits">>], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
-	case lists:member(serve_wallet_deposits, Config#config.enable) of
+	case lists:member(serve_wallet_txs, Config#config.enable) of
 		true ->
 			ar_semaphore:acquire(arql_semaphore(Req), 5000),
-			case catch ar_arql_db:select_txs_by([{to, [Addr]}]) of
-				TXMaps when is_list(TXMaps) ->
-					TXIDs = lists:map(fun(#{ id := ID }) -> ID end, TXMaps),
-					{200, #{}, ar_serialize:jsonify(TXIDs), Req};
-				{'EXIT', {timeout, {gen_server, call, [ar_arql_db, _]}}} ->
-					{503, #{}, <<"ArQL unavailable.">>, Req}
-			end;
+			{Status, Headers, Body} = handle_get_wallet_txs_deposits(Addr),
+			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
@@ -1643,6 +1650,21 @@ estimate_tx_fee_v2(Size, Addr) ->
 	Args = {Size2, PricePerGiBMinute, KryderPlusRateMultiplier, Addr, Accounts, Height + 1},
 	ar_tx:get_tx_fee2(Args).
 
+handle_get_blocklist_data(FromHeight, BlockNumber) ->
+	BlockNumberInt = binary_to_integer(BlockNumber),
+	BlockNumberNew = if
+		BlockNumberInt < 0 -> 1;
+		BlockNumberInt > 100 -> 100;
+		true -> BlockNumberInt
+	end,
+	case ar_storage:read_block_from_height_by_number(binary_to_integer(FromHeight), BlockNumberNew) of
+		not_found ->
+			{404, #{}, []};
+		Res ->
+			?LOG_INFO([{handle_get_blocklist_data, Res}]),
+			{200, #{}, ar_serialize:jsonify(Res)}
+	end.
+
 handle_get_wallet_txs(Addr) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->
@@ -1657,6 +1679,20 @@ handle_get_wallet_txs(Addr) ->
 			end
 	end.
 
+handle_get_wallet_txs_deposits(Addr) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			case ar_storage:read_txs_by_addr_deposits(Addr) of
+				not_found ->
+					{404, #{}, []};
+				Res ->
+					% ?LOG_INFO([{handle_get_wallet_txs, Res}]),
+					{200, #{}, ar_serialize:jsonify(Res)}
+			end
+	end.
+	
 handle_get_address_data(Addr) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->

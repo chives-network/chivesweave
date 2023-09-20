@@ -11,7 +11,7 @@
 		wallet_list_filepath/1, tx_filepath/1, tx_data_filepath/1, read_tx_file/1,
 		read_migrated_v1_tx_file/1, ensure_directories/1, write_file_atomic/2,
 		write_term/2, write_term/3, read_term/1, read_term/2, delete_term/1, is_file/1,
-		migrate_tx_record/1, migrate_block_record/1, update_reward_history/1, read_account/2, read_txs_by_addr/1, read_data_by_addr/1, take_first_n_chars/2]).
+		migrate_tx_record/1, migrate_block_record/1, update_reward_history/1, read_account/2, read_txs_by_addr/1, read_data_by_addr/1, read_txs_by_addr_deposits/1, take_first_n_chars/2, read_block_from_height_by_number/2]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
 
@@ -878,6 +878,7 @@ init([]) ->
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_tx_confirmation_db"),
 			tx_confirmation_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_tx_db"), tx_db),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_address_tx_deposits_db"), address_tx_deposits_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_address_tx_db"), address_tx_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_address_data_db"), address_data_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_block_db"), block_db),
@@ -942,8 +943,11 @@ write_block(B) ->
 	end,
 	
 	%%% Make block data for explorer
-	BlockBin = term_to_binary([B#block.height, ar_util:encode(B#block.indep_hash), B#block.reward_addr, B#block.reward, B#block.timestamp, length(B#block.txs), B#block.weave_size, B#block.block_size]),
+	BlockBin = term_to_binary([B#block.height, ar_util:encode(B#block.indep_hash), ar_util:encode(B#block.reward_addr), B#block.reward, B#block.timestamp, length(B#block.txs), B#block.weave_size, B#block.block_size]),
 	ar_kv:put(explorer_block, list_to_binary(integer_to_list(B#block.height)), BlockBin),
+	?LOG_INFO([{explorer_block, list_to_binary(integer_to_list(B#block.height))}]),
+	?LOG_INFO([{explorer_block, integer_to_list(B#block.height)}]),
+	?LOG_INFO([{explorer_block, B#block.height}]),
 
 	TotalTxReward = 0,
 	lists:foreach(
@@ -978,8 +982,8 @@ write_block(B) ->
 							ar_kv:put(explorer_address_richlist, FromAddress, AddressRichListElementNewBin)				
 					end;
 				false ->
-					%%% address_data_db
-					case ar_kv:get(address_tx_db, TargetAddress) of
+					%%% address_tx_db
+					case ar_kv:get(address_tx_db, FromAddress) of
 						not_found ->
 							TxIdArray = [TxId],
 							TxIdData = term_to_binary(TxIdArray);
@@ -987,7 +991,30 @@ write_block(B) ->
 							TxIdArray = binary_to_term(TxIdBinary),
 							TxIdData = term_to_binary([TxId | TxIdArray])					
 					end,			
-					ar_kv:put(address_tx_db, TargetAddress, TxIdData),
+					ar_kv:put(address_tx_db, FromAddress, TxIdData),
+					
+					%%% address_tx_db
+					case ar_kv:get(address_tx_db, TargetAddress) of
+						not_found ->
+							TxIdArray2 = [TxId],
+							TxIdData2 = term_to_binary(TxIdArray2);
+						{ok, TxIdBinary2} ->
+							TxIdArray2 = binary_to_term(TxIdBinary2),
+							TxIdData2 = term_to_binary([TxId | TxIdArray2])					
+					end,			
+					ar_kv:put(address_tx_db, TargetAddress, TxIdData2),
+					
+					%%% address_tx_deposits_db
+					case ar_kv:get(address_tx_deposits_db, TargetAddress) of
+						not_found ->
+							TxIdArray3 = [TxId],
+							TxIdData3 = term_to_binary(TxIdArray3);
+						{ok, TxIdBinary3} ->
+							TxIdArray3 = binary_to_term(TxIdBinary3),
+							TxIdData3 = term_to_binary([TxId | TxIdArray3])					
+					end,			
+					ar_kv:put(address_tx_deposits_db, TargetAddress, TxIdData3),
+					
 					%%% explorer_address_richlist Send
 					case ar_kv:get(explorer_address_richlist, FromAddress) of
 						not_found ->
@@ -1000,6 +1027,7 @@ write_block(B) ->
 							AddressRichListElementNewBin = term_to_binary(AddressRichListElementNew1),
 							ar_kv:put(explorer_address_richlist, FromAddress, AddressRichListElementNewBin)				
 					end,
+					
 					%%% explorer_address_richlist Receive
 					case ar_kv:get(explorer_address_richlist, TargetAddress) of
 						not_found ->
@@ -1065,6 +1093,22 @@ write_block(B) ->
 take_first_n_chars(Str, N) when is_list(Str), is_integer(N), N >= 0 ->
     lists:sublist(Str, 1, min(length(Str), N)).
 
+generate_range(A, B) when A >= B ->
+    [];
+generate_range(A, B) ->
+    [A | generate_range(A + 1, B)].
+
+read_block_from_height_by_number(FromHeight, BlockNumber) ->
+	BlockHeightArray = generate_range(FromHeight, FromHeight + BlockNumber),
+	lists:map(
+		fun(X) -> 
+			?LOG_INFO([{explorer_block, list_to_binary(integer_to_list(X))},{integer_to_list, integer_to_list(X)}, {x, X}]),
+			case ar_kv:get(explorer_block, list_to_binary(integer_to_list(X))) of 
+				not_found -> []; 
+				{ok, TxIdBinary} -> binary_to_term(TxIdBinary) 
+			end
+		end, BlockHeightArray).
+
 read_txs_by_addr(Addr) ->
 	case ar_kv:get(address_tx_db, Addr) of
 		not_found ->
@@ -1073,6 +1117,13 @@ read_txs_by_addr(Addr) ->
 			binary_to_term(TxIdBinary)
 	end.
 
+read_txs_by_addr_deposits(Addr) ->
+	case ar_kv:get(address_tx_deposits_db, Addr) of
+		not_found ->
+			[];
+		{ok, TxIdBinary} ->
+			binary_to_term(TxIdBinary)
+	end.	
 read_data_by_addr(Addr) ->
 	case ar_kv:get(address_data_db, Addr) of
 		not_found ->

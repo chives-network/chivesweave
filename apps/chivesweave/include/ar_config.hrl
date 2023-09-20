@@ -150,7 +150,7 @@
 	storage_modules = [],
 	start_from_block_index = false,
 	internal_api_secret = not_set,
-	enable = [serve_wallet_txs, serve_wallet_data],
+	enable = [serve_wallet_txs, serve_wallet_data, serve_statistics_network],
 	disable = [],
 	transaction_blacklist_files = [],
 	transaction_blacklist_urls = [],

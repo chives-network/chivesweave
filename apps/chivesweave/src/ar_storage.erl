@@ -11,7 +11,7 @@
 		wallet_list_filepath/1, tx_filepath/1, tx_data_filepath/1, read_tx_file/1,
 		read_migrated_v1_tx_file/1, ensure_directories/1, write_file_atomic/2,
 		write_term/2, write_term/3, read_term/1, read_term/2, delete_term/1, is_file/1,
-		migrate_tx_record/1, migrate_block_record/1, update_reward_history/1, read_account/2, read_txs_by_addr/1, read_data_by_addr/1, read_txs_by_addr_deposits/1, take_first_n_chars/2, read_block_from_height_by_number/2]).
+		migrate_tx_record/1, migrate_block_record/1, update_reward_history/1, read_account/2, read_txs_by_addr/1, read_data_by_addr/1, read_txs_by_addr_deposits/1, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0 ]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
 
@@ -945,9 +945,6 @@ write_block(B) ->
 	%%% Make block data for explorer
 	BlockBin = term_to_binary([B#block.height, ar_util:encode(B#block.indep_hash), ar_util:encode(B#block.reward_addr), B#block.reward, B#block.timestamp, length(B#block.txs), B#block.weave_size, B#block.block_size]),
 	ar_kv:put(explorer_block, list_to_binary(integer_to_list(B#block.height)), BlockBin),
-	?LOG_INFO([{explorer_block, list_to_binary(integer_to_list(B#block.height))}]),
-	?LOG_INFO([{explorer_block, integer_to_list(B#block.height)}]),
-	?LOG_INFO([{explorer_block, B#block.height}]),
 
 	TotalTxReward = 0,
 	lists:foreach(
@@ -1068,13 +1065,14 @@ write_block(B) ->
 
 	%%% statistics_network
 	TodayDate = ar_util:encode(take_first_n_chars(calendar:system_time_to_rfc3339(B#block.timestamp), 10)),
+	?LOG_INFO([{todayDatestatistics_network, TodayDate}]),
 	case ar_kv:get(statistics_network, TodayDate) of
 		not_found ->
-			StatisticsNetwork = {0,0,0,0,0,0,0,0,0,0},
+			StatisticsNetwork = [0,0,0,0,0,0,0,0,0,0],
 			StatisticsNetworkBin = term_to_binary(StatisticsNetwork);
 		{ok, StatisticsNetworkResult} ->
-			{Weave_Size,Weave_Size_Growth,Cumulative_Endowment,Avg_Endowment_Growth,Endowment_Growth,Avg_Pending_Txs,Avg_Pending_Size,Node_Count,Cumulative_Difficulty,Difficulty} = binary_to_term(StatisticsNetworkResult),
-			StatisticsNetworkBin = term_to_binary({Weave_Size+B#block.weave_size,Weave_Size_Growth+B#block.weave_size,Cumulative_Endowment+B#block.reward_pool,Avg_Endowment_Growth+B#block.reward_pool,Endowment_Growth+B#block.reward_pool,Avg_Pending_Txs,Avg_Pending_Size,Node_Count,Cumulative_Difficulty+B#block.cumulative_diff,Difficulty+B#block.cumulative_diff})					
+			[Weave_Size,Weave_Size_Growth,Cumulative_Endowment,Avg_Endowment_Growth,Endowment_Growth,Avg_Pending_Txs,Avg_Pending_Size,Node_Count,Cumulative_Difficulty,Difficulty] = binary_to_term(StatisticsNetworkResult),
+			StatisticsNetworkBin = term_to_binary([Weave_Size+B#block.weave_size,Weave_Size_Growth+B#block.weave_size,Cumulative_Endowment+B#block.reward_pool,Avg_Endowment_Growth+B#block.reward_pool,Endowment_Growth+B#block.reward_pool,Avg_Pending_Txs,Avg_Pending_Size,Node_Count,Cumulative_Difficulty+B#block.cumulative_diff,Difficulty+B#block.cumulative_diff])					
 	end,
 	ar_kv:put(statistics_network, TodayDate, StatisticsNetworkBin),
 
@@ -1108,6 +1106,15 @@ read_block_from_height_by_number(FromHeight, BlockNumber) ->
 				{ok, TxIdBinary} -> binary_to_term(TxIdBinary) 
 			end
 		end, BlockHeightArray).
+
+read_statistics_network() ->
+	TodayDate = take_first_n_chars(calendar:system_time_to_rfc3339(erlang:system_time(second)), 10),
+	case ar_kv:get(statistics_network, ar_util:encode(TodayDate)) of
+		not_found ->
+			{404, #{}, []};
+		{ok, StatisticsNetworkResult} ->
+			{200, #{}, ar_serialize:jsonify(binary_to_term(StatisticsNetworkResult))}							
+	end.
 
 read_txs_by_addr(Addr) ->
 	case ar_kv:get(address_tx_db, Addr) of

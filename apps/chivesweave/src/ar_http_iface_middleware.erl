@@ -1090,6 +1090,18 @@ handle(<<"GET">>, [<<"blocklist">>, FromHeight, BlockNumber], Req, _Pid) ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
 
+%% Return a list of Block infor, used for block explorer.
+handle(<<"GET">>, [<<"statistics_network">>], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_statistics_network, Config#config.enable) of
+		true ->
+			ar_semaphore:acquire(arql_semaphore(Req), 5000),
+			{Status, Headers, Body} = ar_storage:read_statistics_network(),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
 %% Return transaction identifiers (hashes) for the wallet specified via wallet_address.
 %% GET request to endpoint /wallet/{wallet_address}/txs.
 handle(<<"GET">>, [<<"wallet">>, Addr, <<"txs">>], Req, _Pid) ->

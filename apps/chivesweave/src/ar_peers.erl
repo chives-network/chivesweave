@@ -946,8 +946,8 @@ rotate_peer_ports_test() ->
 
 update_rating_test() ->
 	ets:delete_all_objects(?MODULE),
-	Peer1 = {1, 2, 3, 4, 1984},
-	Peer2 = {5, 6, 7, 8, 1984},
+	Peer1 = {1, 2, 3, 4, 1985},
+	Peer2 = {5, 6, 7, 8, 1985},
 
 	?assertEqual(#performance{}, get_or_init_performance(Peer1)),
 	?assertEqual(0, get_total_rating(lifetime)),
@@ -1051,7 +1051,7 @@ test_block_rejected() ->
 
 rate_data_test() ->
 	ets:delete_all_objects(?MODULE),
-	Peer1 = {1, 2, 3, 4, 1984},
+	Peer1 = {1, 2, 3, 4, 1985},
 
 	?assertEqual(#performance{}, get_or_init_performance(Peer1)),
 	?assertEqual(0, get_total_rating(lifetime)),

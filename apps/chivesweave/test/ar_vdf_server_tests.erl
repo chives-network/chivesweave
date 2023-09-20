@@ -232,7 +232,7 @@ test_vdf_client_fast_block() ->
 	{ok, SlaveConfig} = slave_call(application, get_env, [chivesweave, config]),
 	slave_start(
 		B0, SlaveAddress,
-		SlaveConfig#config{ nonce_limiter_server_trusted_peers = [ "127.0.0.1:1984" ] }),
+		SlaveConfig#config{ nonce_limiter_server_trusted_peers = [ "127.0.0.1:1985" ] }),
 	%% Start the master as a VDF server
 	{ok, Config} = application:get_env(chivesweave, config),
 	start(
@@ -277,7 +277,7 @@ test_vdf_client_fast_block_pull_interface() ->
 	{ok, SlaveConfig} = slave_call(application, get_env, [chivesweave, config]),
 	slave_start(
 		B0, SlaveAddress,
-		SlaveConfig#config{ nonce_limiter_server_trusted_peers = [ "127.0.0.1:1984" ],
+		SlaveConfig#config{ nonce_limiter_server_trusted_peers = [ "127.0.0.1:1985" ],
 				enable = [vdf_server_pull | SlaveConfig#config.enable] }),
 	%% Start the master as a VDF server
 	{ok, Config} = application:get_env(chivesweave, config),
@@ -322,7 +322,7 @@ test_vdf_client_slow_block() ->
 	{ok, SlaveConfig} = slave_call(application, get_env, [chivesweave, config]),
 	slave_start(
 		B0, SlaveAddress,
-		SlaveConfig#config{ nonce_limiter_server_trusted_peers = [ "127.0.0.1:1984" ] }),
+		SlaveConfig#config{ nonce_limiter_server_trusted_peers = [ "127.0.0.1:1985" ] }),
 	%% Start the master as a VDF server
 	{ok, Config} = application:get_env(chivesweave, config),
 	start(
@@ -356,7 +356,7 @@ test_vdf_client_slow_block_pull_interface() ->
 	{ok, SlaveConfig} = slave_call(application, get_env, [chivesweave, config]),
 	slave_start(
 		B0, SlaveAddress,
-		SlaveConfig#config{ nonce_limiter_server_trusted_peers = [ "127.0.0.1:1984" ],
+		SlaveConfig#config{ nonce_limiter_server_trusted_peers = [ "127.0.0.1:1985" ],
 				enable = [vdf_server_pull | SlaveConfig#config.enable] }),
 	%% Start the master as a VDF server
 	{ok, Config} = application:get_env(chivesweave, config),

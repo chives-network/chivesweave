@@ -269,7 +269,7 @@
 -define(METRICS_DIR, "metrics").
 
 %% Default TCP port.
--define(DEFAULT_HTTP_IFACE_PORT, 1984).
+-define(DEFAULT_HTTP_IFACE_PORT, 1985).
 
 %% Number of transaction propagation processes to spawn.
 %% Each emitter picks the most valued transaction from the queue

@@ -833,9 +833,9 @@ recovers_from_forks(ForkHeight) ->
 			{ok, {{<<"208">>, _}, _, <<"Transaction already processed.">>, _, _}} =
 				ar_http:req(#{
 					method => post,
-					peer => {127, 0, 0, 1, 1984},
+					peer => {127, 0, 0, 1, 1985},
 					path => "/tx",
-					headers => [{<<"X-P2p-Port">>, <<"1984">>}],
+					headers => [{<<"X-P2p-Port">>, <<"1985">>}],
 					body => ar_serialize:jsonify(ar_serialize:tx_to_json_struct(TX))
 				})
 		end,

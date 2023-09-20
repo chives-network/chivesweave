@@ -503,8 +503,8 @@ test_counters() ->
 	State6 = update_scheduled_task_count("worker2", sync_range, "localhost", 1, State5),
 	?assertEqual(10, State6#state.scheduled_task_count),
 	?assertEqual(1, maps:get("worker2", State6#state.worker_loads, 0)),
-	State7 = update_scheduled_task_count("worker1", sync_range, "1.2.3.4:1984", -1, State6),
-	State8 = update_queued_task_count(sync_range, "1.2.3.4:1984", -1, State7),
+	State7 = update_scheduled_task_count("worker1", sync_range, "1.2.3.4:1985", -1, State6),
+	State8 = update_queued_task_count(sync_range, "1.2.3.4:1985", -1, State7),
 	?assertEqual(9, State8#state.scheduled_task_count),
 	?assertEqual(8, maps:get("worker1", State8#state.worker_loads, 0)),
 	?assertEqual(8, State8#state.queued_task_count).
@@ -529,10 +529,10 @@ test_get_worker() ->
 test_format_peer() ->
 	?assertEqual("localhost", format_peer(read_range, {0, 100, 1, 2, true})),
 	?assertEqual("localhost", format_peer(read_range, undefined)),
-	?assertEqual("1.2.3.4:1984", format_peer(sync_range, {0, 100, {1, 2, 3, 4, 1984}, 2})).
+	?assertEqual("1.2.3.4:1985", format_peer(sync_range, {0, 100, {1, 2, 3, 4, 1985}, 2})).
 
 test_enqueue_main_task() ->
-	Peer1 = {1, 2, 3, 4, 1984},
+	Peer1 = {1, 2, 3, 4, 1985},
 	Peer2 = {5, 6, 7, 8, 1985},
 	StoreID1 = ar_storage_module:id({?PARTITION_SIZE, 1, default}),
 	StoreID2 = ar_storage_module:id({?PARTITION_SIZE, 2, default}),
@@ -560,7 +560,7 @@ test_enqueue_main_task() ->
 	?assertEqual(3, State5#state.queued_task_count).
 
 test_enqueue_peer_task() ->
-	PeerA = {1, 2, 3, 4, 1984},
+	PeerA = {1, 2, 3, 4, 1985},
 	PeerB = {5, 6, 7, 8, 1985},
 	StoreID1 = ar_storage_module:id({?PARTITION_SIZE, 1, default}),
 
@@ -589,7 +589,7 @@ test_enqueue_peer_task() ->
 
 
 test_process_main_queue() ->
-	Peer1 = {1, 2, 3, 4, 1984},
+	Peer1 = {1, 2, 3, 4, 1985},
 	Peer2 = {5, 6, 7, 8, 1985},
 	StoreID1 = ar_storage_module:id({?PARTITION_SIZE, 1, default}),
 	StoreID2 = ar_storage_module:id({?PARTITION_SIZE, 2, default}),
@@ -642,7 +642,7 @@ test_cut_peer_queue() ->
 			sync_jobs = 10
 		}),
 
-		Peer1 = {1, 2, 3, 4, 1984},
+		Peer1 = {1, 2, 3, 4, 1985},
 		TaskQueue = lists:seq(1, 100),
 		PeerTasks = #peer_tasks{
 			peer = Peer1,

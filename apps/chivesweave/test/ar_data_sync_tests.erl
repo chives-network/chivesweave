@@ -1090,14 +1090,14 @@ build_proofs(TX, Chunks, TXs, BlockStartOffset, Height) ->
 get_tx_offset(TXID) ->
 	ar_http:req(#{
 		method => get,
-		peer => {127, 0, 0, 1, 1984},
+		peer => {127, 0, 0, 1, 1985},
 		path => "/tx/" ++ binary_to_list(ar_util:encode(TXID)) ++ "/offset"
 	}).
 
 get_tx_data(TXID) ->
 	ar_http:req(#{
 		method => get,
-		peer => {127, 0, 0, 1, 1984},
+		peer => {127, 0, 0, 1, 1985},
 		path => "/tx/" ++ binary_to_list(ar_util:encode(TXID)) ++ "/data"
 	}).
 
@@ -1261,9 +1261,9 @@ compare_proofs(_, _, EndOffset) ->
 
 enqueue_intervals_test() ->
 	test_enqueue_intervals([], 2, [], [], [], "Empty Intervals"),
-	Peer1 = {1, 2, 3, 4, 1984},
-	Peer2 = {101, 102, 103, 104, 1984},
-	Peer3 = {201, 202, 203, 204, 1984},
+	Peer1 = {1, 2, 3, 4, 1985},
+	Peer2 = {101, 102, 103, 104, 1985},
+	Peer3 = {201, 202, 203, 204, 1985},
 
 	test_enqueue_intervals(
 		[

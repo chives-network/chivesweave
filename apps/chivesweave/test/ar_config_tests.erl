@@ -15,20 +15,20 @@ parse_config() ->
 		port = 1985,
 		mine = true,
 		peers = [
-			{188,166,200,45,1984},
-			{188,166,192,169,1984},
-			{163,47,11,64,1984},
-			{159,203,158,108,1984},
-			{159,203,49,13,1984},
-			{139,59,51,59,1984},
-			{138,197,232,192,1984},
-			{46,101,67,172,1984}
+			{188,166,200,45,1985},
+			{188,166,192,169,1985},
+			{163,47,11,64,1985},
+			{159,203,158,108,1985},
+			{159,203,49,13,1985},
+			{139,59,51,59,1985},
+			{138,197,232,192,1985},
+			{46,101,67,172,1985}
 		],
 		local_peers = [
-			{192, 168, 2, 3, 1984},
+			{192, 168, 2, 3, 1985},
 			{172, 16, 10, 11, 1985}
 		],
-		block_gossip_peers = [{159,203,158,108,1984}, {150,150,150,150, 1983}],
+		block_gossip_peers = [{159,203,158,108,1985}, {150,150,150,150, 1983}],
 		data_dir = "some_data_dir",
 		log_dir = "log_dir",
 		metrics_dir = "metrics_dir",
@@ -110,7 +110,7 @@ parse_config() ->
 		max_nonce_limiter_validation_thread_count = 2,
 		max_nonce_limiter_last_step_validation_thread_count = 3,
 		nonce_limiter_server_trusted_peers = ["127.0.0.1", "2.3.4.5", "6.7.8.9:1982"],
-		nonce_limiter_client_peers = [<<"2.3.6.7:1984">>, <<"4.7.3.1:1983">>, <<"3.3.3.3">>],
+		nonce_limiter_client_peers = [<<"2.3.6.7:1985">>, <<"4.7.3.1:1983">>, <<"3.3.3.3">>],
 		run_defragmentation = true,
 		defragmentation_trigger_threshold = 1_000,
 		defragmentation_modules = [

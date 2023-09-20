@@ -11,7 +11,7 @@
 		wallet_list_filepath/1, tx_filepath/1, tx_data_filepath/1, read_tx_file/1,
 		read_migrated_v1_tx_file/1, ensure_directories/1, write_file_atomic/2,
 		write_term/2, write_term/3, read_term/1, read_term/2, delete_term/1, is_file/1,
-		migrate_tx_record/1, migrate_block_record/1, update_reward_history/1, read_account/2, read_txs_by_addr/1, read_data_by_addr/1, read_txs_by_addr_deposits/1, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0 ]).
+		migrate_tx_record/1, migrate_block_record/1, update_reward_history/1, read_account/2, read_txs_by_addr/1, read_data_by_addr/1, read_txs_by_addr_deposits/1, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0 ]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
 
@@ -1065,7 +1065,6 @@ write_block(B) ->
 
 	%%% statistics_network
 	TodayDate = ar_util:encode(take_first_n_chars(calendar:system_time_to_rfc3339(B#block.timestamp), 10)),
-	?LOG_INFO([{todayDatestatistics_network, TodayDate}]),
 	case ar_kv:get(statistics_network, TodayDate) of
 		not_found ->
 			StatisticsNetwork = [0,0,0,0,0,0,0,0,0,0],
@@ -1080,11 +1079,11 @@ write_block(B) ->
 	TodayDataDate = ar_util:encode(take_first_n_chars(calendar:system_time_to_rfc3339(B#block.timestamp), 10)),
 	case ar_kv:get(statistics_data, TodayDataDate) of
 		not_found ->
-			StatisticsData = {0,0,0,0,0,0,0,{},{}},
+			StatisticsData = [0,0,0,0,0,0,0,'',''],
 			StatisticsDataBin = term_to_binary(StatisticsData);
 		{ok, StatisticsDataResult} ->
-			{Data_Uploaded,Storage_Cost,Data_Size,Data_Fees,Cumulative_Data_Fees,Fees_Towards_Data_Upload,Data_Uploaders,Content_Type,Content_Type_Tx} = binary_to_term(StatisticsDataResult),
-			StatisticsDataBin = term_to_binary({Data_Uploaded+B#block.weave_size,Storage_Cost,Data_Size+B#block.weave_size,Data_Fees+TotalTxReward,Cumulative_Data_Fees+TotalTxReward,Fees_Towards_Data_Upload,Data_Uploaders+1,Content_Type,Content_Type_Tx})					
+			[Data_Uploaded,Storage_Cost,Data_Size,Data_Fees,Cumulative_Data_Fees,Fees_Towards_Data_Upload,Data_Uploaders,Content_Type,Content_Type_Tx] = binary_to_term(StatisticsDataResult),
+			StatisticsDataBin = term_to_binary([Data_Uploaded+B#block.weave_size,Storage_Cost,Data_Size+B#block.weave_size,Data_Fees+TotalTxReward,Cumulative_Data_Fees+TotalTxReward,Fees_Towards_Data_Upload,Data_Uploaders+1,Content_Type,Content_Type_Tx])					
 	end,
 	ar_kv:put(statistics_data, TodayDataDate, StatisticsDataBin).
 
@@ -1114,6 +1113,42 @@ read_statistics_network() ->
 			{404, #{}, []};
 		{ok, StatisticsNetworkResult} ->
 			{200, #{}, ar_serialize:jsonify(binary_to_term(StatisticsNetworkResult))}							
+	end.
+
+read_statistics_data() ->
+	TodayDate = take_first_n_chars(calendar:system_time_to_rfc3339(erlang:system_time(second)), 10),
+	case ar_kv:get(statistics_data, ar_util:encode(TodayDate)) of
+		not_found ->
+			{404, #{}, []};
+		{ok, StatisticsDataResult} ->
+			{200, #{}, ar_serialize:jsonify(binary_to_term(StatisticsDataResult))}							
+	end.
+
+read_statistics_block() ->
+	TodayDate = take_first_n_chars(calendar:system_time_to_rfc3339(erlang:system_time(second)), 10),
+	case ar_kv:get(statistics_block, ar_util:encode(TodayDate)) of
+		not_found ->
+			{404, #{}, []};
+		{ok, StatisticsBlockResult} ->
+			{200, #{}, ar_serialize:jsonify(binary_to_term(StatisticsBlockResult))}							
+	end.
+
+read_statistics_address() ->
+	TodayDate = take_first_n_chars(calendar:system_time_to_rfc3339(erlang:system_time(second)), 10),
+	case ar_kv:get(statistics_address, ar_util:encode(TodayDate)) of
+		not_found ->
+			{404, #{}, []};
+		{ok, StatisticsAddressResult} ->
+			{200, #{}, ar_serialize:jsonify(binary_to_term(StatisticsAddressResult))}							
+	end.
+
+read_statistics_transaction() ->
+	TodayDate = take_first_n_chars(calendar:system_time_to_rfc3339(erlang:system_time(second)), 10),
+	case ar_kv:get(statistics_transaction, ar_util:encode(TodayDate)) of
+		not_found ->
+			{404, #{}, []};
+		{ok, StatisticsTransactionResult} ->
+			{200, #{}, ar_serialize:jsonify(binary_to_term(StatisticsTransactionResult))}							
 	end.
 
 read_txs_by_addr(Addr) ->

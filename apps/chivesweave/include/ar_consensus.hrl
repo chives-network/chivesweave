@@ -46,7 +46,7 @@
 -ifdef(DEBUG).
 -define(SEARCH_SPACE_UPPER_BOUND_DEPTH, 3).
 -else.
--define(SEARCH_SPACE_UPPER_BOUND_DEPTH, 10).
+-define(SEARCH_SPACE_UPPER_BOUND_DEPTH, 50).
 -endif.
 
 %% The maximum mining difficulty. 2 ^ 256. The network difficulty

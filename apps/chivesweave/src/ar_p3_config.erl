@@ -19,7 +19,7 @@
 %%
 %% "p3": {
 %%   "payments": {
-%%     "chivesweave/CHVW": {
+%%     "chivesweave/XWE": {
 %%       "address": "BHAWuomQUIL18WON2LjqjDF4YuRDcmhme7wvFW2BDiU",
 %%       "minimum_balance": "-1000000",
 %%       "confirmations": 2
@@ -31,7 +31,7 @@
 %%       "modSeq": 1,
 %%       "rate_type": "request",
 %%       "rates": {
-%%         "chivesweave/CHVW: {
+%%         "chivesweave/XWE: {
 %%           "price":"10000",
 %%         },
 %%         "chivesweave/VRT": {
@@ -115,7 +115,7 @@ parse_payments([], PaymentsConfig) ->
 parse_payments(BadToken, _PaymentsConfig) ->
 	erlang:error(
 		"'payments' object must be a map of assets to 'payment' objects. " ++
-		"Currently only 'chivesweave/CHVW' is supported.",
+		"Currently only 'chivesweave/XWE' is supported.",
 		BadToken).
 
 parse_payment([{?P3_ADDRESS_HEADER, Address} | Rest], PaymentConfig) ->
@@ -199,7 +199,7 @@ parse_rates([], RatesConfig) ->
 
 parse_rates(BadToken, _RatesConfig) ->
 	erlang:error(
-		"Unexpected 'rates' token. Only 'chivesweave/CHVW' is currenty supported.",
+		"Unexpected 'rates' token. Only 'chivesweave/XWE' is currenty supported.",
 		BadToken).
 
 %% -------------------------------------------------------------------

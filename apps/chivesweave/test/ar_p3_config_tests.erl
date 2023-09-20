@@ -49,7 +49,7 @@ basic_parse_test() ->
 	Config = <<"{
 		\"p3\": {
 			\"payments\": {
-				\"chivesweave/CHVW\": {
+				\"chivesweave/XWE\": {
 					\"address\": \"BHAWuomQUIL18WON2LjqjDF4YuRDcmhme7wvFW2BDiU\",
 					\"minimum_balance\": \"-1000000\",
 					\"confirmations\": 2
@@ -61,7 +61,7 @@ basic_parse_test() ->
 					\"mod_seq\": 1,
 					\"rate_type\": \"request\",
 					\"rates\": {
-						\"chivesweave/CHVW\": 1000
+						\"chivesweave/XWE\": 1000
 					}
 				},
 				{
@@ -69,7 +69,7 @@ basic_parse_test() ->
 					\"mod_seq\": \"5\",
 					\"rate_type\": \"request\",
 					\"rates\": {					
-						\"chivesweave/CHVW\": \"100000\"
+						\"chivesweave/XWE\": \"100000\"
 					}
 				}
 			]
@@ -83,7 +83,7 @@ checksum_parse_test() ->
 	Config = <<"{
 		\"p3\": {
 			\"payments\": {
-				\"chivesweave/CHVW\": {
+				\"chivesweave/XWE\": {
 					\"address\": \"BHAWuomQUIL18WON2LjqjDF4YuRDcmhme7wvFW2BDiU:ToOiTg\",
 					\"minimum_balance\": \"-1000000\",
 					\"confirmations\": 2
@@ -95,7 +95,7 @@ checksum_parse_test() ->
 					\"mod_seq\": 1,
 					\"rate_type\": \"request\",
 					\"rates\": {
-						\"chivesweave/CHVW\": 1000
+						\"chivesweave/XWE\": 1000
 					}
 				},
 				{
@@ -103,7 +103,7 @@ checksum_parse_test() ->
 					\"mod_seq\": \"5\",
 					\"rate_type\": \"request\",
 					\"rates\": {					
-						\"chivesweave/CHVW\": \"100000\"
+						\"chivesweave/XWE\": \"100000\"
 					}
 				}
 			]
@@ -133,7 +133,7 @@ bad_address_parse_error_test() ->
 	Config = <<"{
 		\"p3\": {
 			\"payments\": {
-				\"chivesweave/CHVW\": {
+				\"chivesweave/XWE\": {
 					\"address\": \"BHAWuomQUIL18WON2LjqjDF4YuRDcmhme7wvFW2BDiU:BAD_CHECKSUM\",
 					\"minimum_balance\": \"-1000000\",
 					\"confirmations\": 2
@@ -149,7 +149,7 @@ bad_minimum_balance_parse_error_test() ->
 	Config = <<"{
 		\"p3\": {
 			\"payments\": {
-				\"chivesweave/CHVW\": {
+				\"chivesweave/XWE\": {
 					\"address\": \"BHAWuomQUIL18WON2LjqjDF4YuRDcmhme7wvFW2BDiU\",
 					\"minimum_balance\": \"5.5\",
 					\"confirmations\": 2
@@ -165,7 +165,7 @@ bad_confirmations_parse_error_test() ->
 	Config = <<"{
 		\"p3\": {
 			\"payments\": {
-				\"chivesweave/CHVW\": {
+				\"chivesweave/XWE\": {
 					\"address\": \"BHAWuomQUIL18WON2LjqjDF4YuRDcmhme7wvFW2BDiU\",
 					\"minimum_balance\": \"-1000000\",
 					\"confirmations\": \"abc\"
@@ -181,7 +181,7 @@ bad_payments_token_error_test() ->
 	Config = <<"{
 		\"p3\": {
 			\"payments\": {
-				\"chivesweave/CHVW\": {
+				\"chivesweave/XWE\": {
 					\"address\": \"BHAWuomQUIL18WON2LjqjDF4YuRDcmhme7wvFW2BDiU\",
 					\"minimum_balance\": \"-1000000\",
 					\"confirmations\": 2,
@@ -202,7 +202,7 @@ no_service_list_parse_error_test() ->
 				\"mod_seq\": 1,
 				\"rate_type\": \"request\",
 				\"rates\": {
-					\"chivesweave/CHVW\": \"1000\"
+					\"chivesweave/XWE\": \"1000\"
 				}
 			}
 		}
@@ -219,7 +219,7 @@ bad_service_token_parse_error_test() ->
 				\"invalid\": \"value\",
 				\"rate_type\": \"request\",
 				\"rates\": {
-					\"chivesweave/CHVW\": \"1000\"
+					\"chivesweave/XWE\": \"1000\"
 				}
 			}]
 		}
@@ -235,7 +235,7 @@ modseq_not_integer_parse_error_test() ->
 				\"mod_seq\": \"a\",
 				\"rate_type\": \"request\",
 				\"rates\": {
-					\"chivesweave/CHVW\": \"1000\"
+					\"chivesweave/XWE\": \"1000\"
 				}
 			}]
 		}
@@ -251,7 +251,7 @@ bad_rates_token_parse_error_test() ->
 				\"mod_seq\": 1,
 				\"rate_type\": \"request\",
 				\"rates\": {
-					\"chivesweave/CHVW\": \"1000\",
+					\"chivesweave/XWE\": \"1000\",
 					\"invalid\": \"value\"
 				}
 			}]

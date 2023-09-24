@@ -9,13 +9,6 @@ permanence. By leveraging our novel Blockweave datastructure, data is stored
 in a decentralised, peer-to-peer manner where miners are incentivised to
 store rare data.
 
-# Getting Started
-
-Download and extract the latest archive for your platform on the release
-page, then run the included `bin/start` script to get started.
-
-For more information, refer to the [mining guide](https://docs.arweave.org/info/mining/mining-guide).
-
 # Building from source
 
 ## Requirements
@@ -28,6 +21,10 @@ For more information, refer to the [mining guide](https://docs.arweave.org/info/
 - CMake (CMake version > 3.10.0)
 - SQLite3 headers (libsqlite3-dev on Ubuntu)
 - GNU MP (libgmp-dev on Ubuntu)
+
+- Disk free space size need more than 200G, 3.6T is perfect.
+- HDD and SDD both are support.
+- Friendly for Chia and File miners.
 
 To install the dependencies on Ubuntu 22 (recommended), run:
 
@@ -56,20 +53,26 @@ cd chivesweave
 
 ```
 
-Increase the [open file
-limits](https://docs.arweave.org/info/mining/mining-guide#preparation-file-descriptors-limit).
-
-Make a mainnet build:
+Step 3: Make a mainnet build:
 
 ```sh
 ./rebar3 as mainnet tar
+
+```
+
+Step 4: You will get your wallet and address.
+```sh
 mkdir mainnet_data_dir
 ./_build/mainnet/rel/chivesweave/bin/create-wallet mainnet_data_dir
 
 ```
-You will get your wallet and address.
+You will get your wallet key file in the directory "mainnet_data_dir/wallets/", and the wallet address will show in the console.
+
+Format as "Created a wallet with address [YOUR_WALLET_ADDRESS]."
 
 You will then find the gzipped tarball at `_build/mainnet/rel/chivesweave/chivesweave-x.y.z.tar.gz`.
+
+Step 5: Running your node:
 
 ```sh
 ./_build/mainnet/rel/chivesweave/bin/start mine data_dir mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] peer node1.chivesweave.net peer node2.chivesweave.net
@@ -90,14 +93,14 @@ nohup _build/mainnet/rel/chivesweave/bin/start mine data_dir mainnet_data_dir mi
 
 ```
 
-View the logs:
+Step 6: View the logs:
 
 ```sh
 ./_build/mainnet/rel/chivesweave/bin/logs -f
 
 ```
 
-Stop the node:
+Step 7: Stop the node:
 
 ```sh
 ./_build/mainnet/rel/chivesweave/bin/stop

@@ -239,7 +239,6 @@ handle(<<"GET">>, [<<"queue">>], Req, _Pid) ->
 %% Return additional information about the transaction with the given identifier (hash).
 %% GET request to endpoint /tx/{hash}/status.
 handle(<<"GET">>, [<<"tx">>, Hash, <<"status">>], Req, _Pid) ->
-	ar_semaphore:acquire(arql_semaphore(Req), 5000),
 	case ar_node:is_joined() of
 		false ->
 			not_joined(Req);
@@ -1083,7 +1082,6 @@ handle(<<"GET">>, [<<"blocklist">>, FromHeight, BlockNumber], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_wallet_data, Config#config.enable) of
 		true ->
-			ar_semaphore:acquire(arql_semaphore(Req), 5000),
 			{Status, Headers, Body} = handle_get_blocklist_data(FromHeight,BlockNumber),
 			{Status, Headers, Body, Req};
 		false ->
@@ -1095,7 +1093,6 @@ handle(<<"GET">>, [<<"statistics_network">>], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_statistics_network, Config#config.enable) of
 		true ->
-			ar_semaphore:acquire(arql_semaphore(Req), 5000),
 			{Status, Headers, Body} = ar_storage:read_statistics_network(),
 			{Status, Headers, Body, Req};
 		false ->
@@ -1107,7 +1104,6 @@ handle(<<"GET">>, [<<"statistics_data">>], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_statistics_data, Config#config.enable) of
 		true ->
-			ar_semaphore:acquire(arql_semaphore(Req), 5000),
 			{Status, Headers, Body} = ar_storage:read_statistics_data(),
 			{Status, Headers, Body, Req};
 		false ->
@@ -1119,7 +1115,6 @@ handle(<<"GET">>, [<<"statistics_block">>], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_statistics_block, Config#config.enable) of
 		true ->
-			ar_semaphore:acquire(arql_semaphore(Req), 5000),
 			{Status, Headers, Body} = ar_storage:read_statistics_block(),
 			{Status, Headers, Body, Req};
 		false ->
@@ -1131,7 +1126,6 @@ handle(<<"GET">>, [<<"statistics_address">>], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_statistics_address, Config#config.enable) of
 		true ->
-			ar_semaphore:acquire(arql_semaphore(Req), 5000),
 			{Status, Headers, Body} = ar_storage:read_statistics_address(),
 			{Status, Headers, Body, Req};
 		false ->
@@ -1143,7 +1137,6 @@ handle(<<"GET">>, [<<"statistics_transaction">>], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_statistics_transaction, Config#config.enable) of
 		true ->
-			ar_semaphore:acquire(arql_semaphore(Req), 5000),
 			{Status, Headers, Body} = ar_storage:read_statistics_transaction(),
 			{Status, Headers, Body, Req};
 		false ->
@@ -1156,7 +1149,6 @@ handle(<<"GET">>, [<<"wallet">>, Addr, <<"txs">>], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_wallet_txs, Config#config.enable) of
 		true ->
-			ar_semaphore:acquire(arql_semaphore(Req), 5000),
 			{Status, Headers, Body} = handle_get_wallet_txs(Addr),
 			{Status, Headers, Body, Req};
 		false ->
@@ -1164,12 +1156,23 @@ handle(<<"GET">>, [<<"wallet">>, Addr, <<"txs">>], Req, _Pid) ->
 	end;
 
 %% Return transaction identifiers (hashes) for the wallet specified via wallet_address.
-%% GET request to endpoint /wallet/{wallet_address}/txs.
+%% GET request to endpoint /wallet/{wallet_address}/txsrecord.
+handle(<<"GET">>, [<<"wallet">>, Addr, <<"txsrecord">>], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_wallet_txs, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_wallet_txsrecord(Addr),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+%% Return transaction identifiers (hashes) for the wallet specified via wallet_address.
+%% GET request to endpoint /wallet/{wallet_address}/data.
 handle(<<"GET">>, [<<"wallet">>, Addr, <<"data">>], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_wallet_data, Config#config.enable) of
 		true ->
-			ar_semaphore:acquire(arql_semaphore(Req), 5000),
 			{Status, Headers, Body} = handle_get_address_data(Addr),
 			{Status, Headers, Body, Req};
 		false ->
@@ -1183,9 +1186,18 @@ handle(<<"GET">>, [<<"wallet">>, Addr, <<"txs">>, EarliestTX], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_wallet_txs, Config#config.enable) of
 		true ->
-			ar_semaphore:acquire(arql_semaphore(Req), 5000),
-			{Status, Headers, Body} = handle_get_wallet_txs(Addr),
-			{Status, Headers, Body, Req};
+			case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+				{error, invalid} ->
+					{400, #{}, <<"Invalid address.">>};
+				{ok, _} ->
+					case ar_storage:read_txs_by_addr(Addr) of
+						not_found ->
+							{404, #{}, [], Req};
+						Res ->
+							% ?LOG_INFO([{handle_get_wallet_txs, [lists:last(Res)]}]),
+							{200, #{}, ar_serialize:jsonify([lists:last(Res)]), Req}
+					end
+			end;
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
@@ -1197,8 +1209,20 @@ handle(<<"GET">>, [<<"wallet">>, Addr, <<"deposits">>], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_wallet_txs, Config#config.enable) of
 		true ->
-			ar_semaphore:acquire(arql_semaphore(Req), 5000),
 			{Status, Headers, Body} = handle_get_wallet_txs_deposits(Addr),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+%% Return identifiers (hashes) of transfer transactions of the given
+%% wallet_address send out.
+%% GET request to endpoint /wallet/{wallet_address}/send.
+handle(<<"GET">>, [<<"wallet">>, Addr, <<"send">>], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_wallet_txs, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_wallet_txs_send(Addr),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1211,20 +1235,17 @@ handle(<<"GET">>, [<<"wallet">>, Addr, <<"deposits">>, EarliestDeposit], Req, _P
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_wallet_deposits, Config#config.enable) of
 		true ->
-			ar_semaphore:acquire(arql_semaphore(Req), 5000),
-			case catch ar_arql_db:select_txs_by([{to, [Addr]}]) of
-				TXMaps when is_list(TXMaps) ->
-					TXIDs = lists:map(fun(#{ id := ID }) -> ID end, TXMaps),
-					{Before, After} = lists:splitwith(fun(T) -> T /= EarliestDeposit end, TXIDs),
-					FilteredTXs = case After of
-						[] ->
-							Before;
-						[EarliestDeposit | _] ->
-							Before ++ [EarliestDeposit]
-					end,
-					{200, #{}, ar_serialize:jsonify(FilteredTXs), Req};
-				{'EXIT', {timeout, {gen_server, call, [ar_arql_db, _]}}} ->
-					{503, #{}, <<"ArQL unavailable.">>, Req}
+			case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+				{error, invalid} ->
+					{400, #{}, <<"Invalid address.">>, Req};
+				{ok, _} ->
+					case ar_storage:read_txs_by_addr_deposits(Addr) of
+						not_found ->
+							{404, #{}, [], Req};
+						Res ->
+							% ?LOG_INFO([{handle_get_wallet_txs, [lists:last(Res)]}]),
+							{200, #{}, ar_serialize:jsonify([lists:last(Res)]), Req}
+					end
 			end;
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1721,7 +1742,7 @@ handle_get_blocklist_data(FromHeight, BlockNumber) ->
 		not_found ->
 			{404, #{}, []};
 		Res ->
-			?LOG_INFO([{handle_get_blocklist_data, Res}]),
+			% ?LOG_INFO([{handle_get_blocklist_data, Res}]),
 			{200, #{}, ar_serialize:jsonify(Res)}
 	end.
 
@@ -1731,6 +1752,20 @@ handle_get_wallet_txs(Addr) ->
 			{400, #{}, <<"Invalid address.">>};
 		{ok, _} ->
 			case ar_storage:read_txs_by_addr(Addr) of
+				not_found ->
+					{404, #{}, []};
+				Res ->
+					% ?LOG_INFO([{handle_get_wallet_txs, Res}]),
+					{200, #{}, ar_serialize:jsonify(Res)}
+			end
+	end.
+
+handle_get_wallet_txsrecord(Addr) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			case ar_storage:read_txsrecord_by_addr(Addr) of
 				not_found ->
 					{404, #{}, []};
 				Res ->
@@ -1753,6 +1788,20 @@ handle_get_wallet_txs_deposits(Addr) ->
 			end
 	end.
 	
+handle_get_wallet_txs_send(Addr) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			case ar_storage:read_txs_by_addr_send(Addr) of
+				not_found ->
+					{404, #{}, []};
+				Res ->
+					% ?LOG_INFO([{handle_get_wallet_txs, Res}]),
+					{200, #{}, ar_serialize:jsonify(Res)}
+			end
+	end.
+
 handle_get_address_data(Addr) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->

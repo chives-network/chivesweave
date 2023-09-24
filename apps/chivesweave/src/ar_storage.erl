@@ -11,7 +11,7 @@
 		wallet_list_filepath/1, tx_filepath/1, tx_data_filepath/1, read_tx_file/1,
 		read_migrated_v1_tx_file/1, ensure_directories/1, write_file_atomic/2,
 		write_term/2, write_term/3, read_term/1, read_term/2, delete_term/1, is_file/1,
-		migrate_tx_record/1, migrate_block_record/1, update_reward_history/1, read_account/2, read_txs_by_addr/1, read_data_by_addr/1, read_txs_by_addr_deposits/1, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0 ]).
+		migrate_tx_record/1, migrate_block_record/1, update_reward_history/1, read_account/2, read_txs_by_addr/1, read_txsrecord_by_addr/1, read_data_by_addr/1, read_txs_by_addr_deposits/1, read_txs_by_addr_send/1, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0 ]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
 
@@ -879,6 +879,7 @@ init([]) ->
 			tx_confirmation_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_tx_db"), tx_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_address_tx_deposits_db"), address_tx_deposits_db),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_address_tx_send_db"), address_tx_send_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_address_tx_db"), address_tx_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_address_data_db"), address_data_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_storage_block_db"), block_db),
@@ -896,6 +897,7 @@ init([]) ->
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "statistics_address"), statistics_address),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "statistics_contract"), statistics_contract),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "statistics_token"), statistics_token),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "statistics_summary"), statistics_summary),
 	ets:insert(?MODULE, [{same_disk_storage_modules_total_size,
 			get_same_disk_storage_modules_total_size()}]),
 	{ok, #state{}}.
@@ -1012,6 +1014,17 @@ write_block(B) ->
 					end,			
 					ar_kv:put(address_tx_deposits_db, TargetAddress, TxIdData3),
 					
+					%%% address_tx_send_db
+					case ar_kv:get(address_tx_send_db, TargetAddress) of
+						not_found ->
+							TxIdArray4 = [TxId],
+							TxIdData4 = term_to_binary(TxIdArray4);
+						{ok, TxIdBinary4} ->
+							TxIdArray4 = binary_to_term(TxIdBinary4),
+							TxIdData4 = term_to_binary([TxId | TxIdArray4])					
+					end,			
+					ar_kv:put(address_tx_send_db, TargetAddress, TxIdData4),
+					
 					%%% explorer_address_richlist Send
 					case ar_kv:get(explorer_address_richlist, FromAddress) of
 						not_found ->
@@ -1063,6 +1076,24 @@ write_block(B) ->
         B#block.txs
     ),
 
+	%%% statistics_summary
+	TodayDate = ar_util:encode(take_first_n_chars(calendar:system_time_to_rfc3339(B#block.timestamp), 10)),
+	case ar_kv:get(statistics_summary, list_to_binary("datelist")) of
+		not_found ->
+			StatisticsSummary = [TodayDate],
+			StatisticsSummaryBin = term_to_binary(StatisticsSummary),
+			ar_kv:put(statistics_summary, list_to_binary("datelist"), StatisticsSummaryBin);
+		{ok, StatisticsSummaryResult} ->
+			DateListArray = binary_to_term(StatisticsSummaryResult),
+			case lists:member(TodayDate, DateListArray) of
+				true ->
+					ok;
+				false ->
+					StatisticsSummaryBin = term_to_binary([ TodayDate | DateListArray]),
+					ar_kv:put(statistics_summary, list_to_binary("datelist"), StatisticsSummaryBin)
+			end			
+	end,
+
 	%%% statistics_network
 	TodayDate = ar_util:encode(take_first_n_chars(calendar:system_time_to_rfc3339(B#block.timestamp), 10)),
 	case ar_kv:get(statistics_network, TodayDate) of
@@ -1085,7 +1116,36 @@ write_block(B) ->
 			[Data_Uploaded,Storage_Cost,Data_Size,Data_Fees,Cumulative_Data_Fees,Fees_Towards_Data_Upload,Data_Uploaders,Content_Type,Content_Type_Tx] = binary_to_term(StatisticsDataResult),
 			StatisticsDataBin = term_to_binary([Data_Uploaded+B#block.weave_size,Storage_Cost,Data_Size+B#block.weave_size,Data_Fees+TotalTxReward,Cumulative_Data_Fees+TotalTxReward,Fees_Towards_Data_Upload,Data_Uploaders+1,Content_Type,Content_Type_Tx])					
 	end,
-	ar_kv:put(statistics_data, TodayDataDate, StatisticsDataBin).
+	ar_kv:put(statistics_data, TodayDataDate, StatisticsDataBin),
+
+	%%% statistics_block
+	case ar_kv:get(statistics_block, TodayDataDate) of
+		not_found ->
+			StatisticsBlock = [0,0,0,0,0,0,0,0,0,0,0,0],
+			StatisticsBlockBin = term_to_binary(StatisticsBlock),
+			ar_kv:put(statistics_block, TodayDataDate, StatisticsBlockBin);
+		{ok, StatisticsBlockResult} ->
+			[Blocks,Avg_Txs_By_Block,Cumulative_Block_Rewards,Block_Rewards,Rewards_vs_Endowment,Avg_Block_Rewards,Max_Block_Rewards,Min_Block_Rewards,Avg_Block_Time,Max_Block_Time,Min_Block_Time,BlockUsedTime] = binary_to_term(StatisticsBlockResult),
+			case B#block.reward>Max_Block_Rewards of
+				true ->
+					Max_Block_Rewards_New = B#block.reward;
+				false ->
+					Max_Block_Rewards_New = Max_Block_Rewards
+			end,
+			case B#block.reward<Min_Block_Rewards of
+				true ->
+					Min_Block_Rewards_New = B#block.reward;
+				false ->
+					Min_Block_Rewards_New = Min_Block_Rewards
+			end,
+			case B#block.height>1 of
+				true ->
+					StatisticsBlockBin = term_to_binary([Blocks+1,Avg_Txs_By_Block,Cumulative_Block_Rewards+B#block.reward,Block_Rewards+B#block.reward,Rewards_vs_Endowment,Avg_Block_Rewards,Max_Block_Rewards_New,Min_Block_Rewards_New,Avg_Block_Time,Max_Block_Time,Min_Block_Time,BlockUsedTime]),
+					ar_kv:put(statistics_block, TodayDataDate, StatisticsBlockBin);
+				false ->
+					ok
+			end				
+	end.
 
 take_first_n_chars(Str, N) when is_list(Str), is_integer(N), N >= 0 ->
     lists:sublist(Str, 1, min(length(Str), N)).
@@ -1097,40 +1157,136 @@ generate_range(A, B) ->
 
 read_block_from_height_by_number(FromHeight, BlockNumber) ->
 	BlockHeightArray = generate_range(FromHeight, FromHeight + BlockNumber),
-	lists:map(
+	BlockHeightArrayReverse = lists:reverse(BlockHeightArray),
+	BlockListElement = lists:map(
 		fun(X) -> 
-			?LOG_INFO([{explorer_block, list_to_binary(integer_to_list(X))},{integer_to_list, integer_to_list(X)}, {x, X}]),
-			case ar_kv:get(explorer_block, list_to_binary(integer_to_list(X))) of 
-				not_found -> []; 
-				{ok, TxIdBinary} -> binary_to_term(TxIdBinary) 
-			end
-		end, BlockHeightArray).
+			case X > 0 of 
+				true ->
+					case ar_kv:get(explorer_block, list_to_binary(integer_to_list(X-1))) of 
+						not_found -> []; 
+						{ok, BlockIdBinaryPrevious} -> 
+							BlockIdBinaryResultPrevious = binary_to_term(BlockIdBinaryPrevious),
+							TimestampPrevious = lists:nth(5, BlockIdBinaryResultPrevious),
+							case ar_kv:get(explorer_block, list_to_binary(integer_to_list(X))) of 
+								not_found -> []; 
+								{ok, BlockIdBinary} -> 
+									BlockIdBinaryResult = binary_to_term(BlockIdBinary),
+									BlockMap = #{
+											<<"height">> => lists:nth(1, BlockIdBinaryResult),
+											<<"indep_hash">> => list_to_binary(binary_to_list(lists:nth(2, BlockIdBinaryResult))),
+											<<"reward_addr">> => list_to_binary(binary_to_list(lists:nth(3, BlockIdBinaryResult))),
+											<<"reward">> => lists:nth(4, BlockIdBinaryResult),
+											<<"timestamp">> => lists:nth(5, BlockIdBinaryResult),
+											<<"txs_length">> => lists:nth(6, BlockIdBinaryResult),
+											<<"weave_size">> => lists:nth(7, BlockIdBinaryResult),
+											<<"block_size">> => lists:nth(8, BlockIdBinaryResult),
+											<<"mining_time">> => lists:nth(5, BlockIdBinaryResult) - TimestampPrevious
+										},
+									BlockMap
+							end
+					end;
+				false ->
+					[]
+			end		
+		end, BlockHeightArrayReverse),
+	lists:filter(fun(Element) -> is_map(Element) end, BlockListElement).
+		
 
 read_statistics_network() ->
-	TodayDate = take_first_n_chars(calendar:system_time_to_rfc3339(erlang:system_time(second)), 10),
-	case ar_kv:get(statistics_network, ar_util:encode(TodayDate)) of
+	case ar_kv:get(statistics_summary, list_to_binary("datelist")) of
 		not_found ->
 			{404, #{}, []};
-		{ok, StatisticsNetworkResult} ->
-			{200, #{}, ar_serialize:jsonify(binary_to_term(StatisticsNetworkResult))}							
+		{ok, StatisticsDateListResult} ->
+			DateListArray = binary_to_term(StatisticsDateListResult),
+			Statistics_network = lists:map(
+				fun(X) -> 
+					case ar_kv:get(statistics_network, X) of
+						not_found ->
+							[];
+						{ok, DateListBinary} ->
+							DateListResult = binary_to_term(DateListBinary),
+							DateListMap = #{
+								<<"Date">> => ar_util:decode(X),
+								<<"Weave_Size">> => lists:nth(1, DateListResult),
+								<<"Weave_Size_Growth">> => lists:nth(2, DateListResult),
+								<<"Cumulative_Endowment">> => lists:nth(3, DateListResult),
+								<<"Avg_Endowment_Growth">> => lists:nth(4, DateListResult),
+								<<"Endowment_Growth">> => lists:nth(5, DateListResult),
+								<<"Avg_Pending_Txs">> => lists:nth(6, DateListResult),
+								<<"Avg_Pending_Size">> => lists:nth(7, DateListResult),
+								<<"Node_Count">> => lists:nth(8, DateListResult),
+								<<"Cumulative_Difficulty">> => lists:nth(9, DateListResult),
+								<<"Difficulty">> => lists:nth(10, DateListResult)
+							},
+							DateListMap							
+					end
+				end, DateListArray),
+			{200, #{}, ar_serialize:jsonify(Statistics_network)}
 	end.
 
 read_statistics_data() ->
-	TodayDate = take_first_n_chars(calendar:system_time_to_rfc3339(erlang:system_time(second)), 10),
-	case ar_kv:get(statistics_data, ar_util:encode(TodayDate)) of
+	case ar_kv:get(statistics_summary, list_to_binary("datelist")) of
 		not_found ->
 			{404, #{}, []};
-		{ok, StatisticsDataResult} ->
-			{200, #{}, ar_serialize:jsonify(binary_to_term(StatisticsDataResult))}							
+		{ok, StatisticsDateListResult} ->
+			DateListArray = binary_to_term(StatisticsDateListResult),
+			Statistics_data = lists:map(
+				fun(X) -> 
+					case ar_kv:get(statistics_data, X) of
+						not_found ->
+							[];
+						{ok, DateListBinary} ->
+							DateListResult = binary_to_term(DateListBinary),
+							DateListMap = #{
+								<<"Date">> => ar_util:decode(X),
+								<<"Data_Uploaded">> => lists:nth(1, DateListResult),
+								<<"Storage_Cost">> => lists:nth(2, DateListResult),
+								<<"Data_Size">> => lists:nth(3, DateListResult),
+								<<"Data_Fees">> => lists:nth(4, DateListResult),
+								<<"Cumulative_Data_Fees">> => lists:nth(5, DateListResult),
+								<<"Fees_Towards_Data_Upload">> => lists:nth(6, DateListResult),
+								<<"Data_Uploaders">> => lists:nth(7, DateListResult),
+								<<"Content_Type">> => lists:nth(8, DateListResult),
+								<<"Content_Type_Tx">> => lists:nth(9, DateListResult)
+							},
+							DateListMap							
+					end
+				end, DateListArray),
+			{200, #{}, ar_serialize:jsonify(Statistics_data)}
 	end.
 
 read_statistics_block() ->
-	TodayDate = take_first_n_chars(calendar:system_time_to_rfc3339(erlang:system_time(second)), 10),
-	case ar_kv:get(statistics_block, ar_util:encode(TodayDate)) of
+	case ar_kv:get(statistics_summary, list_to_binary("datelist")) of
 		not_found ->
 			{404, #{}, []};
-		{ok, StatisticsBlockResult} ->
-			{200, #{}, ar_serialize:jsonify(binary_to_term(StatisticsBlockResult))}							
+		{ok, StatisticsDateListResult} ->
+			DateListArray = binary_to_term(StatisticsDateListResult),
+			Statistics_block = lists:map(
+				fun(X) -> 
+					case ar_kv:get(statistics_block, X) of
+						not_found ->
+							[];
+						{ok, DateListBinary} ->
+							DateListResult = binary_to_term(DateListBinary),
+							DateListMap = #{
+								<<"Date">> => ar_util:decode(X),
+								<<"Blocks">> => lists:nth(1, DateListResult),
+								<<"Avg_Txs_By_Block">> => lists:nth(2, DateListResult),
+								<<"Cumulative_Block_Rewards">> => lists:nth(3, DateListResult),
+								<<"Block_Rewards">> => lists:nth(4, DateListResult),
+								<<"Rewards_vs_Endowment">> => lists:nth(5, DateListResult),
+								<<"Avg_Block_Rewards">> => lists:nth(6, DateListResult),
+								<<"Max_Block_Rewards">> => lists:nth(7, DateListResult),
+								<<"Min_Block_Rewards">> => lists:nth(8, DateListResult),
+								<<"Avg_Block_Time">> => lists:nth(9, DateListResult),
+								<<"Max_Block_Time">> => lists:nth(10, DateListResult),
+								<<"Min_Block_Time">> => lists:nth(11, DateListResult),
+								<<"BlockUsedTime">> => lists:nth(12, DateListResult)
+							},
+							DateListMap							
+					end
+				end, DateListArray),
+			{200, #{}, ar_serialize:jsonify(Statistics_block)}
 	end.
 
 read_statistics_address() ->
@@ -1159,6 +1315,44 @@ read_txs_by_addr(Addr) ->
 			binary_to_term(TxIdBinary)
 	end.
 
+read_txsrecord_by_addr(Addr) ->
+	case ar_kv:get(address_tx_db, Addr) of
+		not_found ->
+			[];
+		{ok, TxIdBinary} ->
+			TxIdList = binary_to_term(TxIdBinary),
+			lists:map(
+				fun(X) -> 
+					case ar_util:safe_decode(X) of
+						{ok, ID} ->
+							case ar_storage:read_tx(ID) of
+								unavailable ->
+									ok;
+								#tx{} = TX ->
+									FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+									TargetAddress = ar_util:encode(TX#tx.target),									
+									Tags = lists:map(
+											fun({Name, Value}) ->
+												{[{name, Name},{value, Value}]}
+											end,
+											TX#tx.tags),
+									TxListMap = #{
+										<<"id">> => ar_util:encode(TX#tx.id),
+										<<"owner">> => #{<<"address">> => FromAddress},
+										<<"recipient">> => TargetAddress,
+										<<"quantity">> => #{<<"winston">> => TX#tx.quantity, <<"xwe">>=> float(TX#tx.quantity) / float(?WINSTON_PER_AR)},
+										<<"fee">> => #{<<"winston">> => TX#tx.reward, <<"xwe">>=> float(TX#tx.reward) / float(?WINSTON_PER_AR)},
+										<<"data">> => #{<<"size">> => TX#tx.data_size},
+										<<"tags">> => Tags
+									},
+									TxListMap	
+							end
+					end
+				end, TxIdList)
+	end.
+
+
+
 read_txs_by_addr_deposits(Addr) ->
 	case ar_kv:get(address_tx_deposits_db, Addr) of
 		not_found ->
@@ -1166,6 +1360,15 @@ read_txs_by_addr_deposits(Addr) ->
 		{ok, TxIdBinary} ->
 			binary_to_term(TxIdBinary)
 	end.	
+
+read_txs_by_addr_send(Addr) ->
+	case ar_kv:get(address_tx_send_db, Addr) of
+		not_found ->
+			[];
+		{ok, TxIdBinary} ->
+			binary_to_term(TxIdBinary)
+	end.
+
 read_data_by_addr(Addr) ->
 	case ar_kv:get(address_data_db, Addr) of
 		not_found ->

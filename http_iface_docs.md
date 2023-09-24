@@ -19,17 +19,22 @@ A JSON array containing the network information for the current node.
 ```javascript
 {
   "network": "chivesweave.mainnet",
-  "version": "3",
-  "height": "2956",
-  "blocks": "3495",
-  "peers": "12"
+  "version": 5,
+  "release": 65,
+  "height": 307,
+  "current": "b2H-4b4Df9DruJv1u22eG3CO3E0ElP8iKo9eBO4FUAKDUTLGXlnRGonUFnRNDIDG",
+  "blocks": 308,
+  "peers": 13,
+  "time": "1695258470",
+  "queue_length": 0,
+  "node_state_latency": 1
 }
 ```
 
 #### JavaScript Example Request
 
 ```javascript
-var node = 'http://127.0.0.1:1984';
+var node = 'http://127.0.0.1:1985';
 var path = '/info';
 var url = node + path;
 var xhr = new XMLHttpRequest();
@@ -42,8 +47,6 @@ xhr.onreadystatechange = function() {
 };
 xhr.send();
 ```
-
-
 
 
 
@@ -96,7 +99,7 @@ A JSON transaction record.
 #### JavaScript Example Request
 
 ```javascript
-var node = 'http://127.0.0.1:1984';
+var node = 'http://127.0.0.1:1985';
 var path = '/tx/VvNF3aLS28MXD_o4Lv0lF9_WcxMibFOp166qDqC1Hlw';
 var url = node + path;
 var xhr = new XMLHttpRequest();
@@ -141,7 +144,7 @@ A string containing the requested field.
 #### JavaScript Example Request
 
 ```javascript
-var node = 'http://127.0.0.1:1984';
+var node = 'http://127.0.0.1:1985';
 var path = '/tx/VvNF3aLS28MXD_o4Lv0lF9_WcxMibFOp166qDqC1Hlw/last_tx';
 var url = node + path;
 var xhr = new XMLHttpRequest();
@@ -154,10 +157,6 @@ xhr.onreadystatechange = function() {
 };
 xhr.send();
 ```
-
-
-
-
 
 
 ## GET transaction body as HTML via ID
@@ -185,7 +184,7 @@ A string containing the requested field.
 #### JavaScript Example Request
 
 ```javascript
-var node = 'http://127.0.0.1:1984';
+var node = 'http://127.0.0.1:1985';
 var path = '/tx/B7j_bkDICQyl_y_hBM68zS6-p8-XiFCUmEBaXRroFTM/data.html'
 var url = node + path;
 var xhr = new XMLHttpRequest();
@@ -198,9 +197,6 @@ xhr.onreadystatechange = function() {
 };
 xhr.send();
 ```
-
-
-
 
 
 ## GET estimated transaction price
@@ -230,7 +226,7 @@ A string containing the estimated cost of the transaction in Winston.
 #### JavaScript Example Request
 
 ```javascript
-var node = 'http://127.0.0.1:1984';
+var node = 'http://127.0.0.1:1985';
 var path = '/price/2048';
 var url = node + path;
 var xhr = new XMLHttpRequest();
@@ -243,10 +239,6 @@ xhr.onreadystatechange = function() {
 };
 xhr.send();
 ```
-
-
-
-
 
 
 ## GET block via ID
@@ -286,7 +278,7 @@ A JSON array detailing the block.
 #### JavaScript Example Request
 
 ```javascript
-var node = 'http://127.0.0.1:1984';
+var node = 'http://127.0.0.1:1985';
 var path = '/block/hash/-3-oyxTcYAgbbNoFyDz8hqs7KCJHI4qb4VdER9Jotbs';
 var url = node + path;
 var xhr = new XMLHttpRequest();
@@ -300,18 +292,25 @@ xhr.onreadystatechange = function() {
 xhr.send();
 ```
 
+## GET block via height
 
+Retrieve a JSON array representing the contents of the block specified via the block from height and how many blocks your want to fetch.
 
-
-
+- **URL**
+  `/blocklist/[FromHeight]/[BlockNumber]`
+- **Method**
+  GET
+- **URL Parameters**
+  [FromHeight] : The height at which the block is being requested for
+  [BlockNumber] : how many blocks your want to fetch
 
 
 ## GET block via height
 
 Retrieve a JSON array representing the contents of the block specified via the block height.
 
-- **URL**
-  `/block/height/[block_height]
+- **URL**`
+  `/block/height/[block_height]`
 - **Method**
   GET
 - **URL Parameters**
@@ -343,8 +342,8 @@ A JSON array detailing the block.
 #### JavaScript Example Request
 
 ```javascript
-var node = 'http://127.0.0.1:1984';
-var path = '/block/height/1101';
+var node = 'http://127.0.0.1:1985';
+var path = '/block/height/100';
 var url = node + path;
 var xhr = new XMLHttpRequest();
 
@@ -356,12 +355,6 @@ xhr.onreadystatechange = function() {
 };
 xhr.send();
 ```
-
-
-
-
-
-
 
 
 ## GET current block
@@ -399,7 +392,7 @@ A JSON array detailing the block.
 #### JavaScript Example Request
 
 ```javascript
-var node = 'http://127.0.0.1:1984';
+var node = 'http://127.0.0.1:1985';
 var path = '/current_block';
 var url = node + path;
 var xhr = new XMLHttpRequest();
@@ -412,10 +405,6 @@ xhr.onreadystatechange = function() {
 };
 xhr.send();
 ```
-
-
-
-
 
 
 
@@ -444,7 +433,7 @@ A string containing the balance of the wallet.
 #### JavaScript Example Request
 
 ```javascript
-var node = 'http://127.0.0.1:1984';
+var node = 'http://127.0.0.1:1985';
 var path = '/wallet/VukPk7P3qXAS2Q76ejTwC6Y_U_bMl_z6mgLvgSUJIzE/balance';
 var url = node + path;
 var xhr = new XMLHttpRequest();
@@ -489,7 +478,7 @@ A string containing the ID of the last transaction made by the given address.
 #### JavaScript Example Request
 
 ```javascript
-var node = 'http://127.0.0.1:1984';
+var node = 'http://127.0.0.1:1985';
 var path = '/wallet/VukPk7P3qXAS2Q76ejTwC6Y_U_bMl_z6mgLvgSUJIzE/last_tx';
 var url = node + path;
 var xhr = new XMLHttpRequest();
@@ -509,13 +498,12 @@ xhr.send();
 Retrieve identifiers of transactions made by the given wallet.
 
 - **URL**
-  `/wallet/[wallet_address]/txs/[earliest_tx]`
+  `/wallet/[wallet_address]/txs`
 - **Method**
   GET
 - **URL Parameters**
 
   - [wallet_address] : A Base64 encoded SHA256 hash of the public key.
-  - [earliest_tx] (optional) : A Base64 encoded ID of the earliest transaction to fetch. If not specified, all transactions made by the given wallet are returned.
 
 
 #### Example Response
@@ -530,8 +518,8 @@ A JSON list of base64url encoded transaction identifiers.
 #### JavaScript Example Request
 
 ```javascript
-var node = 'http://127.0.0.1:1984';
-var path = '/wallet/VukPk7P3qXAS2Q76ejTwC6Y_U_bMl_z6mgLvgSUJIzE/txs/bUfaJN-KKS1LRh_DlJv4ff1gmdbHP4io-J9x7cLY5is';
+var node = 'http://127.0.0.1:1985';
+var path = '/wallet/VukPk7P3qXAS2Q76ejTwC6Y_U_bMl_z6mgLvgSUJIzE/txs';
 var url = node + path;
 var xhr = new XMLHttpRequest();
 
@@ -550,13 +538,12 @@ xhr.send();
 Retrieve identifiers of transfer transactions depositing to the given wallet. The index is partial - only transactions known by the given node are returned.
 
 - **URL**
-  `/wallet/[wallet_address]/deposits/[earliest_deposit]`
+  `/wallet/[wallet_address]/deposits/`
 - **Method**
   GET
 - **URL Parameters**
 
   - [wallet_address] : A Base64 encoded SHA256 hash of the public key.
-  - [earliest_deposit] (optional) : A Base64 encoded ID of the earliest transaction to fetch. If not specified, all deposits known by the node are fetched.
 
 
 #### Example Response
@@ -592,7 +579,7 @@ A list containing the IP addresses of all of the nodes peers.
 #### JavaScript Example Request
 
 ```javascript
-var node = 'http://127.0.0.1:1984';
+var node = 'http://127.0.0.1:1985';
 var path = '/peers';
 var url = node + path;
 var xhr = new XMLHttpRequest();
@@ -641,7 +628,7 @@ Post a transaction to the network.
 #### JavaScript Example Request
 
 ```javascript
-var node = 'http://127.0.0.1:1984';
+var node = 'http://127.0.0.1:1985';
 var path = '/tx';
 var url = node + path;
 var xhr = new XMLHttpRequest();
@@ -669,6 +656,29 @@ xhr.send(post);
 
 
 
+
+## GET network statistics
+
+Retrieve a JSON array representing the contents of the network statistics.
+
+- **URL**
+  `/statistics_network`
+- **Method**
+  GET
+
+
+## GET data statistics
+
+Retrieve a JSON array representing the contents of the data statistics.
+
+- **URL**
+  `/statistics_data`
+- **Method**
+  GET
+
+
+
+
 > Please note that in the JSON transaction records all winston value fields (quantity and reward) are strings. This is to allow for interoperability between environments that do not accommodate arbitrary-precision arithmetic. JavaScript for instance stores all numbers as double precision floating point values and as such cannot natively express the integer number of winston. Providing these values as strings allows them to be directly loaded into most 'bignum' libraries.
 
 
@@ -678,7 +688,7 @@ xhr.send(post);
 # Contact
 
 If you have questions or comments on the Chivesweave HTTP interface you can get in touch by
-finding us on [Twitter](https://twitter.com/Chives-network/), [Reddit](https://www.reddit.com/r/Chives-network), [Discord](https://discord.gg/8KrtgBRjZn) or by emailing us at team@chivesweave.org.
+finding us on [Twitter](https://twitter.com/Chives-network/), [Reddit](https://www.reddit.com/r/Chives-network), [Discord](https://discord.gg/8KrtgBRjZn).
 
 # License
 The Chivesweave project is released under GNU General Public License v2.0.

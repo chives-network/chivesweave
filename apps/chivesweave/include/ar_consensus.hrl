@@ -1,12 +1,12 @@
 %% The number of RandomX hashes to compute to pack a chunk.
--define(PACKING_DIFFICULTY, 6).
+-define(PACKING_DIFFICULTY, 4).
 
 %% The number of RandomX hashes to compute to pack a chunk after the fork 2.6.
 %% we want packing x30 longer than regular one
 %% 8   iterations - 2 ms
 %% 360 iterations - 59 ms
 %% 360/8 = 45
--define(PACKING_DIFFICULTY_2_6, 6).
+-define(PACKING_DIFFICULTY_2_6, 4).
 
 -define(RANDOMX_PACKING_ROUNDS, 8 * (?PACKING_DIFFICULTY)).
 
@@ -85,9 +85,9 @@
 	},
 	case Forks of
 		{_Fork_2_4, Fork_2_6} when Height >= Fork_2_6 ->
-			6;
+			4;
 		{Fork_2_4, _Fork_2_6} when Height >= Fork_2_4 ->
-			6
+			4
 	end
 end()).
 -else.

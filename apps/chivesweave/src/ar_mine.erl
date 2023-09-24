@@ -209,7 +209,8 @@ min_difficulty(Height) ->
 			end;
 		false ->
 			Diff
-	end.
+	end,
+	?LOG_INFO([{height_______________, Height},{min_difficulty_______________, Diff},{switch_to_linear_diff, ar_retarget:switch_to_linear_diff(Diff)}]).
 -endif.
 
 sha384_diff_to_randomx_diff(Sha384Diff) ->

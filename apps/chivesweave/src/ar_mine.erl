@@ -199,6 +199,8 @@ min_difficulty(Height) ->
 			false ->
 				min_sha384_difficulty()
 		end,
+	?LOG_INFO([{height______________1_, Height},{min_difficulty_______________, Diff},{switch_to_linear_diff, ar_retarget:switch_to_linear_diff(Diff)}]),
+	?LOG_INFO([{height______________2_, Height},{min_difficulty_______________, Diff},{switch_to_linear_diff, ar_retarget:switch_to_linear_diff_pre_fork_2_5(Diff)}]),
 	case Height >= ar_fork:height_1_8() of
 		true ->
 			case Height >= ar_fork:height_2_5() of
@@ -209,8 +211,7 @@ min_difficulty(Height) ->
 			end;
 		false ->
 			Diff
-	end,
-	?LOG_INFO([{height_______________, Height},{min_difficulty_______________, Diff},{switch_to_linear_diff, ar_retarget:switch_to_linear_diff(Diff)}]).
+	end.
 -endif.
 
 sha384_diff_to_randomx_diff(Sha384Diff) ->

@@ -1616,11 +1616,11 @@ start_mining(State) ->
 			Diff = get_current_diff(),
 			case maps:get(miner_2_6, State) of
 				undefined ->
-					?LOG_INFO([{set_difficulty_1617, Diff}]),
+					?LOG_INFO([{start_mining_set_difficulty_1617, Diff}]),
 					ar_mining_server:start_mining({Diff}),
 					State#{ miner_2_6 => running };
 				_ ->
-					?LOG_INFO([{set_difficulty_1621, Diff}]),
+					?LOG_INFO([{start_mining_set_difficulty_1621, Diff}]),
 					ar_mining_server:set_difficulty(Diff),
 					State
 			end;

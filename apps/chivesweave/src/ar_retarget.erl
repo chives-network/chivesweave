@@ -224,6 +224,10 @@ calculate_difficulty_after_1_8_before_1_9(OldDiff, TS, Last, Height) ->
 		false ->
 			MaxDiff = ?MAX_DIFF,
 			MinDiff = ar_mine:min_difficulty(Height),
+			?LOG_INFO([{oldDiff________________________________, OldDiff}]),
+			?LOG_INFO([{newDiff________________________________, MaxDiff - (MaxDiff - OldDiff) * ActualTime div TargetTime}]),
+			?LOG_INFO([{minDiff________________________________, MinDiff}]),
+			?LOG_INFO([{maxDiff________________________________, MaxDiff}]),
 			between(
 				MaxDiff - (MaxDiff - OldDiff) * ActualTime div TargetTime,
 				max(MinDiff, OldDiff div 2),

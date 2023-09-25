@@ -1,26 +1,31 @@
-name: "Chivesweave Tests"
+name: "Mainnet Tests"
 on:
   push:
-    branches: ["**"]
+    branches: [ "master" ]
 jobs:
   test:
-    runs-on:
-      labels: ubuntu-latest-16-cores
+    runs-on: ubuntu-22.04
     steps:
       - name: Clone repository
-        uses: actions/checkout@v2.3.4
+        uses: actions/checkout@v2
         with:
-          submodules: "recursive"
-      - uses: erlef/setup-beam@v1
+          submodules: true
+
+      - name: Set up Erlang environment
+        uses: erlef/setup-beam@v1
         with:
           otp-version: "24.3"
           rebar3-version: "3.20.0"
-      - name: Install linux dependencies
-        run: sudo apt install libssl-dev libgmp-dev libsqlite3-dev make cmake gcc g++
-      - name: Start empd
-        run: epmd -daemon
-      - name: Make the mainnet package
+
+      - name: Install CMake and g++
         run: |
-          cd chivesweave
+          sudo apt-get update
+          sudo apt-get install cmake g++
+          
+      - name: rebar3 mainnet
+        run: |
           ./rebar3 as mainnet tar
+
+      - name: Running Test Script
+        run: |
           ./bin/test

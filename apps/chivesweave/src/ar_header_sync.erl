@@ -62,7 +62,7 @@ init([]) ->
 	process_flag(trap_exit, true),
 	[ok, ok] = ar_events:subscribe([tx, disksup]),
 	{ok, Config} = application:get_env(chivesweave, config),
-	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_header_sync_db"), ?MODULE),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_header_sync_db"), ?MODULE),
 	{SyncRecord, Height, CurrentBI} =
 		case ar_storage:read_term(header_sync_state) of
 			not_found ->

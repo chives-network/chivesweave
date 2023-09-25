@@ -239,11 +239,11 @@ init(StoreID) ->
 	{Dir, PartitionSize, PartitionIndex} =
 		case StoreID of
 			"default" ->
-				{filename:join(?ROCKS_DB_DIR, "ar_sync_record_db"), undefined, undefined};
+				{filename:join(?ROCKS_DB_DIR, "xwe_sync_record_db"), undefined, undefined};
 			_ ->
 				{Size, Index, _Packing} = ar_storage_module:get_by_id(StoreID),
 				{filename:join(["storage_modules", StoreID, ?ROCKS_DB_DIR,
-						"ar_sync_record_db"]), Size, Index}
+						"xwe_sync_record_db"]), Size, Index}
 		end,
 	StateDB = {sync_record, StoreID},
 	ok = ar_kv:open(Dir, StateDB),

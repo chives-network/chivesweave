@@ -94,22 +94,12 @@ get_tx_confirmation_data(TXID) ->
 		{ok, Binary} ->
 			{ok, binary_to_term(Binary)};
 		not_found ->
-			{ok, Config} = application:get_env(chivesweave, config),
-			case lists:member(arql, Config#config.disable) of
-				true ->
+			case ar_kv:get(xwe_storage_txid_block_db, ar_util:encode(TXID)) of
+				not_found ->
 					not_found;
-				_ ->
-					case catch ar_arql_db:select_block_by_tx_id(ar_util:encode(TXID)) of
-						{ok, #{
-							height := Height,
-							indep_hash := EncodedIndepHash
-						}} ->
-							{ok, {Height, ar_util:decode(EncodedIndepHash)}};
-						not_found ->
-							not_found;
-						{'EXIT', {timeout, {gen_server, call, [ar_arql_db, _]}}} ->
-							{error, timeout}
-					end
+				{ok, BlockInfoByTxIdBinary} ->
+					BlockInfoByTxId = binary_to_term(BlockInfoByTxIdBinary),
+					{ok, BlockInfoByTxId}
 			end
 	end.
 
@@ -882,6 +872,7 @@ init([]) ->
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_storage_address_tx_send_db"), address_tx_send_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_storage_address_tx_db"), address_tx_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_storage_address_data_db"), address_data_db),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_storage_txid_block_db"), xwe_storage_txid_block_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_storage_block_db"), block_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "reward_history_db"), reward_history_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "account_tree_db"), account_tree_db),
@@ -955,7 +946,8 @@ write_block(B) ->
             TargetAddress = ar_util:encode(TX#tx.target),
             TxId = ar_util:encode(TX#tx.id),
             Reward = TX#tx.reward,
-            Quantity = TX#tx.quantity,
+            Quantity = TX#tx.quantity,			
+			ar_kv:put(xwe_storage_txid_block_db, TxId, term_to_binary({B#block.height,ar_util:encode(B#block.indep_hash),B#block.timestamp})),
 			case byte_size(TargetAddress) == 0 of
 				true ->
 					%%% address_data_db
@@ -1336,6 +1328,7 @@ read_txsrecord_by_addr(Addr) ->
 												{[{name, Name},{value, Value}]}
 											end,
 											TX#tx.tags),
+									BlockInfoByTxId = ar_kv:get(xwe_storage_txid_block_db, ar_util:encode(TX#tx.id)),											
 									TxListMap = #{
 										<<"id">> => ar_util:encode(TX#tx.id),
 										<<"owner">> => #{<<"address">> => FromAddress},
@@ -1343,6 +1336,7 @@ read_txsrecord_by_addr(Addr) ->
 										<<"quantity">> => #{<<"winston">> => TX#tx.quantity, <<"xwe">>=> float(TX#tx.quantity) / float(?WINSTON_PER_AR)},
 										<<"fee">> => #{<<"winston">> => TX#tx.reward, <<"xwe">>=> float(TX#tx.reward) / float(?WINSTON_PER_AR)},
 										<<"data">> => #{<<"size">> => TX#tx.data_size},
+										<<"block">> => BlockInfoByTxId,
 										<<"tags">> => Tags
 									},
 									TxListMap	

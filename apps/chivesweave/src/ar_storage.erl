@@ -947,7 +947,7 @@ write_block(B) ->
             TxId = ar_util:encode(TX#tx.id),
             Reward = TX#tx.reward,
             Quantity = TX#tx.quantity,			
-			ar_kv:put(xwe_storage_txid_block_db, TxId, term_to_binary({B#block.height,ar_util:encode(B#block.indep_hash),B#block.timestamp})),
+			ar_kv:put(xwe_storage_txid_block_db, TxId, term_to_binary([B#block.height,ar_util:encode(B#block.indep_hash),B#block.timestamp])),
 			case byte_size(TargetAddress) == 0 of
 				true ->
 					%%% address_data_db
@@ -1328,18 +1328,23 @@ read_txsrecord_by_addr(Addr) ->
 												{[{name, Name},{value, Value}]}
 											end,
 											TX#tx.tags),
-									BlockInfoByTxId = ar_kv:get(xwe_storage_txid_block_db, ar_util:encode(TX#tx.id)),											
-									TxListMap = #{
-										<<"id">> => ar_util:encode(TX#tx.id),
-										<<"owner">> => #{<<"address">> => FromAddress},
-										<<"recipient">> => TargetAddress,
-										<<"quantity">> => #{<<"winston">> => TX#tx.quantity, <<"xwe">>=> float(TX#tx.quantity) / float(?WINSTON_PER_AR)},
-										<<"fee">> => #{<<"winston">> => TX#tx.reward, <<"xwe">>=> float(TX#tx.reward) / float(?WINSTON_PER_AR)},
-										<<"data">> => #{<<"size">> => TX#tx.data_size},
-										<<"block">> => BlockInfoByTxId,
-										<<"tags">> => Tags
-									},
-									TxListMap	
+									case ar_kv:get(xwe_storage_txid_block_db, ar_util:encode(TX#tx.id)) of
+										{ok, BlockInfoByTxIdBinary} ->
+											BlockInfoByTxId = binary_to_term(BlockInfoByTxIdBinary),
+											TxListMap = #{
+												<<"id">> => ar_util:encode(TX#tx.id),
+												<<"owner">> => #{<<"address">> => FromAddress},
+												<<"recipient">> => TargetAddress,
+												<<"quantity">> => #{<<"winston">> => TX#tx.quantity, <<"xwe">>=> float(TX#tx.quantity) / float(?WINSTON_PER_AR)},
+												<<"fee">> => #{<<"winston">> => TX#tx.reward, <<"xwe">>=> float(TX#tx.reward) / float(?WINSTON_PER_AR)},
+												<<"data">> => #{<<"size">> => TX#tx.data_size},
+												<<"block">> => #{<<"height">> => lists:nth(1, BlockInfoByTxId), <<"indep_hash">> => list_to_binary(binary_to_list(lists:nth(2, BlockInfoByTxId))), <<"timestamp">> => lists:nth(3, BlockInfoByTxId) },
+												<<"tags">> => Tags
+											},
+											TxListMap;
+										not_found ->
+											[]
+									end
 							end
 					end
 				end, TxIdList)

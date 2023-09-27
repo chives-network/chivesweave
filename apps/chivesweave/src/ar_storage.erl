@@ -1364,56 +1364,73 @@ read_txrecord_by_txid(TxId) ->
 			end
 	end.
 
+read_txsrecord_function(TxIdBinary) ->
+	TxIdList = binary_to_term(TxIdBinary),
+	lists:map(
+		fun(X) -> 
+			case ar_util:safe_decode(X) of
+				{ok, ID} ->
+					case ar_storage:read_tx(ID) of
+						unavailable ->
+							ok;
+						#tx{} = TX ->
+							FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+							TargetAddress = ar_util:encode(TX#tx.target),									
+							Tags = lists:map(
+									fun({Name, Value}) ->
+										{[{name, Name},{value, Value}]}
+									end,
+									TX#tx.tags),
+							TagsMap = lists:map(
+									fun({Name, Value}) ->
+										{Name, Value}
+									end,
+									TX#tx.tags),
+							DataType = find_value(<<"Content-Type">>, TagsMap),
+							case ar_kv:get(xwe_storage_txid_block_db, ar_util:encode(TX#tx.id)) of
+								{ok, BlockInfoByTxIdBinary} ->
+									BlockInfoByTxId = binary_to_term(BlockInfoByTxIdBinary),
+									TxListMap = #{
+										<<"id">> => ar_util:encode(TX#tx.id),
+										<<"owner">> => #{<<"address">> => FromAddress},
+										<<"recipient">> => TargetAddress,
+										<<"quantity">> => #{<<"winston">> => TX#tx.quantity, <<"xwe">>=> float(TX#tx.quantity) / float(?WINSTON_PER_AR)},
+										<<"fee">> => #{<<"winston">> => TX#tx.reward, <<"xwe">>=> float(TX#tx.reward) / float(?WINSTON_PER_AR)},
+										<<"data">> => #{<<"size">> => TX#tx.data_size, <<"type">> => DataType},
+										<<"block">> => #{<<"height">> => lists:nth(1, BlockInfoByTxId), <<"indep_hash">> => list_to_binary(binary_to_list(lists:nth(2, BlockInfoByTxId))), <<"timestamp">> => lists:nth(3, BlockInfoByTxId) },
+										<<"tags">> => Tags
+									},
+									TxListMap;
+								not_found ->
+									[]
+							end
+					end
+			end
+		end, TxIdList).
+
 read_txsrecord_by_addr(Addr) ->
 	case ar_kv:get(address_tx_db, Addr) of
 		not_found ->
 			[];
 		{ok, TxIdBinary} ->
-			TxIdList = binary_to_term(TxIdBinary),
-			lists:map(
-				fun(X) -> 
-					case ar_util:safe_decode(X) of
-						{ok, ID} ->
-							case ar_storage:read_tx(ID) of
-								unavailable ->
-									ok;
-								#tx{} = TX ->
-									FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
-									TargetAddress = ar_util:encode(TX#tx.target),									
-									Tags = lists:map(
-											fun({Name, Value}) ->
-												{[{name, Name},{value, Value}]}
-											end,
-											TX#tx.tags),
-									TagsMap = lists:map(
-											fun({Name, Value}) ->
-												{Name, Value}
-											end,
-											TX#tx.tags),
-									DataType = find_value(<<"Content-Type">>, TagsMap),
-									case ar_kv:get(xwe_storage_txid_block_db, ar_util:encode(TX#tx.id)) of
-										{ok, BlockInfoByTxIdBinary} ->
-											BlockInfoByTxId = binary_to_term(BlockInfoByTxIdBinary),
-											TxListMap = #{
-												<<"id">> => ar_util:encode(TX#tx.id),
-												<<"owner">> => #{<<"address">> => FromAddress},
-												<<"recipient">> => TargetAddress,
-												<<"quantity">> => #{<<"winston">> => TX#tx.quantity, <<"xwe">>=> float(TX#tx.quantity) / float(?WINSTON_PER_AR)},
-												<<"fee">> => #{<<"winston">> => TX#tx.reward, <<"xwe">>=> float(TX#tx.reward) / float(?WINSTON_PER_AR)},
-												<<"data">> => #{<<"size">> => TX#tx.data_size, <<"type">> => DataType},
-												<<"block">> => #{<<"height">> => lists:nth(1, BlockInfoByTxId), <<"indep_hash">> => list_to_binary(binary_to_list(lists:nth(2, BlockInfoByTxId))), <<"timestamp">> => lists:nth(3, BlockInfoByTxId) },
-												<<"tags">> => Tags
-											},
-											TxListMap;
-										not_found ->
-											[]
-									end
-							end
-					end
-				end, TxIdList)
+			read_txsrecord_function(TxIdBinary)
 	end.
 
+read_txs_by_addr_deposits(Addr) ->
+	case ar_kv:get(address_tx_deposits_db, Addr) of
+		not_found ->
+			[];
+		{ok, TxIdBinary} ->
+			read_txsrecord_function(TxIdBinary)
+	end.	
 
+read_txs_by_addr_send(Addr) ->
+	case ar_kv:get(address_tx_send_db, Addr) of
+		not_found ->
+			[];
+		{ok, TxIdBinary} ->
+			read_txsrecord_function(TxIdBinary)
+	end.
 
 read_datarecord_by_addr(Addr) ->
 	case ar_kv:get(address_data_db, Addr) of
@@ -1465,22 +1482,6 @@ read_datarecord_by_addr(Addr) ->
 	end.
 
 
-
-read_txs_by_addr_deposits(Addr) ->
-	case ar_kv:get(address_tx_deposits_db, Addr) of
-		not_found ->
-			[];
-		{ok, TxIdBinary} ->
-			binary_to_term(TxIdBinary)
-	end.	
-
-read_txs_by_addr_send(Addr) ->
-	case ar_kv:get(address_tx_send_db, Addr) of
-		not_found ->
-			[];
-		{ok, TxIdBinary} ->
-			binary_to_term(TxIdBinary)
-	end.
 
 read_data_by_addr(Addr) ->
 	case ar_kv:get(address_data_db, Addr) of

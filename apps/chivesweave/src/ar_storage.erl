@@ -969,7 +969,7 @@ write_block(B) ->
 							TxIdArrayFrom2 = binary_to_term(TxIdBinaryFrom2),
 							TxIdDataFrom2 = term_to_binary([TxId | TxIdArrayFrom2])					
 					end,			
-					ar_kv:put(address_data_db, FromAddress, TxIdDataFrom2),
+					ar_kv:put(address_tx_db, FromAddress, TxIdDataFrom2),
 					%%% explorer_address_richlist
 					case ar_kv:get(explorer_address_richlist, FromAddress) of
 						not_found ->

@@ -75,7 +75,7 @@ calculate_difficulty(OldDiff, TS, Last, Height, PrevTS) ->
 			calculate_difficulty_with_drop(OldDiff, TS, Last, Height, PrevTS,
 					?INITIAL_DIFF_DROP_2_6, ?DIFF_DROP_2_6);
 		_ when Height > Fork_2_5 ->
-			calculate_difficulty_after_1_8_before_1_9(OldDiff, TS, Last, Height);
+			calculate_difficulty_before_1_8(OldDiff, TS, Last, Height);
 		_ when Height == Fork_2_5 ->
 			calculate_difficulty_at_2_5(OldDiff, TS, Last, Height, PrevTS);
 		_ when Height > Fork_2_4 ->

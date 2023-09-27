@@ -1168,12 +1168,37 @@ handle(<<"GET">>, [<<"wallet">>, Addr, <<"txsrecord">>], Req, _Pid) ->
 	end;
 
 %% Return transaction identifiers (hashes) for the wallet specified via wallet_address.
+%% GET request to endpoint /wallet/{wallet_address}/txsrecord.
+handle(<<"GET">>, [<<"wallet">>, TxId, <<"txrecord">>], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_wallet_txs, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_wallet_txrecord(TxId),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+
+%% Return transaction identifiers (hashes) for the wallet specified via wallet_address.
 %% GET request to endpoint /wallet/{wallet_address}/data.
 handle(<<"GET">>, [<<"wallet">>, Addr, <<"data">>], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_wallet_data, Config#config.enable) of
 		true ->
 			{Status, Headers, Body} = handle_get_address_data(Addr),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+%% Return transaction identifiers (hashes) for the wallet specified via wallet_address.
+%% GET request to endpoint /wallet/{wallet_address}/data.
+handle(<<"GET">>, [<<"wallet">>, Addr, <<"datarecord">>], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_wallet_data, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_address_datarecord(Addr),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1760,6 +1785,16 @@ handle_get_wallet_txs(Addr) ->
 			end
 	end.
 
+
+handle_get_wallet_txrecord(TxId) ->
+	case ar_storage:read_txrecord_by_txid(TxId) of
+		not_found ->
+			{404, #{}, []};
+		Res ->
+			% ?LOG_INFO([{handle_get_wallet_txs, Res}]),
+			{200, #{}, ar_serialize:jsonify(Res)}
+	end.
+
 handle_get_wallet_txsrecord(Addr) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->
@@ -1808,6 +1843,20 @@ handle_get_address_data(Addr) ->
 			{400, #{}, <<"Invalid address.">>};
 		{ok, _} ->
 			case ar_storage:read_data_by_addr(Addr) of
+				not_found ->
+					{404, #{}, []};
+				Res ->
+					% ?LOG_INFO([{handle_get_address_data, Res}]),
+					{200, #{}, ar_serialize:jsonify(Res)}
+			end
+	end.
+
+handle_get_address_datarecord(Addr) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			case ar_storage:read_datarecord_by_addr(Addr) of
 				not_found ->
 					{404, #{}, []};
 				Res ->

@@ -11,7 +11,7 @@
 		wallet_list_filepath/1, tx_filepath/1, tx_data_filepath/1, read_tx_file/1,
 		read_migrated_v1_tx_file/1, ensure_directories/1, write_file_atomic/2,
 		write_term/2, write_term/3, read_term/1, read_term/2, delete_term/1, is_file/1,
-		migrate_tx_record/1, migrate_block_record/1, update_reward_history/1, read_account/2, read_txs_by_addr/1, read_txsrecord_by_addr/1, read_data_by_addr/1, read_datarecord_by_addr/1, read_txs_by_addr_deposits/1, read_txs_by_addr_send/1, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0 ]).
+		migrate_tx_record/1, migrate_block_record/1, update_reward_history/1, read_account/2, read_txs_by_addr/1, read_txrecord_by_txid/1, read_txsrecord_by_addr/1, read_data_by_addr/1, read_datarecord_by_addr/1, read_txs_by_addr_deposits/1, read_txs_by_addr_send/1, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0 ]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
 
@@ -960,6 +960,16 @@ write_block(B) ->
 							TxIdDataFrom = term_to_binary([TxId | TxIdArrayFrom])					
 					end,			
 					ar_kv:put(address_data_db, FromAddress, TxIdDataFrom),
+					%%% address_tx_db
+					case ar_kv:get(address_tx_db, FromAddress) of
+						not_found ->
+							TxIdArrayFrom2 = [TxId],
+							TxIdDataFrom2 = term_to_binary(TxIdArrayFrom2);
+						{ok, TxIdBinaryFrom2} ->
+							TxIdArrayFrom2 = binary_to_term(TxIdBinaryFrom2),
+							TxIdDataFrom2 = term_to_binary([TxId | TxIdArrayFrom2])					
+					end,			
+					ar_kv:put(address_data_db, FromAddress, TxIdDataFrom2),
 					%%% explorer_address_richlist
 					case ar_kv:get(explorer_address_richlist, FromAddress) of
 						not_found ->
@@ -1007,7 +1017,7 @@ write_block(B) ->
 					ar_kv:put(address_tx_deposits_db, TargetAddress, TxIdData3),
 					
 					%%% address_tx_send_db
-					case ar_kv:get(address_tx_send_db, TargetAddress) of
+					case ar_kv:get(address_tx_send_db, FromAddress) of
 						not_found ->
 							TxIdArray4 = [TxId],
 							TxIdData4 = term_to_binary(TxIdArray4);
@@ -1015,7 +1025,7 @@ write_block(B) ->
 							TxIdArray4 = binary_to_term(TxIdBinary4),
 							TxIdData4 = term_to_binary([TxId | TxIdArray4])					
 					end,			
-					ar_kv:put(address_tx_send_db, TargetAddress, TxIdData4),
+					ar_kv:put(address_tx_send_db, FromAddress, TxIdData4),
 					
 					%%% explorer_address_richlist Send
 					case ar_kv:get(explorer_address_richlist, FromAddress) of
@@ -1311,6 +1321,47 @@ find_value(Key, List) ->
 	case lists:keyfind(Key, 1, List) of
 		{Key, Val} -> Val;
 		false -> <<"text/plain">>
+	end.
+
+read_txrecord_by_txid(TxId) ->
+	case ar_util:safe_decode(TxId) of
+		{ok, ID} ->
+			?LOG_INFO([{txId, TxId},{iD___________________, ID}]),
+			case ar_storage:read_tx(ID) of
+				unavailable ->
+					unavailable;
+				#tx{} = TX ->
+					FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+					TargetAddress = ar_util:encode(TX#tx.target),									
+					Tags = lists:map(
+							fun({Name, Value}) ->
+								{[{name, Name},{value, Value}]}
+							end,
+							TX#tx.tags),
+					TagsMap = lists:map(
+							fun({Name, Value}) ->
+								{Name, Value}
+							end,
+							TX#tx.tags),
+					DataType = find_value(<<"Content-Type">>, TagsMap),
+					case ar_kv:get(xwe_storage_txid_block_db, ar_util:encode(TX#tx.id)) of
+						{ok, BlockInfoByTxIdBinary} ->
+							BlockInfoByTxId = binary_to_term(BlockInfoByTxIdBinary),
+							TxListMap = #{
+								<<"id">> => ar_util:encode(TX#tx.id),
+								<<"owner">> => #{<<"address">> => FromAddress},
+								<<"recipient">> => TargetAddress,
+								<<"quantity">> => #{<<"winston">> => TX#tx.quantity, <<"xwe">>=> float(TX#tx.quantity) / float(?WINSTON_PER_AR)},
+								<<"fee">> => #{<<"winston">> => TX#tx.reward, <<"xwe">>=> float(TX#tx.reward) / float(?WINSTON_PER_AR)},
+								<<"data">> => #{<<"size">> => TX#tx.data_size, <<"type">> => DataType},
+								<<"block">> => #{<<"height">> => lists:nth(1, BlockInfoByTxId), <<"indep_hash">> => list_to_binary(binary_to_list(lists:nth(2, BlockInfoByTxId))), <<"timestamp">> => lists:nth(3, BlockInfoByTxId) },
+								<<"tags">> => Tags
+							},
+							TxListMap;
+						not_found ->
+							[]
+					end
+			end
 	end.
 
 read_txsrecord_by_addr(Addr) ->

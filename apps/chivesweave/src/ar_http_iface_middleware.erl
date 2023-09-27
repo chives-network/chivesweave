@@ -1168,6 +1168,19 @@ handle(<<"GET">>, [<<"wallet">>, Addr, <<"txsrecord">>], Req, _Pid) ->
 	end;
 
 %% Return transaction identifiers (hashes) for the wallet specified via wallet_address.
+%% GET request to endpoint /wallet/{wallet_address}/txsrecord.
+handle(<<"GET">>, [<<"wallet">>, TxId, <<"txrecord">>], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_wallet_txs, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_wallet_txrecord(TxId),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+
+%% Return transaction identifiers (hashes) for the wallet specified via wallet_address.
 %% GET request to endpoint /wallet/{wallet_address}/data.
 handle(<<"GET">>, [<<"wallet">>, Addr, <<"data">>], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
@@ -1770,6 +1783,16 @@ handle_get_wallet_txs(Addr) ->
 					% ?LOG_INFO([{handle_get_wallet_txs, Res}]),
 					{200, #{}, ar_serialize:jsonify(Res)}
 			end
+	end.
+
+
+handle_get_wallet_txrecord(TxId) ->
+	case ar_storage:read_txrecord_by_txid(TxId) of
+		not_found ->
+			{404, #{}, []};
+		Res ->
+			% ?LOG_INFO([{handle_get_wallet_txs, Res}]),
+			{200, #{}, ar_serialize:jsonify(Res)}
 	end.
 
 handle_get_wallet_txsrecord(Addr) ->

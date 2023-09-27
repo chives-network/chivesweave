@@ -246,12 +246,16 @@ switch_to_randomx_fork_diff(OldDiff) ->
 calculate_difficulty_before_1_8(OldDiff, TS, Last, Height) ->
 	TargetTime = ?RETARGET_BLOCKS * ?TARGET_TIME,
 	ActualTime = TS - Last,
-	TimeError = abs(ActualTime - TargetTime),
+	?LOG_INFO([{min_difficulty_________________________, ar_mine:min_difficulty(Height)}]),
+	?LOG_INFO([{actualTime_____________________________, ActualTime}]),
+	?LOG_INFO([{minDiff________________________________, OldDiff - erlang:trunc(OldDiff * 0.01)}]),
+	?LOG_INFO([{maxDiff________________________________, OldDiff + erlang:trunc(OldDiff * 0.01)}]),
+	?LOG_INFO([{oldDiff________________________________, OldDiff}]),
 	Diff = erlang:max(
 		if
-			TimeError < (TargetTime * ?RETARGET_TOLERANCE) -> OldDiff;
-			TargetTime > ActualTime                        -> OldDiff + 1;
-			true                                           -> OldDiff - 1
+			ActualTime > (TargetTime * (1 + ?RETARGET_TOLERANCE) ) -> OldDiff - erlang:trunc(OldDiff * 0.01);
+			ActualTime < (TargetTime * (1 - ?RETARGET_TOLERANCE) ) -> OldDiff + erlang:trunc(OldDiff * 0.01);
+			true                                           -> OldDiff
 		end,
 		ar_mine:min_difficulty(Height)
 	),

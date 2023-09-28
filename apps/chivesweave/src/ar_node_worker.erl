@@ -379,7 +379,7 @@ handle_info({event, miner, {found_solution, Args}}, State) ->
 		end,
 	Diff = get_current_diff(Timestamp),
 	PassesDiffCheck = binary:decode_unsigned(SolutionH, big) > Diff,
-	?LOG_INFO([{currentDiff___________, Diff}, {passesDiffCheck, PassesDiffCheck}]),
+	?LOG_INFO([{currentDiff______________________________________________________, Diff}, {passesDiffCheck, PassesDiffCheck}]),
 	[{_, TipNonceLimiterInfo}] = ets:lookup(node_state, nonce_limiter_info),
 	NonceLimiterInfo = #nonce_limiter_info{ global_step_number = StepNumber,
 			output = NonceLimiterOutput,
@@ -411,7 +411,6 @@ handle_info({event, miner, {found_solution, Args}}, State) ->
 			{Seed, NextSeed, PartitionUpperBound, NextPartitionUpperBound}
 					= ar_nonce_limiter:get_seed_data(StepNumber, TipNonceLimiterInfo,
 							PrevH, PrevWeaveSize),
-			?LOG_INFO([{seed_414, Seed},{nextSeed, NextSeed}]),
 			LastStepCheckpoints2 =
 				case LastStepCheckpoints of
 					not_found ->
@@ -448,7 +447,6 @@ handle_info({event, miner, {found_solution, Args}}, State) ->
 					Denomination, Denomination2),
 			CDiff = ar_difficulty:next_cumulative_diff(PrevB#block.cumulative_diff, Diff,
 					Height),
-			?LOG_INFO([{found_solution_450, Diff},{next_cumulative_diff, CDiff}]),
 			UnsignedB = pack_block_with_transactions(#block{
 				nonce = Nonce,
 				previous_block = PrevH,

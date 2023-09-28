@@ -68,7 +68,7 @@
 -endif.
 
 -ifndef(RETARGET_BLOCKS).
--define(RETARGET_BLOCKS, 10).
+-define(RETARGET_BLOCKS, 5).
 -endif.
 
 %% We only do retarget if the time it took to mine ?RETARGET_BLOCKS is bigger than

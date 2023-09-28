@@ -248,8 +248,10 @@ calculate_difficulty_before_1_8(OldDiff, TS, Last, Height) ->
 	ActualTime = TS - Last,
 	Diff = erlang:max(
 		if
-			ActualTime > (TargetTime * (1 + ?RETARGET_TOLERANCE) ) -> OldDiff - erlang:trunc(OldDiff * 0.0001 * ActualTime / TargetTime );
-			ActualTime < (TargetTime * (1 - ?RETARGET_TOLERANCE) ) -> OldDiff + erlang:trunc(OldDiff * 0.00003);
+			ActualTime > erlang:trunc(TargetTime * (1 + ?RETARGET_TOLERANCE) ) -> OldDiff - erlang:trunc(OldDiff * 0.0001 * ActualTime / TargetTime );
+			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 4 ) -> OldDiff + erlang:trunc(OldDiff * 0.00003 * 2);
+			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 2 ) -> OldDiff + erlang:trunc(OldDiff * 0.00003 * 3 div 2);
+			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) ) -> OldDiff + erlang:trunc(OldDiff * 0.00003);
 			true                                           -> OldDiff
 		end,
 		ar_mine:min_difficulty(Height)

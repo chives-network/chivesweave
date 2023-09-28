@@ -200,8 +200,6 @@ min_difficulty(Height) ->
 				min_sha384_difficulty()
 		end,
 	?LOG_INFO([{height______________1_, Height},{min_difficulty_______________, Diff},{switch_to_linear_diff, ar_retarget:switch_to_linear_diff(Diff)}]),
-	?LOG_INFO([{height______________8_, ar_retarget:switch_to_linear_diff(8)}]),
-	?LOG_INFO([{height______________9_, ar_retarget:switch_to_linear_diff(9)}]),
 	case Height >= ar_fork:height_1_8() of
 		true ->
 			case Height >= ar_fork:height_2_5() of

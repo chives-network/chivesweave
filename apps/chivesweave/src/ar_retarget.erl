@@ -249,6 +249,7 @@ calculate_difficulty_before_1_8(OldDiff, TS, Last, Height) ->
 	Diff = erlang:max(
 		if
 			ActualTime > erlang:trunc(TargetTime * (1 + ?RETARGET_TOLERANCE) ) -> OldDiff - erlang:trunc(OldDiff * 0.0001 * ActualTime / TargetTime );
+			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 70 ) -> OldDiff + erlang:trunc(OldDiff * 0.00003 * 50);
 			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 50 ) -> OldDiff + erlang:trunc(OldDiff * 0.00003 * 30);
 			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 12 ) -> OldDiff + erlang:trunc(OldDiff * 0.00003 * 5);
 			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 8 ) -> OldDiff + erlang:trunc(OldDiff * 0.00003 * 4);

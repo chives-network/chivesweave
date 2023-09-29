@@ -248,11 +248,14 @@ calculate_difficulty_before_1_8(OldDiff, TS, Last, Height) ->
 	ActualTime = TS - Last,
 	Diff = erlang:max(
 		if
-			ActualTime > erlang:trunc(TargetTime * (1 + ?RETARGET_TOLERANCE) ) -> OldDiff - erlang:trunc(OldDiff * 0.0002 * ActualTime / TargetTime );
-			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 8 ) -> OldDiff + erlang:trunc(OldDiff * 0.0002 * 4);
-			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 4 ) -> OldDiff + erlang:trunc(OldDiff * 0.0002 * 2);
-			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 2 ) -> OldDiff + erlang:trunc(OldDiff * 0.0002 * 3 div 2);
-			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) ) -> OldDiff + erlang:trunc(OldDiff * 0.0002);
+			ActualTime > erlang:trunc(TargetTime * (1 + ?RETARGET_TOLERANCE) ) -> OldDiff - erlang:trunc(OldDiff * 0.0001 * ActualTime / TargetTime );
+			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 70 ) -> OldDiff + erlang:trunc(OldDiff * 0.0001 * 50);
+			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 50 ) -> OldDiff + erlang:trunc(OldDiff * 0.0001 * 30);
+			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 12 ) -> OldDiff + erlang:trunc(OldDiff * 0.0001 * 5);
+			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 8 ) -> OldDiff + erlang:trunc(OldDiff * 0.0001 * 4);
+			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 4 ) -> OldDiff + erlang:trunc(OldDiff * 0.0001 * 2);
+			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 2 ) -> OldDiff + erlang:trunc(OldDiff * 0.0001 * 3 div 2);
+			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) ) -> OldDiff + erlang:trunc(OldDiff * 0.0001);
 			true                                           -> OldDiff
 		end,
 		ar_mine:min_difficulty(Height)

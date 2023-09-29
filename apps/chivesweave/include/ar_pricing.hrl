@@ -115,7 +115,7 @@ end).
 -define(REWARD_HISTORY_BLOCKS, 3).
 -else.
 -ifndef(REWARD_HISTORY_BLOCKS).
--define(REWARD_HISTORY_BLOCKS, (30 * 1)).
+-define(REWARD_HISTORY_BLOCKS, (30 * 24)).
 -endif.
 -endif.
 

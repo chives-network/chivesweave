@@ -11,7 +11,7 @@
 		wallet_list_filepath/1, tx_filepath/1, tx_data_filepath/1, read_tx_file/1,
 		read_migrated_v1_tx_file/1, ensure_directories/1, write_file_atomic/2,
 		write_term/2, write_term/3, read_term/1, read_term/2, delete_term/1, is_file/1,
-		migrate_tx_record/1, migrate_block_record/1, update_reward_history/1, read_account/2, read_txs_by_addr/1, read_txrecord_by_txid/1, read_txsrecord_by_addr/1, read_data_by_addr/1, read_datarecord_by_addr/1, read_txs_by_addr_deposits/1, read_txs_by_addr_send/1, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0 ]).
+		migrate_tx_record/1, migrate_block_record/1, update_reward_history/1, read_account/2, read_txsrecord_function/1, read_txs_by_addr/3, read_txrecord_by_txid/1, read_txsrecord_by_addr/3, read_data_by_addr/3, read_datarecord_by_addr/3, read_txsrecord_by_addr_deposits/3, read_txsrecord_by_addr_send/3, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0 ]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
 
@@ -983,6 +983,23 @@ write_block(B) ->
 							ar_kv:put(explorer_address_richlist, FromAddress, AddressRichListElementNewBin)				
 					end;
 				false ->
+					case TX#tx.data_size > 0 of
+						true ->
+							?LOG_INFO([{txId_data_size_more_than_0__________________________________________________, TX#tx.data_size}]),
+							%%% address_data_db
+							case ar_kv:get(address_data_db, TargetAddress) of
+								not_found ->
+									TxIdArrayFrom3 = [TxId],
+									TxIdDataFrom3 = term_to_binary(TxIdArrayFrom3);
+								{ok, TxIdBinaryFrom3} ->
+									TxIdArrayFrom3 = binary_to_term(TxIdBinaryFrom3),
+									TxIdDataFrom3 = term_to_binary([TxId | TxIdArrayFrom3])					
+							end,
+							ar_kv:put(address_data_db, TargetAddress, TxIdDataFrom3);
+						false ->
+							?LOG_INFO([{txId_data_size_more_than_0__________________________________________________, TX#tx.data_size}]),
+							ok
+					end,
 					%%% address_tx_db
 					case ar_kv:get(address_tx_db, FromAddress) of
 						not_found ->
@@ -1309,19 +1326,47 @@ read_statistics_transaction() ->
 			{200, #{}, ar_serialize:jsonify(binary_to_term(StatisticsTransactionResult))}							
 	end.
 
-read_txs_by_addr(Addr) ->
-	case ar_kv:get(address_tx_db, Addr) of
-		not_found ->
-			[];
-		{ok, TxIdBinary} ->
-			binary_to_term(TxIdBinary)
-	end.
-
 find_value(Key, List) ->
 	case lists:keyfind(Key, 1, List) of
 		{Key, Val} -> Val;
 		false -> <<"text/plain">>
 	end.
+
+read_txs_by_addr(Addr, PageId, PageRecords) ->
+	try binary_to_integer(PageRecords) of
+		PageRecordsInt ->				
+			PageRecordsNew = if
+				PageRecordsInt < 0 -> 1;
+				PageRecordsInt > 100 -> 100;
+				true -> PageRecordsInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						true -> PageIdInt
+					end,
+					case ar_kv:get(address_tx_db, Addr) of
+						not_found ->
+							[];
+						{ok, TxIdBinary} ->
+							AllArray = binary_to_term(TxIdBinary),
+							Length = length(AllArray),
+							FromIndex = PageIdNew * PageRecordsNew,
+							FromIndexNew = if
+								FromIndex < 1 -> 1;
+								FromIndex > Length -> Length;
+								true -> FromIndex
+							end,
+							lists:sublist(AllArray, FromIndexNew, PageRecordsNew)
+					end
+			catch _:_ ->
+				[]
+			end
+	catch _:_ ->
+		[]
+	end.
+
 
 read_txrecord_by_txid(TxId) ->
 	case ar_util:safe_decode(TxId) of
@@ -1364,8 +1409,7 @@ read_txrecord_by_txid(TxId) ->
 			end
 	end.
 
-read_txsrecord_function(TxIdBinary) ->
-	TxIdList = binary_to_term(TxIdBinary),
+read_txsrecord_function(TxIdList) ->
 	lists:map(
 		fun(X) -> 
 			case ar_util:safe_decode(X) of
@@ -1408,37 +1452,116 @@ read_txsrecord_function(TxIdBinary) ->
 			end
 		end, TxIdList).
 
-read_txsrecord_by_addr(Addr) ->
-	case ar_kv:get(address_tx_db, Addr) of
-		not_found ->
-			[];
-		{ok, TxIdBinary} ->
-			read_txsrecord_function(TxIdBinary)
+read_txsrecord_by_addr(Addr, PageId, PageRecords) ->
+	try binary_to_integer(PageRecords) of
+		PageRecordsInt ->				
+			PageRecordsNew = if
+				PageRecordsInt < 0 -> 1;
+				PageRecordsInt > 100 -> 100;
+				true -> PageRecordsInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						true -> PageIdInt
+					end,
+					case ar_kv:get(address_tx_db, Addr) of
+						not_found ->
+							[];
+						{ok, TxIdBinary} ->
+							AllArray = binary_to_term(TxIdBinary),
+							Length = length(AllArray),
+							FromIndex = PageIdNew * PageRecordsNew,
+							FromIndexNew = if
+								FromIndex < 1 -> 1;
+								FromIndex > Length -> Length;
+								true -> FromIndex
+							end,
+							TargetResult = lists:sublist(AllArray, FromIndexNew, PageRecordsNew),
+							read_txsrecord_function(TargetResult)
+					end
+			catch _:_ ->
+				[]
+			end
+	catch _:_ ->
+		[]
 	end.
 
-read_txs_by_addr_deposits(Addr) ->
-	case ar_kv:get(address_tx_deposits_db, Addr) of
-		not_found ->
-			[];
-		{ok, TxIdBinary} ->
-			read_txsrecord_function(TxIdBinary)
-	end.	
-
-read_txs_by_addr_send(Addr) ->
-	case ar_kv:get(address_tx_send_db, Addr) of
-		not_found ->
-			[];
-		{ok, TxIdBinary} ->
-			read_txsrecord_function(TxIdBinary)
+read_txsrecord_by_addr_deposits(Addr, PageId, PageRecords) ->
+	try binary_to_integer(PageRecords) of
+		PageRecordsInt ->				
+			PageRecordsNew = if
+				PageRecordsInt < 0 -> 1;
+				PageRecordsInt > 100 -> 100;
+				true -> PageRecordsInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						true -> PageIdInt
+					end,
+					case ar_kv:get(address_tx_deposits_db, Addr) of
+						not_found ->
+							[];
+						{ok, TxIdBinary} ->
+							AllArray = binary_to_term(TxIdBinary),
+							Length = length(AllArray),
+							FromIndex = PageIdNew * PageRecordsNew,
+							FromIndexNew = if
+								FromIndex < 1 -> 1;
+								FromIndex > Length -> Length;
+								true -> FromIndex
+							end,
+							TargetResult = lists:sublist(AllArray, FromIndexNew, PageRecordsNew),
+							read_txsrecord_function(TargetResult)
+					end
+			catch _:_ ->
+				[]
+			end
+	catch _:_ ->
+		[]
 	end.
 
-read_datarecord_by_addr(Addr) ->
-	case ar_kv:get(address_data_db, Addr) of
-		not_found ->
-			[];
-		{ok, TxIdBinary} ->
-			TxIdList = binary_to_term(TxIdBinary),
-			lists:map(
+read_txsrecord_by_addr_send(Addr, PageId, PageRecords) ->
+	try binary_to_integer(PageRecords) of
+		PageRecordsInt ->				
+			PageRecordsNew = if
+				PageRecordsInt < 0 -> 1;
+				PageRecordsInt > 100 -> 100;
+				true -> PageRecordsInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						true -> PageIdInt
+					end,
+					case ar_kv:get(address_tx_send_db, Addr) of
+						not_found ->
+							[];
+						{ok, TxIdBinary} ->
+							AllArray = binary_to_term(TxIdBinary),
+							Length = length(AllArray),
+							FromIndex = PageIdNew * PageRecordsNew,
+							FromIndexNew = if
+								FromIndex < 1 -> 1;
+								FromIndex > Length -> Length;
+								true -> FromIndex
+							end,
+							TargetResult = lists:sublist(AllArray, FromIndexNew, PageRecordsNew),
+							read_txsrecord_function(TargetResult)
+					end
+			catch _:_ ->
+				[]
+			end
+	catch _:_ ->
+		[]
+	end.
+
+read_datarecord_function(TxIdList) ->
+	lists:map(
 				fun(X) -> 
 					case ar_util:safe_decode(X) of
 						{ok, ID} ->
@@ -1478,17 +1601,77 @@ read_datarecord_by_addr(Addr) ->
 									end
 							end
 					end
-				end, TxIdList)
+				end, TxIdList).
+
+read_datarecord_by_addr(Addr, PageId, PageRecords) ->
+	try binary_to_integer(PageRecords) of
+		PageRecordsInt ->				
+			PageRecordsNew = if
+				PageRecordsInt < 0 -> 1;
+				PageRecordsInt > 100 -> 100;
+				true -> PageRecordsInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						true -> PageIdInt
+					end,
+					case ar_kv:get(address_data_db, Addr) of
+						not_found ->
+							[];
+						{ok, TxIdBinary} ->
+							AllArray = binary_to_term(TxIdBinary),
+							Length = length(AllArray),
+							FromIndex = PageIdNew * PageRecordsNew,
+							FromIndexNew = if
+								FromIndex < 1 -> 1;
+								FromIndex > Length -> Length;
+								true -> FromIndex
+							end,
+							TargetResult = lists:sublist(AllArray, FromIndexNew, PageRecordsNew),
+							read_datarecord_function(TargetResult)
+					end
+			catch _:_ ->
+				[]
+			end
+	catch _:_ ->
+		[]
 	end.
 
-
-
-read_data_by_addr(Addr) ->
-	case ar_kv:get(address_data_db, Addr) of
-		not_found ->
-			[];
-		{ok, TxIdBinary} ->
-			binary_to_term(TxIdBinary)
+read_data_by_addr(Addr, PageId, PageRecords) ->
+	try binary_to_integer(PageRecords) of
+		PageRecordsInt ->				
+			PageRecordsNew = if
+				PageRecordsInt < 0 -> 1;
+				PageRecordsInt > 100 -> 100;
+				true -> PageRecordsInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						true -> PageIdInt
+					end,
+					case ar_kv:get(address_data_db, Addr) of
+						not_found ->
+							[];
+						{ok, TxIdBinary} ->
+							AllArray = binary_to_term(TxIdBinary),
+							Length = length(AllArray),
+							FromIndex = PageIdNew * PageRecordsNew,
+							FromIndexNew = if
+								FromIndex < 1 -> 1;
+								FromIndex > Length -> Length;
+								true -> FromIndex
+							end,
+							lists:sublist(AllArray, FromIndexNew, PageRecordsNew)
+					end
+			catch _:_ ->
+				[]
+			end
+	catch _:_ ->
+		[]
 	end.
 
 update_reward_history(B) ->

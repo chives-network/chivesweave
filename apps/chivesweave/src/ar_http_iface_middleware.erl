@@ -1817,7 +1817,7 @@ handle_get_blockpage_data(PageId, PageRecords) ->
 						PageIdInt > AllPages -> AllPages;
 						true -> PageIdInt
 					end,
-					FromHeight = CurrentHeight - PageIdNew * PageRecordsNew,
+					FromHeight = CurrentHeight - PageIdNew * PageRecordsNew + 1,
 					FromHeightNew = if
 						FromHeight < 0 -> 0;
 						FromHeight > CurrentHeight -> CurrentHeight;

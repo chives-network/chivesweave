@@ -558,45 +558,12 @@ is_tx_fee_sufficient(Args) ->
 get_tx_fee(Args) ->
 	{DataSize, Rate, PricePerGiBMinute, KryderPlusRateMultiplier, Addr, Timestamp, Accounts,
 			Height} = Args,
-	Fork_2_6 = ar_fork:height_2_6(),
 	Fork_2_6_8 = ar_fork:height_2_6_8(),
 	PreFork26Args = {DataSize, Rate, Height, Accounts, Addr, Timestamp},
-	V2PricingArgs = {DataSize, PricePerGiBMinute, KryderPlusRateMultiplier, Addr, Accounts,
-					Height},
-
-	V2PricingHeight = Fork_2_6_8 + (?PRICE_2_6_8_TRANSITION_START)
-					+ (?PRICE_2_6_8_TRANSITION_BLOCKS),
-
-	TransitionStart_2_6 = Fork_2_6 + ?PRICE_2_6_TRANSITION_START,
-	TransitionEnd_2_6 = TransitionStart_2_6 + ?PRICE_2_6_TRANSITION_BLOCKS,
-	TransitionStart_2_6_8 = Fork_2_6_8 + ?PRICE_2_6_8_TRANSITION_START,
-	TransitionEnd_2_6_8 = TransitionStart_2_6_8 + ?PRICE_2_6_8_TRANSITION_BLOCKS,
-
 	case Height of
-		H when H >= V2PricingHeight ->
-			%% New pricing is fully live
-			get_tx_fee2(V2PricingArgs);
-		H when H >= TransitionStart_2_6_8 ->
-			%% 2.6.8 transition period. Interpolate between a static fee-based pricing and
-			%% new pricing throughout the 2.6.8 transition period
-			get_transition_tx_fee(
-				get_static_2_6_8_tx_fee(DataSize, Addr, Accounts), %% StartFee
-				get_tx_fee2(V2PricingArgs), %% EndFee
-				TransitionStart_2_6_8, 
-				TransitionEnd_2_6_8,
-				Height);
 		H when H >= Fork_2_6_8 ->
 			%% Pre-2.6.8 transition period. Use a static fee-based pricing + new account fee.
 			get_static_2_6_8_tx_fee(DataSize, Addr, Accounts);
-		H when H >= TransitionStart_2_6 ->
-			%% 2.6 transition period. Interpolate between pre-2.6 pricing and new pricing
-			%% throughout the 2.6 transition period
-			get_transition_tx_fee(
-				get_tx_fee_pre_fork_2_6(PreFork26Args), %% StartFee
-				get_tx_fee2(V2PricingArgs), %% EndFee
-				TransitionStart_2_6, 
-				TransitionEnd_2_6,
-				Height);
 		_ ->
 			get_tx_fee_pre_fork_2_6(PreFork26Args)
 	end.

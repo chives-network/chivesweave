@@ -60,7 +60,18 @@ maybe_retarget(Height, CurDiff, TS, LastRetargetTS, PrevTS) ->
 		true ->
 			calculate_difficulty(CurDiff, TS, LastRetargetTS, Height, PrevTS);
 		false ->
-			CurDiff
+			TargetTime = 3 * ?TARGET_TIME,
+			ActualTime = TS - PrevTS,
+			NewDiff = erlang:max(
+				if
+					ActualTime > erlang:trunc(TargetTime) -> CurDiff - erlang:trunc(CurDiff * 0.0001 * ActualTime / TargetTime );
+					true                                           -> CurDiff
+				end,
+				ar_mine:min_difficulty(Height)
+			),
+			?LOG_INFO([{curDiff________________________________, CurDiff}]),
+			?LOG_INFO([{newDiff________________________________, NewDiff}]),
+			NewDiff
 	end.
 
 calculate_difficulty(OldDiff, TS, Last, Height, PrevTS) ->
@@ -261,8 +272,6 @@ calculate_difficulty_before_1_8(OldDiff, TS, Last, Height) ->
 		ar_mine:min_difficulty(Height)
 	),
 	?LOG_INFO([{min_difficulty_________________________, ar_mine:min_difficulty(Height)}]),
-	?LOG_INFO([{actualTime__TS____________________________, TS}]),
-	?LOG_INFO([{actualTime__Last___________________________, Last}]),
 	?LOG_INFO([{actualTime_____________________________, ActualTime}]),
 	?LOG_INFO([{oldDiff________________________________, OldDiff}]),
 	?LOG_INFO([{newDiff________________________________, Diff}]),

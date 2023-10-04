@@ -84,7 +84,7 @@
 %% We only do retarget if the time it took to mine ?RETARGET_BLOCKS is more than
 %% 1.1 times bigger or smaller than ?TARGET_TIME * ?RETARGET_BLOCKS. Was used before
 %% the fork 2.5 where we got rid of the floating point calculations.
--define(RETARGET_TOLERANCE, 0.1).
+-define(RETARGET_TOLERANCE, 0.2).
 
 -define(JOIN_CLOCK_TOLERANCE, 15).
 
@@ -225,7 +225,7 @@
 -define(BLOCK_PROPAGATION_PARALLELIZATION, 20).
 
 %% The maximum number of peers to propagate txs to, by default.
--define(DEFAULT_MAX_PROPAGATION_PEERS, 16).
+-define(DEFAULT_MAX_PROPAGATION_PEERS, 64).
 
 %% The maximum number of peers to propagate blocks to, by default.
 -define(DEFAULT_MAX_BLOCK_PROPAGATION_PEERS, 1000).

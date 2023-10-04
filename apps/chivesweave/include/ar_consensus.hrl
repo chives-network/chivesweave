@@ -26,7 +26,7 @@
 -ifdef(DEBUG).
 -define(RECALL_RANGE_SIZE, (512 * 1024)).
 -else.
--define(RECALL_RANGE_SIZE, 104857600). % == 100 * 1024 * 1024
+-define(RECALL_RANGE_SIZE, 2097152 * 2). % == 2 * 1024 * 1024
 -endif.
 
 -ifdef(FORKS_RESET).

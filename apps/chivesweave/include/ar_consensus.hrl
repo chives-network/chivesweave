@@ -85,9 +85,9 @@
 	},
 	case Forks of
 		{_Fork_2_4, Fork_2_6} when Height >= Fork_2_6 ->
-			8;
+			7;
 		{Fork_2_4, _Fork_2_6} when Height >= Fork_2_4 ->
-			8
+			7
 	end
 end()).
 -else.

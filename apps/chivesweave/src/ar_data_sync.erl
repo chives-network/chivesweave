@@ -1875,7 +1875,7 @@ remove_tx_index_range(Start, End, State) ->
 						Error;
 					(_, TXID, ok) ->
 						ar_kv:delete(TXIndex, TXID),
-						ar_tx_blacklist:norify_about_orphaned_tx(TXID)
+						xwe_tx_blacklist:norify_about_orphaned_tx(TXID)
 				end,
 				ok,
 				Map
@@ -2046,7 +2046,7 @@ update_tx_index(SizeTaggedTXs, BlockStartOffset, StoreID) ->
 						case ar_kv:put({tx_index, StoreID}, TXID,
 								term_to_binary({AbsoluteEndOffset, TXSize})) of
 							ok ->
-								ar_tx_blacklist:notify_about_added_tx(TXID, AbsoluteEndOffset,
+								xwe_tx_blacklist:notify_about_added_tx(TXID, AbsoluteEndOffset,
 										AbsoluteStartOffset),
 								TXEndOffset;
 							{error, Reason} ->
@@ -2233,7 +2233,7 @@ find_peer_intervals(Start, End, StoreID, AllPeersIntervals) ->
 %% intervals.
 get_unsynced_intervals(Start, End, StoreID) ->
 	UnsyncedIntervals = get_unsynced_intervals(Start, End, ar_intervals:new(), StoreID),
-	BlacklistedIntervals = ar_tx_blacklist:get_blacklisted_intervals(Start, End),
+	BlacklistedIntervals = xwe_tx_blacklist:get_blacklisted_intervals(Start, End),
 	ar_intervals:outerjoin(BlacklistedIntervals, UnsyncedIntervals).
 
 get_unsynced_intervals(Start, End, Intervals, _StoreID) when Start >= End ->
@@ -2505,7 +2505,7 @@ get_chunk_data_key(DataPathHash) ->
 	<< Timestamp:256, DataPathHash/binary >>.
 
 write_chunk(Offset, ChunkDataKey, Chunk, ChunkSize, DataPath, Packing, State) ->
-	case ar_tx_blacklist:is_byte_blacklisted(Offset) of
+	case xwe_tx_blacklist:is_byte_blacklisted(Offset) of
 		true ->
 			ok;
 		false ->
@@ -2554,7 +2554,7 @@ should_store_in_chunk_storage(Offset, ChunkSize, Packing) ->
 
 update_chunks_index(Args, State) ->
 	AbsoluteChunkOffset = element(1, Args),
-	case ar_tx_blacklist:is_byte_blacklisted(AbsoluteChunkOffset) of
+	case xwe_tx_blacklist:is_byte_blacklisted(AbsoluteChunkOffset) of
 		true ->
 			ok;
 		false ->
@@ -3072,7 +3072,7 @@ process_disk_pool_matured_chunk_offset(Iterator, TXRoot, TXPath, AbsoluteOffset,
 			{noreply, State2} ->
 				{noreply, State2};
 			StoreID2 ->
-				case ar_tx_blacklist:is_byte_blacklisted(AbsoluteOffset) of
+				case xwe_tx_blacklist:is_byte_blacklisted(AbsoluteOffset) of
 					true ->
 						gen_server:cast(self(), {process_disk_pool_chunk_offsets, Iterator,
 								MayConclude, Args}),

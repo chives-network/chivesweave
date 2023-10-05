@@ -384,7 +384,7 @@ handle_info({event, nonce_limiter, initialized}, State) ->
 	ar_disk_cache:write_block(B),
 	ar_data_sync:join(RecentBI),
 	ar_header_sync:join(Height, RecentBI, Blocks),
-	ar_tx_blacklist:start_taking_down(),
+	xwe_tx_blacklist:start_taking_down(),
 	Current = element(1, hd(RecentBI)),
 	ar_block_cache:initialize_from_list(block_cache,
 			lists:sublist(Blocks, ?STORE_BLOCKS_BEHIND_CURRENT)),

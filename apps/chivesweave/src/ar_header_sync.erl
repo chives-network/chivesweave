@@ -218,7 +218,7 @@ handle_cast({failed_to_get_block, H, H2, TXRoot, Height, Backoff},
 
 handle_cast({remove_tx, TXID}, State) ->
 	{ok, _Size} = ar_storage:delete_blacklisted_tx(TXID),
-	ar_tx_blacklist:notify_about_removed_tx(TXID),
+	xwe_tx_blacklist:notify_about_removed_tx(TXID),
 	{noreply, State};
 
 handle_cast({remove_block, Height}, State) ->

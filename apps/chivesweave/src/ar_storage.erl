@@ -270,7 +270,7 @@ write_full_block(BShadow, TXs) ->
 is_blacklisted(#tx{ format = 2 }) ->
 	false;
 is_blacklisted(#tx{ id = TXID }) ->
-	ar_tx_blacklist:is_tx_blacklisted(TXID).
+	xwe_tx_blacklist:is_tx_blacklisted(TXID).
 
 update_confirmation_index(B) ->
 	{ok, Config} = application:get_env(chivesweave, config),
@@ -633,7 +633,7 @@ write_tx(#tx{ format = Format, id = TXID } = TX) ->
 									ok
 							end;
 						{true, 2} ->
-							case ar_tx_blacklist:is_tx_blacklisted(TX#tx.id) of
+							case xwe_tx_blacklist:is_tx_blacklisted(TX#tx.id) of
 								true ->
 									ok;
 								false ->

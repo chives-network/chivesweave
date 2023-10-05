@@ -68,7 +68,7 @@ in
     peer = mkOption {
       type = types.nonEmptyListOf types.str;
       default = [ ];
-      example = [ "http://domain-or-ip.com:1984" ];
+      example = [ "http://domain-or-ip.com:1985" ];
       description = ''
         List of primary node peers
       '';
@@ -77,7 +77,7 @@ in
     vdfServerTrustedPeer = mkOption {
       type = types.listOf types.str;
       default = [ ];
-      example = [ "http://domain-or-ip.com:1984" ];
+      example = [ "http://domain-or-ip.com:1985" ];
       description = ''
         List of trusted peers to fetch VDF outputs from
       '';
@@ -86,7 +86,7 @@ in
     vdfClientPeer = mkOption {
       type = types.listOf types.str;
       default = [ ];
-      example = [ "http://domain-or-ip.com:1984" ];
+      example = [ "http://domain-or-ip.com:1985" ];
       description = ''
         List of peers to serve VDF updates to
       '';

@@ -798,7 +798,7 @@ commandline_parser_test_() ->
 		Addr = crypto:strong_rand_bytes(32),
 		Tests =
 			[
-				{"peer 1.2.3.4 peer 5.6.7.8:9", #config.peers, [{5,6,7,8,9},{1,2,3,4,1984}]},
+				{"peer 1.2.3.4 peer 5.6.7.8:9", #config.peers, [{5,6,7,8,9},{1,2,3,4,1985}]},
 				{"mine", #config.mine, true},
 				{"port 22", #config.port, 22},
 				{"mining_addr "

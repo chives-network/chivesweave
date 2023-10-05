@@ -233,12 +233,12 @@ test_vdf_client_fast_block() ->
 	{ok, SlaveConfig} = slave_call(application, get_env, [chivesweave, config]),
 	slave_start(
 		B0, SlaveAddress,
-		SlaveConfig#config{ nonce_limiter_server_trusted_peers = [ "127.0.0.1:1984" ] }),
+		SlaveConfig#config{ nonce_limiter_server_trusted_peers = [ "127.0.0.1:1985" ] }),
 	%% Start the master as a VDF server
 	{ok, Config} = application:get_env(chivesweave, config),
 	start(
 		B0, ar_wallet:to_address(ar_wallet:new_keyfile()),
-		Config#config{ nonce_limiter_client_peers = [ "127.0.0.1:1983" ]}),
+		Config#config{ nonce_limiter_client_peers = [ "127.0.0.1:1985" ]}),
 	connect_to_slave(),
 
 	%% Post the block to the VDF client. It won't be able to validate it since the VDF server
@@ -278,13 +278,13 @@ test_vdf_client_fast_block_pull_interface() ->
 	{ok, SlaveConfig} = slave_call(application, get_env, [chivesweave, config]),
 	slave_start(
 		B0, SlaveAddress,
-		SlaveConfig#config{ nonce_limiter_server_trusted_peers = [ "127.0.0.1:1984" ],
+		SlaveConfig#config{ nonce_limiter_server_trusted_peers = [ "127.0.0.1:1985" ],
 				enable = [vdf_server_pull | SlaveConfig#config.enable] }),
 	%% Start the master as a VDF server
 	{ok, Config} = application:get_env(chivesweave, config),
 	start(
 		B0, ar_wallet:to_address(ar_wallet:new_keyfile()),
-		Config#config{ nonce_limiter_client_peers = [ "127.0.0.1:1983" ]}),
+		Config#config{ nonce_limiter_client_peers = [ "127.0.0.1:1985" ]}),
 	connect_to_slave(),
 
 	%% Post the block to the VDF client. It won't be able to validate it since the VDF server
@@ -323,12 +323,12 @@ test_vdf_client_slow_block() ->
 	{ok, SlaveConfig} = slave_call(application, get_env, [chivesweave, config]),
 	slave_start(
 		B0, SlaveAddress,
-		SlaveConfig#config{ nonce_limiter_server_trusted_peers = [ "127.0.0.1:1984" ] }),
+		SlaveConfig#config{ nonce_limiter_server_trusted_peers = [ "127.0.0.1:1985" ] }),
 	%% Start the master as a VDF server
 	{ok, Config} = application:get_env(chivesweave, config),
 	start(
 		B0, ar_wallet:to_address(ar_wallet:new_keyfile()),
-		Config#config{ nonce_limiter_client_peers = [ "127.0.0.1:1983" ]}),
+		Config#config{ nonce_limiter_client_peers = [ "127.0.0.1:1985" ]}),
 	connect_to_slave(),
 	timer:sleep(10000),
 
@@ -357,13 +357,13 @@ test_vdf_client_slow_block_pull_interface() ->
 	{ok, SlaveConfig} = slave_call(application, get_env, [chivesweave, config]),
 	slave_start(
 		B0, SlaveAddress,
-		SlaveConfig#config{ nonce_limiter_server_trusted_peers = [ "127.0.0.1:1984" ],
+		SlaveConfig#config{ nonce_limiter_server_trusted_peers = [ "127.0.0.1:1985" ],
 				enable = [vdf_server_pull | SlaveConfig#config.enable] }),
 	%% Start the master as a VDF server
 	{ok, Config} = application:get_env(chivesweave, config),
 	start(
 		B0, ar_wallet:to_address(ar_wallet:new_keyfile()),
-		Config#config{ nonce_limiter_client_peers = [ "127.0.0.1:1983" ]}),
+		Config#config{ nonce_limiter_client_peers = [ "127.0.0.1:1985" ]}),
 	connect_to_slave(),
 	timer:sleep(10000),
 

@@ -247,7 +247,7 @@ start_slave_application(Config) ->
 	ApplicationConfig = #config{
 		start_from_latest_state = false,
 		port = 1983,
-		peers = [{127, 0, 0, 1, 1984}],
+		peers = [{127, 0, 0, 1, 1985}],
 		data_dir = ?config(data_dir, Config) ++ "slave",
 		metrics_dir = "metrics_slave"
 	},

@@ -60,7 +60,18 @@ maybe_retarget(Height, CurDiff, TS, LastRetargetTS, PrevTS) ->
 		true ->
 			calculate_difficulty(CurDiff, TS, LastRetargetTS, Height, PrevTS);
 		false ->
-			CurDiff
+			TargetTime = 4 * ?TARGET_TIME,
+			ActualTime = TS - PrevTS,
+			NewDiff = erlang:max(
+				if
+					ActualTime > erlang:trunc(TargetTime) -> CurDiff - erlang:trunc(CurDiff * 0.0001 * ActualTime / TargetTime );
+					true                                           -> CurDiff
+				end,
+				ar_mine:min_difficulty(Height)
+			),
+			?LOG_INFO([{curDiff_______maybe_retarget_________________________, CurDiff}]),
+			?LOG_INFO([{newDiff_______maybe_retarget_________________________, NewDiff}]),
+			NewDiff
 	end.
 
 -ifdef(TESTNET).
@@ -77,16 +88,9 @@ calculate_difficulty(OldDiff, TS, Last, Height, PrevTS) ->
 	Fork_1_9 = ar_fork:height_1_9(),
 	Fork_2_4 = ar_fork:height_2_4(),
 	Fork_2_5 = ar_fork:height_2_5(),
-	Fork_2_6 = ar_fork:height_2_6(),
-	TestnetDifficultyDropHeight = get_testnet_difficulty_drop_height(),
 	case Height of
-		_ when Height == TestnetDifficultyDropHeight ->
-			calculate_difficulty_with_drop(OldDiff, TS, Last, Height, PrevTS, 100, 2);
-		_ when Height == Fork_2_6 ->
-			calculate_difficulty_with_drop(OldDiff, TS, Last, Height, PrevTS,
-					?INITIAL_DIFF_DROP_2_6, ?DIFF_DROP_2_6);
 		_ when Height > Fork_2_5 ->
-			calculate_difficulty(OldDiff, TS, Last, Height);
+			calculate_difficulty_before_1_8(OldDiff, TS, Last, Height);
 		_ when Height == Fork_2_5 ->
 			calculate_difficulty_at_2_5(OldDiff, TS, Last, Height, PrevTS);
 		_ when Height > Fork_2_4 ->

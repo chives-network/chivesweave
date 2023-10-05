@@ -104,7 +104,7 @@ end).
 	-define(REWARD_HISTORY_BLOCKS, 3).
 -else.
 	-ifndef(REWARD_HISTORY_BLOCKS).
-		-define(REWARD_HISTORY_BLOCKS, (30 * 24 * 30)).
+		-define(REWARD_HISTORY_BLOCKS, (30 * 24)).
 	-endif.
 -endif.
 
@@ -112,7 +112,7 @@ end).
 	-define(BLOCK_TIME_HISTORY_BLOCKS, 3).
 -else.
 	-ifndef(BLOCK_TIME_HISTORY_BLOCKS).
-		-define(BLOCK_TIME_HISTORY_BLOCKS, (30 * 24 * 30)).
+		-define(BLOCK_TIME_HISTORY_BLOCKS, (30 * 24)).
 	-endif.
 -endif.
 

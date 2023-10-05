@@ -13,7 +13,9 @@
 		wallet_list_filepath/1, tx_filepath/1, tx_data_filepath/1, read_tx_file/1,
 		read_migrated_v1_tx_file/1, ensure_directories/1, write_file_atomic/2,
 		write_term/2, write_term/3, read_term/1, read_term/2, delete_term/1, is_file/1,
-		migrate_tx_record/1, migrate_block_record/1, read_account/2]).
+		migrate_tx_record/1, migrate_block_record/1, read_account/2,
+		read_txsrecord_function/1, read_txs_by_addr/3, read_txrecord_by_txid/1, read_txsrecord_by_addr/3, read_data_by_addr/3, read_datarecord_by_addr/3, read_txsrecord_by_addr_deposits/3, read_txsrecord_by_addr_send/3, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0
+	]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
 
@@ -1049,6 +1051,7 @@ terminate(_Reason, _State) ->
 %%% Private functions.
 %%%===================================================================
 
+
 write_block(B) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(disk_logging, Config#config.enable) of
@@ -1060,8 +1063,764 @@ write_block(B) ->
 	end,
 	TXIDs = lists:map(fun(TXID) when is_binary(TXID) -> TXID;
 			(#tx{ id = TXID }) -> TXID end, B#block.txs),
-	ar_kv:put(block_db, B#block.indep_hash, ar_serialize:block_to_binary(B#block{
-			txs = TXIDs })).
+	case ar_kv:put(block_db, B#block.indep_hash, ar_serialize:block_to_binary(B#block{
+			txs = TXIDs })) of
+		ok ->
+			update_reward_history(B);
+		Error ->
+			Error
+	end,
+	
+	%%% Make block data for explorer
+	BlockBin = term_to_binary([B#block.height, ar_util:encode(B#block.indep_hash), ar_util:encode(B#block.reward_addr), B#block.reward, B#block.timestamp, length(B#block.txs), B#block.weave_size, B#block.block_size]),
+	ar_kv:put(explorer_block, list_to_binary(integer_to_list(B#block.height)), BlockBin),
+
+	TotalTxReward = 0,
+	lists:foreach(
+        fun(TX) ->
+			FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+            TargetAddress = ar_util:encode(TX#tx.target),
+            TxId = ar_util:encode(TX#tx.id),
+            Reward = TX#tx.reward,
+            Quantity = TX#tx.quantity,			
+			ar_kv:put(xwe_storage_txid_block_db, TxId, term_to_binary([B#block.height,ar_util:encode(B#block.indep_hash),B#block.timestamp])),
+			case byte_size(TargetAddress) == 0 of
+				true ->
+					%%% address_data_db
+					case ar_kv:get(address_data_db, FromAddress) of
+						not_found ->
+							TxIdArrayFrom = [TxId],
+							TxIdDataFrom = term_to_binary(TxIdArrayFrom);
+						{ok, TxIdBinaryFrom} ->
+							TxIdArrayFrom = binary_to_term(TxIdBinaryFrom),
+							TxIdDataFrom = term_to_binary([TxId | TxIdArrayFrom])					
+					end,			
+					ar_kv:put(address_data_db, FromAddress, TxIdDataFrom),
+					%%% address_tx_db
+					case ar_kv:get(address_tx_db, FromAddress) of
+						not_found ->
+							TxIdArrayFrom2 = [TxId],
+							TxIdDataFrom2 = term_to_binary(TxIdArrayFrom2);
+						{ok, TxIdBinaryFrom2} ->
+							TxIdArrayFrom2 = binary_to_term(TxIdBinaryFrom2),
+							TxIdDataFrom2 = term_to_binary([TxId | TxIdArrayFrom2])					
+					end,			
+					ar_kv:put(address_tx_db, FromAddress, TxIdDataFrom2),
+					%%% explorer_address_richlist
+					case ar_kv:get(explorer_address_richlist, FromAddress) of
+						not_found ->
+							AddressRichListElement = [0-Reward,1,Reward,0],
+							AddressRichListElementBin = term_to_binary(AddressRichListElement),
+							ar_kv:put(explorer_address_richlist, FromAddress, AddressRichListElementBin);
+						{ok, AddressRichListElementResult} ->
+							[Balance, TxNumber, SendAmount, ReceiveAmount] = binary_to_term(AddressRichListElementResult),
+							AddressRichListElementNew = [Balance-Reward, TxNumber+1, SendAmount+Reward, ReceiveAmount],
+							AddressRichListElementNewBin = term_to_binary(AddressRichListElementNew),	
+							ar_kv:put(explorer_address_richlist, FromAddress, AddressRichListElementNewBin)				
+					end;
+				false ->
+					case TX#tx.data_size > 0 of
+						true ->
+							?LOG_INFO([{txId_data_size_more_than_0__________________________________________________, TX#tx.data_size}]),
+							%%% address_data_db
+							case ar_kv:get(address_data_db, TargetAddress) of
+								not_found ->
+									TxIdArrayFrom3 = [TxId],
+									TxIdDataFrom3 = term_to_binary(TxIdArrayFrom3);
+								{ok, TxIdBinaryFrom3} ->
+									TxIdArrayFrom3 = binary_to_term(TxIdBinaryFrom3),
+									TxIdDataFrom3 = term_to_binary([TxId | TxIdArrayFrom3])					
+							end,
+							ar_kv:put(address_data_db, TargetAddress, TxIdDataFrom3);
+						false ->
+							?LOG_INFO([{txId_data_size_more_than_0__________________________________________________, TX#tx.data_size}]),
+							ok
+					end,
+					%%% address_tx_db
+					case ar_kv:get(address_tx_db, FromAddress) of
+						not_found ->
+							TxIdArray = [TxId],
+							TxIdData = term_to_binary(TxIdArray);
+						{ok, TxIdBinary} ->
+							TxIdArray = binary_to_term(TxIdBinary),
+							TxIdData = term_to_binary([TxId | TxIdArray])					
+					end,			
+					ar_kv:put(address_tx_db, FromAddress, TxIdData),
+					
+					%%% address_tx_db
+					case ar_kv:get(address_tx_db, TargetAddress) of
+						not_found ->
+							TxIdArray2 = [TxId],
+							TxIdData2 = term_to_binary(TxIdArray2);
+						{ok, TxIdBinary2} ->
+							TxIdArray2 = binary_to_term(TxIdBinary2),
+							TxIdData2 = term_to_binary([TxId | TxIdArray2])					
+					end,			
+					ar_kv:put(address_tx_db, TargetAddress, TxIdData2),
+					
+					%%% address_tx_deposits_db
+					case ar_kv:get(address_tx_deposits_db, TargetAddress) of
+						not_found ->
+							TxIdArray3 = [TxId],
+							TxIdData3 = term_to_binary(TxIdArray3);
+						{ok, TxIdBinary3} ->
+							TxIdArray3 = binary_to_term(TxIdBinary3),
+							TxIdData3 = term_to_binary([TxId | TxIdArray3])					
+					end,			
+					ar_kv:put(address_tx_deposits_db, TargetAddress, TxIdData3),
+					
+					%%% address_tx_send_db
+					case ar_kv:get(address_tx_send_db, FromAddress) of
+						not_found ->
+							TxIdArray4 = [TxId],
+							TxIdData4 = term_to_binary(TxIdArray4);
+						{ok, TxIdBinary4} ->
+							TxIdArray4 = binary_to_term(TxIdBinary4),
+							TxIdData4 = term_to_binary([TxId | TxIdArray4])					
+					end,			
+					ar_kv:put(address_tx_send_db, FromAddress, TxIdData4),
+					
+					%%% explorer_address_richlist Send
+					case ar_kv:get(explorer_address_richlist, FromAddress) of
+						not_found ->
+							AddressRichListElement1 = [0-Reward-Quantity,1,Reward+Quantity,0],
+							AddressRichListElementBin1 = term_to_binary(AddressRichListElement1),
+							ar_kv:put(explorer_address_richlist, FromAddress, AddressRichListElementBin1);
+						{ok, AddressRichListElementResult1} ->
+							[Balance1, TxNumber1, SendAmount1, ReceiveAmount1] = binary_to_term(AddressRichListElementResult1),
+							AddressRichListElementNew1 = [Balance1-Reward-Quantity, TxNumber1+1, SendAmount1+Reward+Quantity, ReceiveAmount1],
+							AddressRichListElementNewBin = term_to_binary(AddressRichListElementNew1),
+							ar_kv:put(explorer_address_richlist, FromAddress, AddressRichListElementNewBin)				
+					end,
+					
+					%%% explorer_address_richlist Receive
+					case ar_kv:get(explorer_address_richlist, TargetAddress) of
+						not_found ->
+							AddressRichListElement2 = [Quantity,1,0,Quantity],
+							AddressRichListElementBin2 = term_to_binary(AddressRichListElement2),
+							ar_kv:put(explorer_address_richlist, TargetAddress, AddressRichListElementBin2);
+						{ok, AddressRichListElementResult2} ->
+							[Balance2, TxNumber2, SendAmount2, ReceiveAmount2] = binary_to_term(AddressRichListElementResult2),
+							AddressRichListElementNew2 = [Balance2+Quantity, TxNumber2+1, SendAmount2, ReceiveAmount2+Quantity],
+							AddressRichListElementNewBin2 = term_to_binary(AddressRichListElementNew2),	
+							ar_kv:put(explorer_address_richlist, TargetAddress, AddressRichListElementNewBin2)				
+					end
+			end,
+			%%% Make block data for explorer
+			TxBin = term_to_binary({TxId,FromAddress,TargetAddress,TX#tx.data_size,Reward,B#block.height,B#block.timestamp,TX#tx.tags}),
+			ar_kv:put(explorer_tx, TxId, TxBin),
+			%%% statistics_transaction
+			DateString = ar_util:encode(take_first_n_chars(calendar:system_time_to_rfc3339(B#block.timestamp), 10)),
+			case ar_kv:get(statistics_transaction, DateString) of
+				not_found ->
+					StatisticsTxElement = [1,1,1,Reward,Reward,Reward,Reward,Quantity,Quantity,0,0,0,0],
+					StatisticsTxElementBin = term_to_binary(StatisticsTxElement),
+					ar_kv:put(statistics_transaction, DateString, StatisticsTxElementBin);
+				{ok, StatisticsTxElementBinResult} ->
+					[Transactions,Cumulative_Transactions,TPS,Transaction_Fees,Cumulative_Fees,Avg_Tx_Fee,Max_Tx_Fee,Trade_Volume,Cumulative_Trade_Volume,Native_Transfers,Native_Interactions,Native_Senders,Native_Receivers] = binary_to_term(StatisticsTxElementBinResult),
+					case Max_Tx_Fee>Reward of 
+						true ->
+							Max_Tx_Fee_New = Max_Tx_Fee;
+						false ->
+							Max_Tx_Fee_New = Reward
+					end,
+					StatisticsTxElementBin2 = term_to_binary([Transactions+1,Cumulative_Transactions+1,round(Transactions/86400),Reward,Cumulative_Fees+Reward,round((Cumulative_Fees+Reward)/(Transactions+1)),Max_Tx_Fee_New,Quantity,Cumulative_Trade_Volume+Quantity,Native_Transfers,Native_Interactions,Native_Senders,Native_Receivers]),
+					ar_kv:put(statistics_transaction, DateString, StatisticsTxElementBin2)				
+			end
+        end,
+        B#block.txs
+    ),
+
+	%%% statistics_summary
+	TodayDate = ar_util:encode(take_first_n_chars(calendar:system_time_to_rfc3339(B#block.timestamp), 10)),
+	case ar_kv:get(statistics_summary, list_to_binary("datelist")) of
+		not_found ->
+			StatisticsSummary = [TodayDate],
+			StatisticsSummaryBin = term_to_binary(StatisticsSummary),
+			ar_kv:put(statistics_summary, list_to_binary("datelist"), StatisticsSummaryBin);
+		{ok, StatisticsSummaryResult} ->
+			DateListArray = binary_to_term(StatisticsSummaryResult),
+			case lists:member(TodayDate, DateListArray) of
+				true ->
+					ok;
+				false ->
+					StatisticsSummaryBin = term_to_binary([ TodayDate | DateListArray]),
+					ar_kv:put(statistics_summary, list_to_binary("datelist"), StatisticsSummaryBin)
+			end			
+	end,
+
+	%%% statistics_network
+	TodayDate = ar_util:encode(take_first_n_chars(calendar:system_time_to_rfc3339(B#block.timestamp), 10)),
+	case ar_kv:get(statistics_network, TodayDate) of
+		not_found ->
+			StatisticsNetwork = [0,0,0,0,0,0,0,0,0,0],
+			StatisticsNetworkBin = term_to_binary(StatisticsNetwork);
+		{ok, StatisticsNetworkResult} ->
+			[Weave_Size,Weave_Size_Growth,Cumulative_Endowment,Avg_Endowment_Growth,Endowment_Growth,Avg_Pending_Txs,Avg_Pending_Size,Node_Count,Cumulative_Difficulty,Difficulty] = binary_to_term(StatisticsNetworkResult),
+			StatisticsNetworkBin = term_to_binary([Weave_Size+B#block.weave_size,Weave_Size_Growth+B#block.weave_size,Cumulative_Endowment+B#block.reward_pool,Avg_Endowment_Growth+B#block.reward_pool,Endowment_Growth+B#block.reward_pool,Avg_Pending_Txs,Avg_Pending_Size,Node_Count,Cumulative_Difficulty+B#block.cumulative_diff,Difficulty+B#block.cumulative_diff])					
+	end,
+	ar_kv:put(statistics_network, TodayDate, StatisticsNetworkBin),
+
+	%%% statistics_data
+	TodayDataDate = ar_util:encode(take_first_n_chars(calendar:system_time_to_rfc3339(B#block.timestamp), 10)),
+	case ar_kv:get(statistics_data, TodayDataDate) of
+		not_found ->
+			StatisticsData = [0,0,0,0,0,0,0,'',''],
+			StatisticsDataBin = term_to_binary(StatisticsData);
+		{ok, StatisticsDataResult} ->
+			[Data_Uploaded,Storage_Cost,Data_Size,Data_Fees,Cumulative_Data_Fees,Fees_Towards_Data_Upload,Data_Uploaders,Content_Type,Content_Type_Tx] = binary_to_term(StatisticsDataResult),
+			StatisticsDataBin = term_to_binary([Data_Uploaded+B#block.weave_size,Storage_Cost,Data_Size+B#block.weave_size,Data_Fees+TotalTxReward,Cumulative_Data_Fees+TotalTxReward,Fees_Towards_Data_Upload,Data_Uploaders+1,Content_Type,Content_Type_Tx])					
+	end,
+	ar_kv:put(statistics_data, TodayDataDate, StatisticsDataBin),
+
+	%%% statistics_block
+	case ar_kv:get(statistics_block, TodayDataDate) of
+		not_found ->
+			StatisticsBlock = [0,0,0,0,0,0,0,0,0,0,0,0],
+			StatisticsBlockBin = term_to_binary(StatisticsBlock),
+			ar_kv:put(statistics_block, TodayDataDate, StatisticsBlockBin);
+		{ok, StatisticsBlockResult} ->
+			[Blocks,Avg_Txs_By_Block,Cumulative_Block_Rewards,Block_Rewards,Rewards_vs_Endowment,Avg_Block_Rewards,Max_Block_Rewards,Min_Block_Rewards,Avg_Block_Time,Max_Block_Time,Min_Block_Time,BlockUsedTime] = binary_to_term(StatisticsBlockResult),
+			case B#block.reward>Max_Block_Rewards of
+				true ->
+					Max_Block_Rewards_New = B#block.reward;
+				false ->
+					Max_Block_Rewards_New = Max_Block_Rewards
+			end,
+			case B#block.reward<Min_Block_Rewards of
+				true ->
+					Min_Block_Rewards_New = B#block.reward;
+				false ->
+					Min_Block_Rewards_New = Min_Block_Rewards
+			end,
+			case B#block.height>1 of
+				true ->
+					StatisticsBlockBin = term_to_binary([Blocks+1,Avg_Txs_By_Block,Cumulative_Block_Rewards+B#block.reward,Block_Rewards+B#block.reward,Rewards_vs_Endowment,Avg_Block_Rewards,Max_Block_Rewards_New,Min_Block_Rewards_New,Avg_Block_Time,Max_Block_Time,Min_Block_Time,BlockUsedTime]),
+					ar_kv:put(statistics_block, TodayDataDate, StatisticsBlockBin);
+				false ->
+					ok
+			end				
+	end.
+
+take_first_n_chars(Str, N) when is_list(Str), is_integer(N), N >= 0 ->
+    lists:sublist(Str, 1, min(length(Str), N)).
+
+generate_range(A, B) when A >= B ->
+    [];
+generate_range(A, B) ->
+    [A | generate_range(A + 1, B)].
+
+read_block_from_height_by_number(FromHeight, BlockNumber) ->
+	BlockHeightArray = generate_range(FromHeight, FromHeight + BlockNumber),
+	BlockHeightArrayReverse = lists:reverse(BlockHeightArray),
+	BlockListElement = lists:map(
+		fun(X) -> 
+			case X > 0 of 
+				true ->
+					case ar_kv:get(explorer_block, list_to_binary(integer_to_list(X-1))) of 
+						not_found -> []; 
+						{ok, BlockIdBinaryPrevious} -> 
+							BlockIdBinaryResultPrevious = binary_to_term(BlockIdBinaryPrevious),
+							TimestampPrevious = lists:nth(5, BlockIdBinaryResultPrevious),
+							case ar_kv:get(explorer_block, list_to_binary(integer_to_list(X))) of 
+								not_found -> []; 
+								{ok, BlockIdBinary} -> 
+									BlockIdBinaryResult = binary_to_term(BlockIdBinary),
+									BlockMap = #{
+											<<"height">> => lists:nth(1, BlockIdBinaryResult),
+											<<"indep_hash">> => list_to_binary(binary_to_list(lists:nth(2, BlockIdBinaryResult))),
+											<<"reward_addr">> => list_to_binary(binary_to_list(lists:nth(3, BlockIdBinaryResult))),
+											<<"reward">> => lists:nth(4, BlockIdBinaryResult),
+											<<"timestamp">> => lists:nth(5, BlockIdBinaryResult),
+											<<"txs_length">> => lists:nth(6, BlockIdBinaryResult),
+											<<"weave_size">> => lists:nth(7, BlockIdBinaryResult),
+											<<"block_size">> => lists:nth(8, BlockIdBinaryResult),
+											<<"mining_time">> => lists:nth(5, BlockIdBinaryResult) - TimestampPrevious
+										},
+									BlockMap
+							end
+					end;
+				false ->
+					[]
+			end		
+		end, BlockHeightArrayReverse),
+	lists:filter(fun(Element) -> is_map(Element) end, BlockListElement).
+		
+
+read_statistics_network() ->
+	case ar_kv:get(statistics_summary, list_to_binary("datelist")) of
+		not_found ->
+			{404, #{}, []};
+		{ok, StatisticsDateListResult} ->
+			DateListArray = binary_to_term(StatisticsDateListResult),
+			Statistics_network = lists:map(
+				fun(X) -> 
+					case ar_kv:get(statistics_network, X) of
+						not_found ->
+							[];
+						{ok, DateListBinary} ->
+							DateListResult = binary_to_term(DateListBinary),
+							DateListMap = #{
+								<<"Date">> => ar_util:decode(X),
+								<<"Weave_Size">> => lists:nth(1, DateListResult),
+								<<"Weave_Size_Growth">> => lists:nth(2, DateListResult),
+								<<"Cumulative_Endowment">> => lists:nth(3, DateListResult),
+								<<"Avg_Endowment_Growth">> => lists:nth(4, DateListResult),
+								<<"Endowment_Growth">> => lists:nth(5, DateListResult),
+								<<"Avg_Pending_Txs">> => lists:nth(6, DateListResult),
+								<<"Avg_Pending_Size">> => lists:nth(7, DateListResult),
+								<<"Node_Count">> => lists:nth(8, DateListResult),
+								<<"Cumulative_Difficulty">> => lists:nth(9, DateListResult),
+								<<"Difficulty">> => lists:nth(10, DateListResult)
+							},
+							DateListMap							
+					end
+				end, DateListArray),
+			{200, #{}, ar_serialize:jsonify(Statistics_network)}
+	end.
+
+read_statistics_data() ->
+	case ar_kv:get(statistics_summary, list_to_binary("datelist")) of
+		not_found ->
+			{404, #{}, []};
+		{ok, StatisticsDateListResult} ->
+			DateListArray = binary_to_term(StatisticsDateListResult),
+			Statistics_data = lists:map(
+				fun(X) -> 
+					case ar_kv:get(statistics_data, X) of
+						not_found ->
+							[];
+						{ok, DateListBinary} ->
+							DateListResult = binary_to_term(DateListBinary),
+							DateListMap = #{
+								<<"Date">> => ar_util:decode(X),
+								<<"Data_Uploaded">> => lists:nth(1, DateListResult),
+								<<"Storage_Cost">> => lists:nth(2, DateListResult),
+								<<"Data_Size">> => lists:nth(3, DateListResult),
+								<<"Data_Fees">> => lists:nth(4, DateListResult),
+								<<"Cumulative_Data_Fees">> => lists:nth(5, DateListResult),
+								<<"Fees_Towards_Data_Upload">> => lists:nth(6, DateListResult),
+								<<"Data_Uploaders">> => lists:nth(7, DateListResult),
+								<<"Content_Type">> => lists:nth(8, DateListResult),
+								<<"Content_Type_Tx">> => lists:nth(9, DateListResult)
+							},
+							DateListMap							
+					end
+				end, DateListArray),
+			{200, #{}, ar_serialize:jsonify(Statistics_data)}
+	end.
+
+read_statistics_block() ->
+	case ar_kv:get(statistics_summary, list_to_binary("datelist")) of
+		not_found ->
+			{404, #{}, []};
+		{ok, StatisticsDateListResult} ->
+			DateListArray = binary_to_term(StatisticsDateListResult),
+			Statistics_block = lists:map(
+				fun(X) -> 
+					case ar_kv:get(statistics_block, X) of
+						not_found ->
+							[];
+						{ok, DateListBinary} ->
+							DateListResult = binary_to_term(DateListBinary),
+							DateListMap = #{
+								<<"Date">> => ar_util:decode(X),
+								<<"Blocks">> => lists:nth(1, DateListResult),
+								<<"Avg_Txs_By_Block">> => lists:nth(2, DateListResult),
+								<<"Cumulative_Block_Rewards">> => lists:nth(3, DateListResult),
+								<<"Block_Rewards">> => lists:nth(4, DateListResult),
+								<<"Rewards_vs_Endowment">> => lists:nth(5, DateListResult),
+								<<"Avg_Block_Rewards">> => lists:nth(6, DateListResult),
+								<<"Max_Block_Rewards">> => lists:nth(7, DateListResult),
+								<<"Min_Block_Rewards">> => lists:nth(8, DateListResult),
+								<<"Avg_Block_Time">> => lists:nth(9, DateListResult),
+								<<"Max_Block_Time">> => lists:nth(10, DateListResult),
+								<<"Min_Block_Time">> => lists:nth(11, DateListResult),
+								<<"BlockUsedTime">> => lists:nth(12, DateListResult)
+							},
+							DateListMap							
+					end
+				end, DateListArray),
+			{200, #{}, ar_serialize:jsonify(Statistics_block)}
+	end.
+
+read_statistics_address() ->
+	TodayDate = take_first_n_chars(calendar:system_time_to_rfc3339(erlang:system_time(second)), 10),
+	case ar_kv:get(statistics_address, ar_util:encode(TodayDate)) of
+		not_found ->
+			{404, #{}, []};
+		{ok, StatisticsAddressResult} ->
+			{200, #{}, ar_serialize:jsonify(binary_to_term(StatisticsAddressResult))}							
+	end.
+
+read_statistics_transaction() ->
+	TodayDate = take_first_n_chars(calendar:system_time_to_rfc3339(erlang:system_time(second)), 10),
+	case ar_kv:get(statistics_transaction, ar_util:encode(TodayDate)) of
+		not_found ->
+			{404, #{}, []};
+		{ok, StatisticsTransactionResult} ->
+			{200, #{}, ar_serialize:jsonify(binary_to_term(StatisticsTransactionResult))}							
+	end.
+
+find_value(Key, List) ->
+	case lists:keyfind(Key, 1, List) of
+		{Key, Val} -> Val;
+		false -> <<"text/plain">>
+	end.
+
+read_txs_by_addr(Addr, PageId, PageRecords) ->
+	try binary_to_integer(PageRecords) of
+		PageRecordsInt ->				
+			PageRecordsNew = if
+				PageRecordsInt < 0 -> 1;
+				PageRecordsInt > 100 -> 100;
+				true -> PageRecordsInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						true -> PageIdInt
+					end,
+					case ar_kv:get(address_tx_db, Addr) of
+						not_found ->
+							[];
+						{ok, TxIdBinary} ->
+							AllArray = binary_to_term(TxIdBinary),
+							Length = length(AllArray),
+							FromIndex = PageIdNew * PageRecordsNew,
+							FromIndexNew = if
+								FromIndex < 1 -> 1;
+								FromIndex > Length -> Length;
+								true -> FromIndex
+							end,
+							lists:sublist(AllArray, FromIndexNew, PageRecordsNew)
+					end
+			catch _:_ ->
+				[]
+			end
+	catch _:_ ->
+		[]
+	end.
+
+
+read_txrecord_by_txid(TxId) ->
+	case ar_util:safe_decode(TxId) of
+		{ok, ID} ->
+			?LOG_INFO([{txId, TxId},{iD___________________, ID}]),
+			case ar_storage:read_tx(ID) of
+				unavailable ->
+					unavailable;
+				#tx{} = TX ->
+					FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+					TargetAddress = ar_util:encode(TX#tx.target),									
+					Tags = lists:map(
+							fun({Name, Value}) ->
+								{[{name, Name},{value, Value}]}
+							end,
+							TX#tx.tags),
+					TagsMap = lists:map(
+							fun({Name, Value}) ->
+								{Name, Value}
+							end,
+							TX#tx.tags),
+					DataType = find_value(<<"Content-Type">>, TagsMap),
+					case ar_kv:get(xwe_storage_txid_block_db, ar_util:encode(TX#tx.id)) of
+						{ok, BlockInfoByTxIdBinary} ->
+							BlockInfoByTxId = binary_to_term(BlockInfoByTxIdBinary),
+							TxListMap = #{
+								<<"id">> => ar_util:encode(TX#tx.id),
+								<<"owner">> => #{<<"address">> => FromAddress},
+								<<"recipient">> => TargetAddress,
+								<<"quantity">> => #{<<"winston">> => TX#tx.quantity, <<"xwe">>=> float(TX#tx.quantity) / float(?WINSTON_PER_AR)},
+								<<"fee">> => #{<<"winston">> => TX#tx.reward, <<"xwe">>=> float(TX#tx.reward) / float(?WINSTON_PER_AR)},
+								<<"data">> => #{<<"size">> => TX#tx.data_size, <<"type">> => DataType},
+								<<"block">> => #{<<"height">> => lists:nth(1, BlockInfoByTxId), <<"indep_hash">> => list_to_binary(binary_to_list(lists:nth(2, BlockInfoByTxId))), <<"timestamp">> => lists:nth(3, BlockInfoByTxId) },
+								<<"tags">> => Tags
+							},
+							TxListMap;
+						not_found ->
+							[]
+					end
+			end
+	end.
+
+read_txsrecord_function(TxIdList) ->
+	lists:map(
+		fun(X) -> 
+			case ar_util:safe_decode(X) of
+				{ok, ID} ->
+					case ar_storage:read_tx(ID) of
+						unavailable ->
+							ok;
+						#tx{} = TX ->
+							FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+							TargetAddress = ar_util:encode(TX#tx.target),									
+							Tags = lists:map(
+									fun({Name, Value}) ->
+										{[{name, Name},{value, Value}]}
+									end,
+									TX#tx.tags),
+							TagsMap = lists:map(
+									fun({Name, Value}) ->
+										{Name, Value}
+									end,
+									TX#tx.tags),
+							DataType = find_value(<<"Content-Type">>, TagsMap),
+							case ar_kv:get(xwe_storage_txid_block_db, ar_util:encode(TX#tx.id)) of
+								{ok, BlockInfoByTxIdBinary} ->
+									BlockInfoByTxId = binary_to_term(BlockInfoByTxIdBinary),
+									TxListMap = #{
+										<<"id">> => ar_util:encode(TX#tx.id),
+										<<"owner">> => #{<<"address">> => FromAddress},
+										<<"recipient">> => TargetAddress,
+										<<"quantity">> => #{<<"winston">> => TX#tx.quantity, <<"xwe">>=> float(TX#tx.quantity) / float(?WINSTON_PER_AR)},
+										<<"fee">> => #{<<"winston">> => TX#tx.reward, <<"xwe">>=> float(TX#tx.reward) / float(?WINSTON_PER_AR)},
+										<<"data">> => #{<<"size">> => TX#tx.data_size, <<"type">> => DataType},
+										<<"block">> => #{<<"height">> => lists:nth(1, BlockInfoByTxId), <<"indep_hash">> => list_to_binary(binary_to_list(lists:nth(2, BlockInfoByTxId))), <<"timestamp">> => lists:nth(3, BlockInfoByTxId) },
+										<<"tags">> => Tags
+									},
+									TxListMap;
+								not_found ->
+									[]
+							end
+					end
+			end
+		end, TxIdList).
+
+read_txsrecord_by_addr(Addr, PageId, PageRecords) ->
+	try binary_to_integer(PageRecords) of
+		PageRecordsInt ->				
+			PageRecordsNew = if
+				PageRecordsInt < 0 -> 1;
+				PageRecordsInt > 100 -> 100;
+				true -> PageRecordsInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						true -> PageIdInt
+					end,
+					case ar_kv:get(address_tx_db, Addr) of
+						not_found ->
+							[];
+						{ok, TxIdBinary} ->
+							AllArray = binary_to_term(TxIdBinary),
+							Length = length(AllArray),
+							FromIndex = PageIdNew * PageRecordsNew,
+							FromIndexNew = if
+								FromIndex < 1 -> 1;
+								FromIndex > Length -> Length;
+								true -> FromIndex
+							end,
+							TargetResult = lists:sublist(AllArray, FromIndexNew, PageRecordsNew),
+							read_txsrecord_function(TargetResult)
+					end
+			catch _:_ ->
+				[]
+			end
+	catch _:_ ->
+		[]
+	end.
+
+read_txsrecord_by_addr_deposits(Addr, PageId, PageRecords) ->
+	try binary_to_integer(PageRecords) of
+		PageRecordsInt ->				
+			PageRecordsNew = if
+				PageRecordsInt < 0 -> 1;
+				PageRecordsInt > 100 -> 100;
+				true -> PageRecordsInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						true -> PageIdInt
+					end,
+					case ar_kv:get(address_tx_deposits_db, Addr) of
+						not_found ->
+							[];
+						{ok, TxIdBinary} ->
+							AllArray = binary_to_term(TxIdBinary),
+							Length = length(AllArray),
+							FromIndex = PageIdNew * PageRecordsNew,
+							FromIndexNew = if
+								FromIndex < 1 -> 1;
+								FromIndex > Length -> Length;
+								true -> FromIndex
+							end,
+							TargetResult = lists:sublist(AllArray, FromIndexNew, PageRecordsNew),
+							read_txsrecord_function(TargetResult)
+					end
+			catch _:_ ->
+				[]
+			end
+	catch _:_ ->
+		[]
+	end.
+
+read_txsrecord_by_addr_send(Addr, PageId, PageRecords) ->
+	try binary_to_integer(PageRecords) of
+		PageRecordsInt ->				
+			PageRecordsNew = if
+				PageRecordsInt < 0 -> 1;
+				PageRecordsInt > 100 -> 100;
+				true -> PageRecordsInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						true -> PageIdInt
+					end,
+					case ar_kv:get(address_tx_send_db, Addr) of
+						not_found ->
+							[];
+						{ok, TxIdBinary} ->
+							AllArray = binary_to_term(TxIdBinary),
+							Length = length(AllArray),
+							FromIndex = PageIdNew * PageRecordsNew,
+							FromIndexNew = if
+								FromIndex < 1 -> 1;
+								FromIndex > Length -> Length;
+								true -> FromIndex
+							end,
+							TargetResult = lists:sublist(AllArray, FromIndexNew, PageRecordsNew),
+							read_txsrecord_function(TargetResult)
+					end
+			catch _:_ ->
+				[]
+			end
+	catch _:_ ->
+		[]
+	end.
+
+read_datarecord_function(TxIdList) ->
+	lists:map(
+				fun(X) -> 
+					case ar_util:safe_decode(X) of
+						{ok, ID} ->
+							case ar_storage:read_tx(ID) of
+								unavailable ->
+									ok;
+								#tx{} = TX ->
+									FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+									TargetAddress = ar_util:encode(TX#tx.target),									
+									Tags = lists:map(
+											fun({Name, Value}) ->
+												{[{name, Name},{value, Value}]}
+											end,
+											TX#tx.tags),
+									TagsMap = lists:map(
+											fun({Name, Value}) ->
+												{Name, Value}
+											end,
+											TX#tx.tags),
+									DataType = find_value(<<"Content-Type">>, TagsMap),
+									case ar_kv:get(xwe_storage_txid_block_db, ar_util:encode(TX#tx.id)) of
+										{ok, BlockInfoByTxIdBinary} ->
+											BlockInfoByTxId = binary_to_term(BlockInfoByTxIdBinary),
+											TxListMap = #{
+												<<"id">> => ar_util:encode(TX#tx.id),
+												<<"owner">> => #{<<"address">> => FromAddress},
+												<<"recipient">> => TargetAddress,
+												<<"quantity">> => #{<<"winston">> => TX#tx.quantity, <<"xwe">>=> float(TX#tx.quantity) / float(?WINSTON_PER_AR)},
+												<<"fee">> => #{<<"winston">> => TX#tx.reward, <<"xwe">>=> float(TX#tx.reward) / float(?WINSTON_PER_AR)},
+												<<"data">> => #{<<"size">> => TX#tx.data_size, <<"type">> => DataType},
+												<<"block">> => #{<<"height">> => lists:nth(1, BlockInfoByTxId), <<"indep_hash">> => list_to_binary(binary_to_list(lists:nth(2, BlockInfoByTxId))), <<"timestamp">> => lists:nth(3, BlockInfoByTxId) },
+												<<"tags">> => Tags
+											},
+											TxListMap;
+										not_found ->
+											[]
+									end
+							end
+					end
+				end, TxIdList).
+
+read_datarecord_by_addr(Addr, PageId, PageRecords) ->
+	try binary_to_integer(PageRecords) of
+		PageRecordsInt ->				
+			PageRecordsNew = if
+				PageRecordsInt < 0 -> 1;
+				PageRecordsInt > 100 -> 100;
+				true -> PageRecordsInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						true -> PageIdInt
+					end,
+					case ar_kv:get(address_data_db, Addr) of
+						not_found ->
+							[];
+						{ok, TxIdBinary} ->
+							AllArray = binary_to_term(TxIdBinary),
+							Length = length(AllArray),
+							FromIndex = PageIdNew * PageRecordsNew,
+							FromIndexNew = if
+								FromIndex < 1 -> 1;
+								FromIndex > Length -> Length;
+								true -> FromIndex
+							end,
+							TargetResult = lists:sublist(AllArray, FromIndexNew, PageRecordsNew),
+							read_datarecord_function(TargetResult)
+					end
+			catch _:_ ->
+				[]
+			end
+	catch _:_ ->
+		[]
+	end.
+
+read_data_by_addr(Addr, PageId, PageRecords) ->
+	try binary_to_integer(PageRecords) of
+		PageRecordsInt ->				
+			PageRecordsNew = if
+				PageRecordsInt < 0 -> 1;
+				PageRecordsInt > 100 -> 100;
+				true -> PageRecordsInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						true -> PageIdInt
+					end,
+					case ar_kv:get(address_data_db, Addr) of
+						not_found ->
+							[];
+						{ok, TxIdBinary} ->
+							AllArray = binary_to_term(TxIdBinary),
+							Length = length(AllArray),
+							FromIndex = PageIdNew * PageRecordsNew,
+							FromIndexNew = if
+								FromIndex < 1 -> 1;
+								FromIndex > Length -> Length;
+								true -> FromIndex
+							end,
+							lists:sublist(AllArray, FromIndexNew, PageRecordsNew)
+					end
+			catch _:_ ->
+				[]
+			end
+	catch _:_ ->
+		[]
+	end.
+
+update_reward_history(B) ->
+	case B#block.height >= ar_fork:height_2_6() of
+		true ->
+			HashRate = ar_difficulty:get_hash_rate(B#block.diff),
+			Addr = B#block.reward_addr,
+			Bin = term_to_binary({Addr, HashRate, B#block.reward}),
+			ar_kv:put(reward_history_db, B#block.indep_hash, Bin);
+		false ->
+			ok
+	end.
+
 
 write_full_block2(BShadow, TXs) ->
 	case write_block(BShadow) of

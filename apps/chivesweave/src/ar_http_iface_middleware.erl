@@ -1101,14 +1101,142 @@ handle(<<"GET">>, [<<"tx_anchor">>], Req, _Pid) ->
 			{200, #{}, ar_util:encode(SuggestedAnchor), Req}
 	end;
 
+%% Return a list of Block infor, used for block explorer.
+handle(<<"GET">>, [<<"blocklist">>, FromHeight, BlockNumber], Req, _Pid) ->
+	{Status, Headers, Body} = handle_get_blocklist_data(FromHeight,BlockNumber),
+	{Status, Headers, Body, Req};
+
+%% Return a list of Block infor by page number, used for block explorer.
+handle(<<"GET">>, [<<"blockpage">>, PageId, PageRecords], Req, _Pid) ->
+	{Status, Headers, Body} = handle_get_blockpage_data(PageId, PageRecords),
+	{Status, Headers, Body, Req};
+
+%% Return a list of Last Block, used for block explorer.
+handle(<<"GET">>, [<<"block">>, <<"last">>, BlockNumber], Req, _Pid) ->
+	{Status, Headers, Body} = handle_get_block_last_data(BlockNumber),
+	{Status, Headers, Body, Req};
+
+%% Return a list of Last Block, used for block explorer.
+handle(<<"GET">>, [<<"block">>, <<"txs">>, Height], Req, _Pid) ->
+	{Status, Headers, Body} = handle_get_block_txs_by_height(Height),
+	{Status, Headers, Body, Req};
+
+%% Return a list of Last Block, used for block explorer.
+handle(<<"GET">>, [<<"block">>, <<"txsrecord">>, Height], Req, _Pid) ->
+	{Status, Headers, Body} = handle_get_block_txsrecord_by_height(Height),
+	{Status, Headers, Body, Req};
+
+%% Return a list of Block infor, used for block explorer.
+handle(<<"GET">>, [<<"statistics_network">>], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_statistics_network, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = ar_storage:read_statistics_network(),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+%% Return a list of Block infor, used for block explorer.
+handle(<<"GET">>, [<<"statistics_data">>], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_statistics_data, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = ar_storage:read_statistics_data(),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+%% Return a list of Block infor, used for block explorer.
+handle(<<"GET">>, [<<"statistics_block">>], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_statistics_block, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = ar_storage:read_statistics_block(),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+%% Return a list of Block infor, used for block explorer.
+handle(<<"GET">>, [<<"statistics_address">>], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_statistics_address, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = ar_storage:read_statistics_address(),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+%% Return a list of Block infor, used for block explorer.
+handle(<<"GET">>, [<<"statistics_transaction">>], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_statistics_transaction, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = ar_storage:read_statistics_transaction(),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
 %% Return transaction identifiers (hashes) for the wallet specified via wallet_address.
 %% GET request to endpoint /wallet/{wallet_address}/txs.
-handle(<<"GET">>, [<<"wallet">>, Addr, <<"txs">>], Req, _Pid) ->
+handle(<<"GET">>, [<<"wallet">>, Addr, <<"txs">>, PageId, PageRecords], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_wallet_txs, Config#config.enable) of
 		true ->
-			ar_semaphore:acquire(arql_semaphore(Req), 5000),
-			{Status, Headers, Body} = handle_get_wallet_txs(Addr, none),
+			{Status, Headers, Body} = handle_get_wallet_txs(Addr, PageId, PageRecords),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+%% Return transaction identifiers (hashes) for the wallet specified via wallet_address.
+%% GET request to endpoint /wallet/{wallet_address}/txsrecord.
+handle(<<"GET">>, [<<"wallet">>, Addr, <<"txsrecord">>, PageId, PageRecords], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_wallet_txs, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_wallet_txsrecord(Addr, PageId, PageRecords),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+%% Return transaction identifiers (hashes) for the wallet specified via wallet_address.
+%% GET request to endpoint /wallet/{wallet_address}/txsrecord.
+handle(<<"GET">>, [<<"wallet">>, TxId, <<"txrecord">>], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_wallet_txs, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_wallet_txrecord(TxId),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+
+%% Return transaction identifiers (hashes) for the wallet specified via wallet_address.
+%% GET request to endpoint /wallet/{wallet_address}/data.
+handle(<<"GET">>, [<<"wallet">>, Addr, <<"data">>, PageId, PageRecords], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_wallet_data, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_address_data(Addr, PageId, PageRecords),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+%% Return transaction identifiers (hashes) for the wallet specified via wallet_address.
+%% GET request to endpoint /wallet/{wallet_address}/data.
+handle(<<"GET">>, [<<"wallet">>, Addr, <<"datarecord">>, PageId, PageRecords], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_wallet_data, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_address_datarecord(Addr, PageId, PageRecords),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1121,9 +1249,18 @@ handle(<<"GET">>, [<<"wallet">>, Addr, <<"txs">>, EarliestTX], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_wallet_txs, Config#config.enable) of
 		true ->
-			ar_semaphore:acquire(arql_semaphore(Req), 5000),
-			{Status, Headers, Body} = handle_get_wallet_txs(Addr, ar_util:decode(EarliestTX)),
-			{Status, Headers, Body, Req};
+			case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+				{error, invalid} ->
+					{400, #{}, <<"Invalid address.">>};
+				{ok, _} ->
+					case ar_storage:read_txs_by_addr(Addr) of
+						not_found ->
+							{404, #{}, [], Req};
+						Res ->
+							% ?LOG_INFO([{handle_get_wallet_txs, [lists:last(Res)]}]),
+							{200, #{}, ar_serialize:jsonify([lists:last(Res)]), Req}
+					end
+			end;
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
@@ -1131,18 +1268,25 @@ handle(<<"GET">>, [<<"wallet">>, Addr, <<"txs">>, EarliestTX], Req, _Pid) ->
 %% Return identifiers (hashes) of transfer transactions depositing to the given
 %% wallet_address.
 %% GET request to endpoint /wallet/{wallet_address}/deposits.
-handle(<<"GET">>, [<<"wallet">>, Addr, <<"deposits">>], Req, _Pid) ->
+handle(<<"GET">>, [<<"wallet">>, Addr, <<"deposits">>, PageId, PageRecords], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
-	case lists:member(serve_wallet_deposits, Config#config.enable) of
+	case lists:member(serve_wallet_txs, Config#config.enable) of
 		true ->
-			ar_semaphore:acquire(arql_semaphore(Req), 5000),
-			case catch ar_arql_db:select_txs_by([{to, [Addr]}]) of
-				TXMaps when is_list(TXMaps) ->
-					TXIDs = lists:map(fun(#{ id := ID }) -> ID end, TXMaps),
-					{200, #{}, ar_serialize:jsonify(TXIDs), Req};
-				{'EXIT', {timeout, {gen_server, call, [ar_arql_db, _]}}} ->
-					{503, #{}, <<"ArQL unavailable.">>, Req}
-			end;
+			{Status, Headers, Body} = handle_get_wallet_txs_deposits(Addr, PageId, PageRecords),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+%% Return identifiers (hashes) of transfer transactions of the given
+%% wallet_address send out.
+%% GET request to endpoint /wallet/{wallet_address}/send.
+handle(<<"GET">>, [<<"wallet">>, Addr, <<"send">>, PageId, PageRecords], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_wallet_txs, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_wallet_txs_send(Addr, PageId, PageRecords),
+			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
@@ -1154,20 +1298,17 @@ handle(<<"GET">>, [<<"wallet">>, Addr, <<"deposits">>, EarliestDeposit], Req, _P
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_wallet_deposits, Config#config.enable) of
 		true ->
-			ar_semaphore:acquire(arql_semaphore(Req), 5000),
-			case catch ar_arql_db:select_txs_by([{to, [Addr]}]) of
-				TXMaps when is_list(TXMaps) ->
-					TXIDs = lists:map(fun(#{ id := ID }) -> ID end, TXMaps),
-					{Before, After} = lists:splitwith(fun(T) -> T /= EarliestDeposit end, TXIDs),
-					FilteredTXs = case After of
-						[] ->
-							Before;
-						[EarliestDeposit | _] ->
-							Before ++ [EarliestDeposit]
-					end,
-					{200, #{}, ar_serialize:jsonify(FilteredTXs), Req};
-				{'EXIT', {timeout, {gen_server, call, [ar_arql_db, _]}}} ->
-					{503, #{}, <<"ArQL unavailable.">>, Req}
+			case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+				{error, invalid} ->
+					{400, #{}, <<"Invalid address.">>, Req};
+				{ok, _} ->
+					case ar_storage:read_txsrecord_by_addr_deposits(Addr) of
+						not_found ->
+							{404, #{}, [], Req};
+						Res ->
+							% ?LOG_INFO([{handle_get_wallet_txs, [lists:last(Res)]}]),
+							{200, #{}, ar_serialize:jsonify([lists:last(Res)]), Req}
+					end
 			end;
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1639,22 +1780,232 @@ estimate_tx_fee_v2(Size, Addr) ->
 	Args = {Size2, PricePerGiBMinute, KryderPlusRateMultiplier, Addr, Accounts, Height + 1},
 	ar_tx:get_tx_fee2(Args).
 
-handle_get_wallet_txs(Addr, EarliestTXID) ->
+handle_get_blocklist_data(FromHeight, BlockNumber) ->
+	try binary_to_integer(BlockNumber) of
+		BlockNumberInt ->				
+			BlockNumberNew = if
+				BlockNumberInt < 0 -> 1;
+				BlockNumberInt > 100 -> 100;
+				true -> BlockNumberInt
+			end,
+			try binary_to_integer(FromHeight) of
+				FromHeightInt ->
+					CurrentHeight = ar_node:get_height(),
+					FromHeightNew = if
+						FromHeightInt < 0 -> 0;
+						FromHeightInt > CurrentHeight -> CurrentHeight;
+						true -> FromHeightInt
+					end,
+					case ar_storage:read_block_from_height_by_number(FromHeightNew, BlockNumberNew) of
+						not_found ->
+							{404, #{}, []};
+						Res ->
+							% ?LOG_INFO([{handle_get_blocklist_data, Res}]),
+							{200, #{}, ar_serialize:jsonify(Res)}
+					end
+			catch _:_ ->
+				{404, #{}, []}
+			end
+	catch _:_ ->
+		{404, #{}, []}
+	end.
+
+handle_get_blockpage_data(PageId, PageRecords) ->
+	try binary_to_integer(PageRecords) of
+		PageRecordsInt ->				
+			PageRecordsNew = if
+				PageRecordsInt < 0 -> 1;
+				PageRecordsInt > 100 -> 100;
+				true -> PageRecordsInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					CurrentHeight = ar_node:get_height(),
+					AllPages = math:ceil(CurrentHeight / PageRecordsNew),
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						PageIdInt > AllPages -> AllPages;
+						true -> PageIdInt
+					end,
+					FromHeight = CurrentHeight - PageIdNew * PageRecordsNew + 1,
+					FromHeightNew = if
+						FromHeight < 0 -> 0;
+						FromHeight > CurrentHeight -> CurrentHeight;
+						true -> FromHeight
+					end,
+					case ar_storage:read_block_from_height_by_number(FromHeightNew, PageRecordsNew) of
+						not_found ->
+							{404, #{}, []};
+						Res ->
+							% ?LOG_INFO([{handle_get_blocklist_data, Res}]),
+							{200, #{}, ar_serialize:jsonify(Res)}
+					end
+			catch _:_ ->
+				{404, #{}, []}
+			end
+	catch _:_ ->
+		{404, #{}, []}
+	end.
+	
+handle_get_block_last_data(BlockNumber) ->
+	BlockNumberInt = binary_to_integer(BlockNumber),
+	BlockNumberNew = if
+		BlockNumberInt < 0 -> 1;
+		BlockNumberInt > 100 -> 100;
+		true -> BlockNumberInt
+	end,
+	CurrentHeight = ar_node:get_height(),
+	FromHeight = CurrentHeight - BlockNumberNew,
+	FromHeightNew = if
+		FromHeight < 0 -> 0;
+		true -> FromHeight
+	end,
+	case ar_storage:read_block_from_height_by_number(FromHeightNew, BlockNumberNew) of
+		not_found ->
+			{404, #{}, []};
+		Res ->
+			% ?LOG_INFO([{handle_get_block_last_data, Res}]),
+			{200, #{}, ar_serialize:jsonify(Res)}
+	end.
+
+handle_get_block_txs_by_height(Height) ->
+	HeightInt = binary_to_integer(Height),
+	case ar_block_index:get_element_by_height(HeightInt) of
+		not_found ->
+			{404, #{}, jiffy:encode(#{ error => block_not_found })};
+		{H, _, _} ->
+			B =
+				case ar_block_cache:get(block_cache, H) of
+					not_found ->
+						ar_storage:read_block(H);
+					B2 ->
+						B2
+				end,
+			case B of
+				unavailable ->
+					{404, #{}, jiffy:encode(#{ error => block_not_found })};
+				#block{ txs = TXs2 } ->
+					TXIDs = lists:map(fun(TX) when is_binary(TX) -> ar_util:encode(TX); (#tx{ id = TX }) -> ar_util:encode(TX) end, TXs2),
+					{200, #{}, ar_serialize:jsonify(TXIDs)}
+			end
+	end.
+
+handle_get_block_txsrecord_by_height(Height) ->
+	HeightInt = binary_to_integer(Height),
+	case ar_block_index:get_element_by_height(HeightInt) of
+		not_found ->
+			{404, #{}, jiffy:encode(#{ error => block_not_found })};
+		{H, _, _} ->
+			B =
+				case ar_block_cache:get(block_cache, H) of
+					not_found ->
+						ar_storage:read_block(H);
+					B2 ->
+						B2
+				end,
+			case B of
+				unavailable ->
+					{404, #{}, jiffy:encode(#{ error => block_not_found })};
+				#block{ txs = TXs2 } ->
+					TXIDs = lists:map(fun(TX) when is_binary(TX) -> ar_util:encode(TX); (#tx{ id = TX }) -> ar_util:encode(TX) end, TXs2),
+					?LOG_INFO([{handle_get_block_txsrecord_by_heightTXIDs, TXIDs}]),
+					TxsRecord = ar_storage:read_txsrecord_function(term_to_binary(TXIDs)),
+					?LOG_INFO([{handle_get_block_txsrecord_by_heightTxsRecord, TxsRecord}]),
+					{200, #{}, ar_serialize:jsonify(TxsRecord)}
+			end
+	end.
+
+handle_get_wallet_txs(Addr, PageId, PageRecords) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->
 			{400, #{}, <<"Invalid address.">>};
 		{ok, _} ->
-			case catch ar_arql_db:select_txs_by([{from, [Addr]}]) of
-				TXMaps when is_list(TXMaps) ->
-					TXIDs = lists:map(
-						fun(#{ id := ID }) -> ar_util:decode(ID) end,
-						TXMaps
-					),
-					RecentTXIDs = get_wallet_txs(EarliestTXID, TXIDs),
-					EncodedTXIDs = lists:map(fun ar_util:encode/1, RecentTXIDs),
-					{200, #{}, ar_serialize:jsonify(EncodedTXIDs)};
-				{'EXIT', {timeout, {gen_server, call, [ar_arql_db, _]}}} ->
-					{503, #{}, <<"ArQL unavailable.">>}
+			case ar_storage:read_txs_by_addr(Addr, PageId, PageRecords) of
+				not_found ->
+					{404, #{}, []};
+				Res ->
+					% ?LOG_INFO([{handle_get_wallet_txs, Res}]),
+					{200, #{}, ar_serialize:jsonify(Res)}
+			end
+	end.
+
+
+handle_get_wallet_txrecord(TxId) ->
+	case ar_storage:read_txrecord_by_txid(TxId) of
+		not_found ->
+			{404, #{}, []};
+		Res ->
+			% ?LOG_INFO([{handle_get_wallet_txs, Res}]),
+			{200, #{}, ar_serialize:jsonify(Res)}
+	end.
+
+handle_get_wallet_txsrecord(Addr, PageId, PageRecords) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			case ar_storage:read_txsrecord_by_addr(Addr, PageId, PageRecords) of
+				not_found ->
+					{404, #{}, []};
+				Res ->
+					% ?LOG_INFO([{handle_get_wallet_txs, Res}]),
+					{200, #{}, ar_serialize:jsonify(Res)}
+			end
+	end.
+
+handle_get_wallet_txs_deposits(Addr, PageId, PageRecords) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			case ar_storage:read_txsrecord_by_addr_deposits(Addr, PageId, PageRecords) of
+				not_found ->
+					{404, #{}, []};
+				Res ->
+					% ?LOG_INFO([{handle_get_wallet_txs, Res}]),
+					{200, #{}, ar_serialize:jsonify(Res)}
+			end
+	end.
+	
+handle_get_wallet_txs_send(Addr, PageId, PageRecords) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			case ar_storage:read_txsrecord_by_addr_send(Addr, PageId, PageRecords) of
+				not_found ->
+					{404, #{}, []};
+				Res ->
+					% ?LOG_INFO([{handle_get_wallet_txs, Res}]),
+					{200, #{}, ar_serialize:jsonify(Res)}
+			end
+	end.
+
+handle_get_address_data(Addr, PageId, PageRecords) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			case ar_storage:read_data_by_addr(Addr, PageId, PageRecords) of
+				not_found ->
+					{404, #{}, []};
+				Res ->
+					% ?LOG_INFO([{handle_get_address_data, Res}]),
+					{200, #{}, ar_serialize:jsonify(Res)}
+			end
+	end.
+
+handle_get_address_datarecord(Addr, PageId, PageRecords) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			case ar_storage:read_datarecord_by_addr(Addr, PageId, PageRecords) of
+				not_found ->
+					{404, #{}, []};
+				Res ->
+					% ?LOG_INFO([{handle_get_address_data, Res}]),
+					{200, #{}, ar_serialize:jsonify(Res)}
 			end
 	end.
 
@@ -2173,6 +2524,7 @@ return_info(Req) ->
 					},
 					{blocks, BlockCount},
 					{peers, prometheus_gauge:value(arweave_peer_count)},
+					{time, integer_to_binary(os:system_time(second))},
 					{queue_length,
 						element(
 							2,

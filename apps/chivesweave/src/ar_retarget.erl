@@ -60,18 +60,7 @@ maybe_retarget(Height, CurDiff, TS, LastRetargetTS, PrevTS) ->
 		true ->
 			calculate_difficulty(CurDiff, TS, LastRetargetTS, Height, PrevTS);
 		false ->
-			TargetTime = 4 * ?TARGET_TIME,
-			ActualTime = TS - PrevTS,
-			NewDiff = erlang:max(
-				if
-					ActualTime > erlang:trunc(TargetTime) -> CurDiff - erlang:trunc(CurDiff * 0.0001 * ActualTime / TargetTime );
-					true                                           -> CurDiff
-				end,
-				ar_mine:min_difficulty(Height)
-			),
-			?LOG_INFO([{curDiff_______maybe_retarget_________________________, CurDiff}]),
-			?LOG_INFO([{newDiff_______maybe_retarget_________________________, NewDiff}]),
-			NewDiff
+			CurDiff
 	end.
 
 -ifdef(TESTNET).
@@ -259,15 +248,24 @@ switch_to_randomx_fork_diff(OldDiff) ->
 calculate_difficulty_before_1_8(OldDiff, TS, Last, Height) ->
 	TargetTime = ?RETARGET_BLOCKS * ?TARGET_TIME,
 	ActualTime = TS - Last,
-	TimeError = abs(ActualTime - TargetTime),
 	Diff = erlang:max(
 		if
-			TimeError < (TargetTime * ?RETARGET_TOLERANCE) -> OldDiff;
-			TargetTime > ActualTime                        -> OldDiff + 1;
-			true                                           -> OldDiff - 1
+			ActualTime > erlang:trunc(TargetTime * (1 + ?RETARGET_TOLERANCE) ) -> OldDiff - erlang:trunc(OldDiff * 0.0001 * ActualTime / TargetTime );
+			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 70 ) -> OldDiff + erlang:trunc(OldDiff * 0.0001 * 50);
+			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 50 ) -> OldDiff + erlang:trunc(OldDiff * 0.0001 * 30);
+			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 12 ) -> OldDiff + erlang:trunc(OldDiff * 0.0001 * 5);
+			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 8 ) -> OldDiff + erlang:trunc(OldDiff * 0.0001 * 4);
+			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 4 ) -> OldDiff + erlang:trunc(OldDiff * 0.0001 * 2);
+			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 2 ) -> OldDiff + erlang:trunc(OldDiff * 0.0001 * 3 div 2);
+			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) ) -> OldDiff + erlang:trunc(OldDiff * 0.0001);
+			true                                           -> OldDiff
 		end,
-		min_difficulty(Height)
+		ar_mine:min_difficulty(Height)
 	),
+	?LOG_INFO([{min_difficulty_________________________, ar_mine:min_difficulty(Height)}]),
+	?LOG_INFO([{actualTime_____________________________, ActualTime}]),
+	?LOG_INFO([{oldDiff________________________________, OldDiff}]),
+	?LOG_INFO([{newDiff________________________________, Diff}]),
 	Diff.
 
 between(N, Min, _) when N < Min -> Min;

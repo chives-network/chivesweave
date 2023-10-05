@@ -683,7 +683,7 @@
 -define(OK(Tuple), begin (case (Tuple) of {ok, SuccessValue} -> (SuccessValue) end) end).
 
 %% The messages to be stored inside the genesis block.
--define(GENESIS_BLOCK_MESSAGES, []).
+-define(GENESIS_BLOCK_MESSAGES, ["Thank you Sam Williams!"]).
 
 %% Minimum number of characters for internal API secret. Used in the optional HTTP API
 %% for signing transactions.

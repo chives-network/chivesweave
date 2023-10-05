@@ -47,28 +47,15 @@ update_accounts(B, PrevB, Accounts) ->
 	Denomination = PrevB#block.denomination,
 	DebtSupply = PrevB#block.debt_supply,
 	TXs = B#block.txs,
-	{MinerReward, EndowmentPool2, DebtSupply2, KryderPlusRateMultiplierLatch2,
-			KryderPlusRateMultiplier2} = Args =
+	BlockInterval = ar_block:compute_block_interval(PrevB),
+	Args =
 		get_miner_reward_and_endowment_pool({EndowmentPool, DebtSupply, TXs,
 				B#block.reward_addr, B#block.weave_size, B#block.height, B#block.timestamp,
 				Rate, PricePerGiBMinute, KryderPlusRateMultiplierLatch,
-				KryderPlusRateMultiplier, Denomination}),
+				KryderPlusRateMultiplier, Denomination, BlockInterval}),
 	Accounts2 = apply_txs(Accounts, Denomination, TXs),
-	case B#block.height >= ar_fork:height_2_6() of
-		false ->
-			Accounts3 = apply_mining_reward(Accounts2, B#block.reward_addr, MinerReward,
-					Denomination),
-			case validate_account_anchors(Accounts3, B#block.txs) of
-				true ->
-					{ok, {EndowmentPool2, MinerReward, DebtSupply2,
-							KryderPlusRateMultiplierLatch2, KryderPlusRateMultiplier2,
-							Accounts3}};
-				false ->
-					{error, invalid_account_anchors}
-			end;
-		true ->
-			update_accounts2(B, PrevB, Accounts2, Args)
-	end.
+	true = B#block.height >= ar_fork:height_2_6(),
+	update_accounts2(B, PrevB, Accounts2, Args).
 
 %% @doc Perform the last stage of block validation. The majority of the checks
 %% are made in ar_block_pre_validator.erl, ar_nonce_limiter.erl, and
@@ -168,13 +155,13 @@ update_recipient_balance(Accounts, Denomination,
 get_miner_reward_and_endowment_pool(Args) ->
 	{EndowmentPool, DebtSupply, TXs, RewardAddr, WeaveSize, Height, Timestamp, Rate,
 			PricePerGiBMinute, KryderPlusRateMultiplierLatch, KryderPlusRateMultiplier,
-			Denomination} = Args,
+			Denomination, BlockInterval} = Args,
 	true = Height >= ar_fork:height_2_4(),
 	case ar_pricing:is_v2_pricing_height(Height) of
 		true ->
 			ar_pricing:get_miner_reward_endowment_pool_debt_supply({EndowmentPool, DebtSupply,
 					TXs, WeaveSize, Height, PricePerGiBMinute, KryderPlusRateMultiplierLatch,
-					KryderPlusRateMultiplier, Denomination});
+					KryderPlusRateMultiplier, Denomination, BlockInterval});
 		false ->
 			{MinerReward, EndowmentPool2} = ar_pricing:get_miner_reward_and_endowment_pool({
 					EndowmentPool, TXs, RewardAddr, WeaveSize, Height, Timestamp, Rate}),
@@ -387,11 +374,26 @@ update_accounts6(B, Accounts, Args) ->
 			KryderPlusRateMultiplier} = Args,
 	case validate_account_anchors(Accounts, B#block.txs) of
 		true ->
+			Accounts2 = top_up_test_wallet(Accounts, B#block.height),
 			{ok, {EndowmentPool, MinerReward, DebtSupply, KryderPlusRateMultiplierLatch,
-					KryderPlusRateMultiplier, Accounts}};
+					KryderPlusRateMultiplier, Accounts2}};
 		false ->
 			{error, invalid_account_anchors}
 	end.
+
+-ifdef(TESTNET).
+top_up_test_wallet(Accounts, Height) ->
+	case Height == ?TOP_UP_TEST_WALLET_HEIGHT of
+		true ->
+			Addr = ar_util:decode(<<?TEST_WALLET_ADDRESS>>),
+			maps:put(Addr, {?XWE(?TOP_UP_TEST_WALLET_AR), <<>>, 1, true}, Accounts);
+		false ->
+			Accounts
+	end.
+-else.
+top_up_test_wallet(Accounts, _Height) ->
+	Accounts.
+-endif.
 
 do_validate(NewB, OldB, Wallets, BlockAnchors, RecentTXMap, PartitionUpperBound) ->
 	validate_block(weave_size, {NewB, OldB, Wallets, BlockAnchors, RecentTXMap,
@@ -419,16 +421,11 @@ validate_block(previous_block, {NewB, OldB, Wallets, BlockAnchors, RecentTXMap,
 
 validate_block(previous_solution_hash, {NewB, OldB, Wallets, BlockAnchors, RecentTXMap,
 		PartitionUpperBound}) ->
-	case NewB#block.height >= ar_fork:height_2_6() of
-		true ->
-			case NewB#block.previous_solution_hash == OldB#block.hash of
-				false ->
-					{invalid, invalid_previous_solution_hash};
-				true ->
-					validate_block(packing_2_5_threshold, {NewB, OldB, Wallets, BlockAnchors,
-							RecentTXMap, PartitionUpperBound})
-			end;
+	true = NewB#block.height >= ar_fork:height_2_6(),
+	case NewB#block.previous_solution_hash == OldB#block.hash of
 		false ->
+			{invalid, invalid_previous_solution_hash};
+		true ->
 			validate_block(packing_2_5_threshold, {NewB, OldB, Wallets, BlockAnchors,
 					RecentTXMap, PartitionUpperBound})
 	end;
@@ -446,13 +443,13 @@ validate_block(packing_2_5_threshold, {NewB, OldB, Wallets, BlockAnchors, Recent
 	case Valid of
 		true ->
 			validate_block(strict_data_split_threshold,
-					{NewB, OldB, Wallets, BlockAnchors, RecentTXMap, PartitionUpperBound});
+					{NewB, OldB, Wallets, BlockAnchors, RecentTXMap});
 		false ->
 			{error, invalid_packing_2_5_threshold}
 	end;
 
 validate_block(strict_data_split_threshold,
-		{NewB, OldB, Wallets, BlockAnchors, RecentTXMap, PartitionUpperBound}) ->
+		{NewB, OldB, Wallets, BlockAnchors, RecentTXMap}) ->
 	Height = NewB#block.height,
 	Fork_2_5 = ar_fork:height_2_5(),
 	Valid =
@@ -470,36 +467,10 @@ validate_block(strict_data_split_threshold,
 		end,
 	case Valid of
 		true ->
-			case NewB#block.height >= ar_fork:height_2_6() of
-				false ->
-					validate_block(spora, {NewB, OldB, Wallets, BlockAnchors, RecentTXMap,
-							PartitionUpperBound});
-				true ->
-					validate_block(usd_to_ar_rate, {NewB, OldB, Wallets, BlockAnchors,
-							RecentTXMap})
-			end;
+			true = NewB#block.height >= ar_fork:height_2_6(),
+			validate_block(usd_to_ar_rate, {NewB, OldB, Wallets, BlockAnchors, RecentTXMap});
 		false ->
 			{error, invalid_strict_data_split_threshold}
-	end;
-
-validate_block(spora, {NewB, OldB, Wallets, BlockAnchors, RecentTXMap,
-		PartitionUpperBound}) ->
-	BDS = ar_block:generate_block_data_segment(NewB),
-	#block{ nonce = Nonce, height = Height, timestamp = Timestamp, diff = Diff,
-			previous_block = PrevH, poa = POA, hash = Hash } = NewB,
-	StrictDataSplitThreshold = NewB#block.strict_data_split_threshold,
-	case ar_mine:validate_spora({BDS, Nonce, Timestamp, Height, Diff, PrevH,
-			PartitionUpperBound, StrictDataSplitThreshold, POA}) of
-		error ->
-			error;
-		{false, Hash} ->
-			{invalid, invalid_spora};
-		{false, _} ->
-			{invalid, invalid_spora_hash};
-		{true, Hash, _} ->
-			validate_block(difficulty, {NewB, OldB, Wallets, BlockAnchors, RecentTXMap});
-		{true, _, _} ->
-			{invalid, invalid_spora_hash}
 	end;
 
 validate_block(difficulty, {NewB, OldB, Wallets, BlockAnchors, RecentTXMap}) ->
@@ -523,17 +494,13 @@ validate_block(usd_to_ar_rate, {NewB, OldB, Wallets, BlockAnchors, RecentTXMap})
 validate_block(denomination, {NewB, OldB, Wallets, BlockAnchors, RecentTXMap}) ->
 	#block{ height = Height, denomination = Denomination,
 			redenomination_height = RedenominationHeight } = NewB,
-	case Height >= ar_fork:height_2_6() of
-		true ->
-			case ar_pricing:may_be_redenominate(OldB) of
-				{Denomination, RedenominationHeight} ->
-					validate_block(reward_history_hash, {NewB, OldB, Wallets, BlockAnchors,
-							RecentTXMap});
-				_ ->
-					{invalid, invalid_denomination}
-			end;
-		false ->
-			validate_block(txs, {NewB, OldB, Wallets, BlockAnchors, RecentTXMap})
+	true = Height >= ar_fork:height_2_6(),
+	case ar_pricing:may_be_redenominate(OldB) of
+		{Denomination, RedenominationHeight} ->
+			validate_block(reward_history_hash, {NewB, OldB, Wallets, BlockAnchors,
+					RecentTXMap});
+		_ ->
+			{invalid, invalid_denomination}
 	end;
 
 validate_block(reward_history_hash, {NewB, OldB, Wallets, BlockAnchors, RecentTXMap}) ->
@@ -546,10 +513,46 @@ validate_block(reward_history_hash, {NewB, OldB, Wallets, BlockAnchors, RecentTX
 			| RewardHistory], ?REWARD_HISTORY_BLOCKS),
 	case ar_block:reward_history_hash(RewardHistory2) of
 		RewardHistoryHash ->
-			validate_block(price_per_gib_minute, {NewB, OldB, Wallets, BlockAnchors,
+			validate_block(block_time_history_hash, {NewB, OldB, Wallets, BlockAnchors,
 					RecentTXMap});
 		_ ->
 			{invalid, invalid_reward_history_hash}
+	end;
+
+validate_block(block_time_history_hash, {NewB, OldB, Wallets, BlockAnchors, RecentTXMap}) ->
+	case NewB#block.height >= ar_fork:height_2_7() of
+		false ->
+			validate_block(next_vdf_difficulty, {NewB, OldB, Wallets, BlockAnchors,
+					RecentTXMap});
+		true ->
+			#block{ block_time_history_hash = HistoryHash } = NewB,
+			History2 = lists:sublist(ar_block:update_block_time_history(NewB, OldB),
+					?BLOCK_TIME_HISTORY_BLOCKS),
+			case ar_block:block_time_history_hash(History2) of
+				HistoryHash ->
+					validate_block(next_vdf_difficulty, {NewB, OldB, Wallets, BlockAnchors,
+							RecentTXMap});
+				_ ->
+					{invalid, invalid_block_time_history_hash}
+			end
+	end;
+
+validate_block(next_vdf_difficulty, {NewB, OldB, Wallets, BlockAnchors, RecentTXMap}) ->
+	case NewB#block.height >= ar_fork:height_2_7() of
+		false ->
+			validate_block(price_per_gib_minute, {NewB, OldB, Wallets, BlockAnchors,
+					RecentTXMap});
+		true ->
+			ExpectedNextVDFDifficulty = ar_block:compute_next_vdf_difficulty(OldB),
+			#nonce_limiter_info{ next_vdf_difficulty = NextVDFDifficulty } = 
+				NewB#block.nonce_limiter_info,
+			case ExpectedNextVDFDifficulty == NextVDFDifficulty of
+				false ->
+					{invalid, invalid_next_vdf_difficulty};
+				true ->
+					validate_block(price_per_gib_minute, {NewB, OldB, Wallets, BlockAnchors,
+							RecentTXMap})
+			end
 	end;
 
 validate_block(price_per_gib_minute, {NewB, OldB, Wallets, BlockAnchors, RecentTXMap}) ->
@@ -579,15 +582,10 @@ validate_block(txs, {NewB = #block{ timestamp = Timestamp, height = Height, txs 
 		invalid ->
 			{invalid, invalid_txs};
 		valid ->
-			case Height >= ar_fork:height_2_6() of
-				true ->
-					%% The field size limits in 2.6 are naturally asserted in
-					%% ar_serialize:binary_to_block/1.
-					validate_block(tx_root, {NewB, OldB});
-				false ->
-					validate_block(block_field_sizes, {NewB, OldB, Wallets, BlockAnchors,
-							RecentTXMap})
-			end
+			true = Height >= ar_fork:height_2_6(),
+			%% The field size limits in 2.6 are naturally asserted in
+			%% ar_serialize:binary_to_block/1.
+			validate_block(tx_root, {NewB, OldB})
 	end;
 
 validate_block(block_field_sizes, {NewB, OldB, _Wallets, _BlockAnchors, _RecentTXMap}) ->
@@ -627,7 +625,33 @@ validate_block(cumulative_diff, {NewB, OldB}) ->
 		false ->
 			{invalid, invalid_cumulative_difficulty};
 		true ->
-			valid
+			validate_block(merkle_rebase_support_threshold, {NewB, OldB})
+	end;
+
+validate_block(merkle_rebase_support_threshold, {NewB, OldB}) ->
+	#block{ height = Height } = NewB,
+	case Height > ar_fork:height_2_7() of
+		true ->
+			case NewB#block.merkle_rebase_support_threshold
+					== OldB#block.merkle_rebase_support_threshold of
+				false ->
+					{error, invalid_merkle_rebase_support_threshold};
+				true ->
+					valid
+			end;
+		false ->
+			case Height == ar_fork:height_2_7() of
+				true ->
+					case NewB#block.merkle_rebase_support_threshold
+							== OldB#block.weave_size of
+						true ->
+							valid;
+						false ->
+							{error, invalid_merkle_rebase_support_threshold}
+					end;
+				false ->
+					valid
+			end
 	end.
 
 -ifdef(DEBUG).
@@ -685,11 +709,11 @@ block_validation_test_() ->
 
 test_block_validation() ->
 	Wallet = {_, Pub} = ar_wallet:new(),
-	[B0] = ar_weave:init([{ar_wallet:to_address(Pub), ?AR(200), <<>>}]),
+	[B0] = ar_weave:init([{ar_wallet:to_address(Pub), ?XWE(200), <<>>}]),
 	ar_test_node:start(B0),
 	%% Add at least 10 KiB of data to the weave and mine a block on top,
 	%% to make sure SPoRA mining activates.
-	PrevTX = ar_test_node:sign_tx(master, Wallet, #{ reward => ?AR(10),
+	PrevTX = ar_test_node:sign_tx(master, Wallet, #{ reward => ?XWE(10),
 			data => crypto:strong_rand_bytes(10 * 1024 * 1024) }),
 	ar_test_node:assert_post_tx_to_master(PrevTX),
 	ar_node:mine(),
@@ -701,13 +725,13 @@ test_block_validation() ->
 	PartitionUpperBound = ar_node:get_partition_upper_bound(BI),
 	BlockAnchors = ar_node:get_block_anchors(),
 	RecentTXMap = ar_node:get_recent_txs_map(),
-	TX = ar_test_node:sign_tx(master, Wallet, #{ reward => ?AR(10),
+	TX = ar_test_node:sign_tx(master, Wallet, #{ reward => ?XWE(10),
 			data => crypto:strong_rand_bytes(7 * 1024 * 1024), last_tx => PrevH }),
 	ar_test_node:assert_post_tx_to_master(TX),
 	ar_node:mine(),
 	[{H, _, _} | _] = ar_test_node:wait_until_height(3),
 	B = ar_node:get_block_shadow_from_cache(H),
-	Wallets = #{ ar_wallet:to_address(Pub) => {?AR(200), <<>>} },
+	Wallets = #{ ar_wallet:to_address(Pub) => {?XWE(200), <<>>} },
 	?assertEqual(valid, validate(B, PrevB, Wallets, BlockAnchors, RecentTXMap,
 			PartitionUpperBound)),
 	?assertMatch({ok, _}, update_accounts(B, PrevB, Wallets)),
@@ -737,10 +761,10 @@ test_block_validation() ->
 			validate_block(txs, {B#block{ txs = [#tx{ signature = <<1>> }] }, PrevB, Wallets,
 					BlockAnchors, RecentTXMap})),
 	?assertEqual({invalid, invalid_txs},
-			validate(B#block{ txs = [TX#tx{ reward = ?AR(201) }] }, PrevB, Wallets,
+			validate(B#block{ txs = [TX#tx{ reward = ?XWE(201) }] }, PrevB, Wallets,
 					BlockAnchors, RecentTXMap, PartitionUpperBound)),
 	?assertEqual({error, invalid_account_anchors},
-			update_accounts(B#block{ txs = [TX#tx{ reward = ?AR(201) }] }, PrevB, Wallets)),
+			update_accounts(B#block{ txs = [TX#tx{ reward = ?XWE(201) }] }, PrevB, Wallets)),
 	?assertEqual({invalid, invalid_tx_root},
 			validate_block(tx_root, {
 				InvDataRootB#block{ indep_hash = ar_block:indep_hash(InvDataRootB) }, PrevB})),

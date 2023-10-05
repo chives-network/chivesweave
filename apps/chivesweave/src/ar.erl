@@ -132,7 +132,10 @@ show_help() ->
 					"network via this configuration parameter."},
 			{"sync_from_local_peers_only", "If set, the data (not headers) is only synced "
 					"from the local network peers specified via the local_peer parameter."},
-			{"start_from_block_index", "Start the node from the latest stored block index."},
+			{"start_from_latest_state", "Start the node from the latest stored state."},
+			{"start_from_block (block hash)", "Start the node from the state corresponding "
+					"to the given block hash."},
+			{"start_from_block_index", "The legacy name for start_from_latest_state."},
 			{"mine", "Automatically start mining once the netwok has been joined."},
 			{"port", "The local port to use for mining. "
 						"This port must be accessible by remote peers."},
@@ -178,15 +181,6 @@ show_help() ->
 				"so it is used to pack synced data even if the \"mine\" flag is not "
 				"specified. The data already packed with different addresses is not repacked.",
 				[?WALLET_DIR])},
-			{"stage_one_hashing_threads (num)",
-				io_lib:format(
-					"The number of mining processes searching for the SPoRA chunks to read."
-					"Default: ~B. If the total number of stage one and stage two processes "
-					"exceeds the number of available CPU cores, the excess processes will be "
-					"hashing chunks when anything gets queued, and search for chunks "
-					"otherwise. Only takes effect until the fork 2.6.",
-					[?NUM_STAGE_ONE_HASHING_PROCESSES]
-				)},
 			{"hashing_threads (num)", io_lib:format("The number of hashing processes to spawn."
 					" Takes effect starting from the fork 2.6 block."
 					" Default is ~B.", [?NUM_HASHING_PROCESSES])},
@@ -198,18 +192,6 @@ show_help() ->
 					"new data unless the number of already fetched unprocessed chunks does "
 					"not exceed this number. When omitted, it is determined based on the "
 					"number of mining partitions and available RAM."},
-			{"io_threads (num)",
-				io_lib:format("The number of processes reading SPoRA chunks during mining. "
-					"Default: ~B. Only takes effect until the fork 2.6.",
-					[?NUM_IO_MINING_THREADS])},
-			{"stage_two_hashing_threads (num)",
-				io_lib:format(
-					"The number of mining processes hashing SPoRA chunks."
-					"Default: ~B. If the total number of stage one and stage two processes "
-					"exceeds the number of available CPU cores, the excess processes will be "
-					"hashing chunks when anything gets queued, and search for chunks "
-					"otherwise. Only takes effect until the fork 2.6.",
-					[?NUM_STAGE_TWO_HASHING_PROCESSES])},
 			{"max_emitters (num)", io_lib:format("The number of transaction propagation "
 				"processes to spawn. Default is ~B.", [?NUM_EMITTER_PROCESSES])},
 			{"tx_validators (num)", "Ignored. Set the post_tx key in the semaphores object"
@@ -448,8 +430,6 @@ parse_cli_args(["mining_addr", Addr | Rest], C) ->
 	end;
 parse_cli_args(["max_miners", Num | Rest], C) ->
 	parse_cli_args(Rest, C#config{ max_miners = list_to_integer(Num) });
-parse_cli_args(["io_threads", Num | Rest], C) ->
-	parse_cli_args(Rest, C#config{ io_threads = list_to_integer(Num) });
 parse_cli_args(["hashing_threads", Num | Rest], C) ->
 	parse_cli_args(Rest, C#config{ hashing_threads = list_to_integer(Num) });
 parse_cli_args(["data_cache_size_limit", Num | Rest], C) ->
@@ -461,10 +441,6 @@ parse_cli_args(["packing_cache_size_limit", Num | Rest], C) ->
 parse_cli_args(["mining_server_chunk_cache_size_limit", Num | Rest], C) ->
 	parse_cli_args(Rest, C#config{
 			mining_server_chunk_cache_size_limit = list_to_integer(Num) });
-parse_cli_args(["stage_one_hashing_threads", Num | Rest], C) ->
-	parse_cli_args(Rest, C#config{ stage_one_hashing_threads = list_to_integer(Num) });
-parse_cli_args(["stage_two_hashing_threads", Num | Rest], C) ->
-	parse_cli_args(Rest, C#config{ stage_two_hashing_threads = list_to_integer(Num) });
 parse_cli_args(["max_emitters", Num | Rest], C) ->
 	parse_cli_args(Rest, C#config{ max_emitters = list_to_integer(Num) });
 parse_cli_args(["disk_space", Size | Rest], C) ->
@@ -476,7 +452,18 @@ parse_cli_args(["disk_space_check_frequency", Frequency | Rest], C) ->
 parse_cli_args(["ipfs_pin" | Rest], C) ->
 	parse_cli_args(Rest, C#config{ ipfs_pin = true });
 parse_cli_args(["start_from_block_index" | Rest], C) ->
-	parse_cli_args(Rest, C#config{ start_from_block_index = true });
+	parse_cli_args(Rest, C#config{ start_from_latest_state = true });
+parse_cli_args(["start_from_block", H | Rest], C) ->
+	case ar_util:safe_decode(H) of
+		{ok, Decoded} when byte_size(Decoded) == 48 ->
+			parse_cli_args(Rest, C#config{ start_from_block = Decoded });
+		_ ->
+			io:format("Invalid start_from_block.~n", []),
+			timer:sleep(1000),
+			erlang:halt()
+	end;
+parse_cli_args(["start_from_latest_state" | Rest], C) ->
+	parse_cli_args(Rest, C#config{ start_from_latest_state = true });
 parse_cli_args(["init" | Rest], C)->
 	parse_cli_args(Rest, C#config{ init = true });
 parse_cli_args(["internal_api_secret", Secret | Rest], C)
@@ -679,7 +666,7 @@ set_mining_address(#config{ mining_addr = Addr }) ->
 			ar:console("~nThe mining key for the address ~s was not found."
 				" Make sure you placed the file in [data_dir]/~s (the node is looking for"
 				" [data_dir]/~s/[mining_addr].json or "
-				"[data_dir]/~s/chivesweave_keyfile_[mining_addr].json file)."
+				"[data_dir]/~s/arweave_keyfile_[mining_addr].json file)."
 				" Do not specify \"mining_addr\" if you want one to be generated.~n~n",
 				[ar_util:encode(Addr), ?WALLET_DIR, ?WALLET_DIR, ?WALLET_DIR]),
 			erlang:halt();
@@ -811,7 +798,7 @@ commandline_parser_test_() ->
 		Addr = crypto:strong_rand_bytes(32),
 		Tests =
 			[
-				{"peer 1.2.3.4 peer 5.6.7.8:9", #config.peers, [{5,6,7,8,9},{1,2,3,4,1985}]},
+				{"peer 1.2.3.4 peer 5.6.7.8:9", #config.peers, [{5,6,7,8,9},{1,2,3,4,1984}]},
 				{"mine", #config.mine, true},
 				{"port 22", #config.port, 22},
 				{"mining_addr "

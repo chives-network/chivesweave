@@ -70,7 +70,7 @@ get_scan_height() ->
 init([]) ->
 	process_flag(trap_exit, true),
 	%% Database for general P3 state data (e.g. last scanned block height)
-	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_p3_ledger_db"),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_p3_ledger_db"),
 			ar_p3_state_db),
 	{ok, #{}}.
 
@@ -156,7 +156,7 @@ create_account(Address, PublicKey, Asset) ->
 		{"p3_account", BasicOpts},
 		{"p3_tx", BasicOpts}],
 	ok = ar_kv:open(
-		filename:join([?ROCKS_DB_DIR, "xwe_p3_ledger_db", DatabaseId]),
+		filename:join([?ROCKS_DB_DIR, "ar_p3_ledger_db", DatabaseId]),
 		ColumnFamilyDescriptors, [],
 		[{?MODULE, Address}, {p3_account, Address}, {p3_tx, Address}]),
 	Account = #p3_account{

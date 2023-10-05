@@ -21,10 +21,10 @@
 %	RSA2 = ar_wallet:new(),
 %	EDDSA = ar_wallet:new({?EDDSA_SIGN_ALG, ed25519}),
 %	ECDSA = ar_wallet:new({?ECDSA_SIGN_ALG, secp256k1}),
-%	[B0] = ar_weave:init([{ar_wallet:to_address(element(2, RSA)), ?AR(1000), <<>>},
-%			{ar_wallet:to_address(element(2, EDDSA)), ?AR(1000), <<>>},
-%			{ar_wallet:to_address(element(2, ECDSA)), ?AR(1000), <<>>},
-%			{ar_wallet:to_address(element(2, RSA2)), ?AR(1000), <<>>}]),
+%	[B0] = ar_weave:init([{ar_wallet:to_address(element(2, RSA)), ?XWE(1000), <<>>},
+%			{ar_wallet:to_address(element(2, EDDSA)), ?XWE(1000), <<>>},
+%			{ar_wallet:to_address(element(2, ECDSA)), ?XWE(1000), <<>>},
+%			{ar_wallet:to_address(element(2, RSA2)), ?XWE(1000), <<>>}]),
 %	start(B0),
 %	slave_start(B0),
 %	connect_to_slave(),
@@ -295,7 +295,7 @@
 %	{Scenario, Wallets, GenesisWallets,
 %			ExpectedAccounts} = generate_wallets(ScenarioTemplate,
 %					GenesisWalletsTemplate, ExpectedAccountsTemplate),
-%	[B0] = ar_weave:init(GenesisWallets, ?DEFAULT_DIFF, ?AR(1)),
+%	[B0] = ar_weave:init(GenesisWallets, ?DEFAULT_DIFF, ?XWE(1)),
 %	{Master, _} = start(B0),
 %	{Slave, _} = slave_start(B0),
 %	connect_to_slave(),
@@ -501,23 +501,23 @@ replay_attack_test_() ->
 	{timeout, 120, fun() ->
 		Key1 = {_Priv1, Pub1} = ar_wallet:new(),
 		{_Priv2, Pub2} = ar_wallet:new(),
-		[B0] = ar_weave:init([{ar_wallet:to_address(Pub1), ?AR(10000), <<>>}]),
+		[B0] = ar_weave:init([{ar_wallet:to_address(Pub1), ?XWE(10000), <<>>}]),
 		{_Node1, _} = start(B0),
 		slave_start(B0),
 		connect_to_slave(),
 		SignedTX = sign_v1_tx(master, Key1, #{ target => ar_wallet:to_address(Pub2),
-				quantity => ?AR(1000), reward => ?AR(1), last_tx => <<>> }),
+				quantity => ?XWE(1000), reward => ?XWE(1), last_tx => <<>> }),
 		assert_post_tx_to_master(SignedTX),
 		ar_node:mine(),
 		assert_slave_wait_until_height(1),
-		?assertEqual(?AR(8999), slave_call(ar_node, get_balance, [Pub1])),
-		?assertEqual(?AR(1000), slave_call(ar_node, get_balance, [Pub2])),
+		?assertEqual(?XWE(8999), slave_call(ar_node, get_balance, [Pub1])),
+		?assertEqual(?XWE(1000), slave_call(ar_node, get_balance, [Pub2])),
 		ar_events:send(tx, {ready_for_mining, SignedTX}),
 		wait_until_receives_txs([SignedTX]),
 		ar_node:mine(),
 		assert_slave_wait_until_height(2),
-		?assertEqual(?AR(8999), slave_call(ar_node, get_balance, [Pub1])),
-		?assertEqual(?AR(1000), slave_call(ar_node, get_balance, [Pub2]))
+		?assertEqual(?XWE(8999), slave_call(ar_node, get_balance, [Pub1])),
+		?assertEqual(?XWE(1000), slave_call(ar_node, get_balance, [Pub2]))
 	end}.
 
 %% @doc Create two new wallets and a blockweave with a wallet balance.
@@ -530,9 +530,9 @@ test_wallet_transaction() ->
 		fun() ->
 			{Priv1, Pub1} = ar_wallet:new_keyfile(KeyType),
 			{_Priv2, Pub2} = ar_wallet:new(),
-			TX = ar_tx:new(ar_wallet:to_address(Pub2), ?AR(1), ?AR(9000), <<>>),
+			TX = ar_tx:new(ar_wallet:to_address(Pub2), ?XWE(1), ?XWE(9000), <<>>),
 			SignedTX = ar_tx:sign(TX#tx{ format = 2 }, Priv1, Pub1),
-			[B0] = ar_weave:init([{ar_wallet:to_address(Pub1), ?AR(10000), <<>>}]),
+			[B0] = ar_weave:init([{ar_wallet:to_address(Pub1), ?XWE(10000), <<>>}]),
 			{_Node1, _} = start(B0,
 					ar_wallet:to_address(ar_wallet:new_keyfile({eddsa, ed25519}))),
 			slave_start(B0),
@@ -541,8 +541,8 @@ test_wallet_transaction() ->
 			ar_node:mine(),
 			wait_until_height(1),
 			assert_slave_wait_until_height(1),
-			?assertEqual(?AR(999), slave_call(ar_node, get_balance, [Pub1])),
-			?assertEqual(?AR(9000), slave_call(ar_node, get_balance, [Pub2]))
+			?assertEqual(?XWE(999), slave_call(ar_node, get_balance, [Pub1])),
+			?assertEqual(?XWE(9000), slave_call(ar_node, get_balance, [Pub2]))
 		end
 	end,
 	[
@@ -557,11 +557,11 @@ test_wallet_transaction() ->
 %		{Priv1, Pub1} = ar_wallet:new({?RSA_SIGN_ALG, 65537}),
 %		{Priv2, Pub2} = ar_wallet:new({?ECDSA_SIGN_ALG, secp256k1}),
 %		{_Priv3, Pub3} = ar_wallet:new({?EDDSA_SIGN_ALG, ed25519}),
-%		TX = ar_tx:new(Pub2, ?AR(1), ?AR(9000), <<>>),
+%		TX = ar_tx:new(Pub2, ?XWE(1), ?XWE(9000), <<>>),
 %		SignedTX = ar_tx:sign(TX#tx{ format = 2 }, Priv1, Pub1),
-%		TX2 = ar_tx:new(Pub3, ?AR(1), ?AR(500), <<>>),
+%		TX2 = ar_tx:new(Pub3, ?XWE(1), ?XWE(500), <<>>),
 %		SignedTX2 = ar_tx:sign(TX2#tx{ format = 2 }, Priv2, Pub2),
-%		[B0] = ar_weave:init([{ar_wallet:to_address(Pub1), ?AR(10000), <<>>}], 8),
+%		[B0] = ar_weave:init([{ar_wallet:to_address(Pub1), ?XWE(10000), <<>>}], 8),
 %		start(B0),
 %		slave_start(B0),
 %		connect_to_slave(),
@@ -571,9 +571,9 @@ test_wallet_transaction() ->
 %		assert_post_tx_to_slave(SignedTX2),
 %		slave_mine(),
 %		wait_until_height(2),
-%		?AR(999) = ar_node:get_balance(Pub1),
-%		?AR(8499) = ar_node:get_balance(Pub2),
-%		?AR(500) = ar_node:get_balance(Pub3)
+%		?XWE(999) = ar_node:get_balance(Pub1),
+%		?XWE(8499) = ar_node:get_balance(Pub2),
+%		?XWE(500) = ar_node:get_balance(Pub3)
 %	end).
 
 %% @doc Ensure that TX Id threading functions correctly (in the positive case).
@@ -581,22 +581,22 @@ tx_threading_test_() ->
 	{timeout, 120, fun() ->
 		Key1 = {_Priv1, Pub1} = ar_wallet:new(),
 		{_Priv2, Pub2} = ar_wallet:new(),
-		[B0] = ar_weave:init([{ar_wallet:to_address(Pub1), ?AR(10000), <<>>}]),
+		[B0] = ar_weave:init([{ar_wallet:to_address(Pub1), ?XWE(10000), <<>>}]),
 		{_Node1, _} = start(B0),
 		slave_start(B0),
 		connect_to_slave(),
 		SignedTX = sign_v1_tx(master, Key1, #{ target => ar_wallet:to_address(Pub2),
-				quantity => ?AR(1000), reward => ?AR(1), last_tx => <<>> }),
+				quantity => ?XWE(1000), reward => ?XWE(1), last_tx => <<>> }),
 		SignedTX2 = sign_v1_tx(master, Key1, #{ target => ar_wallet:to_address(Pub2),
-				quantity => ?AR(1000), reward => ?AR(1), last_tx => SignedTX#tx.id }),
+				quantity => ?XWE(1000), reward => ?XWE(1), last_tx => SignedTX#tx.id }),
 		assert_post_tx_to_master(SignedTX),
 		ar_node:mine(),
 		wait_until_height(1),
 		assert_post_tx_to_master(SignedTX2),
 		ar_node:mine(),
 		assert_slave_wait_until_height(2),
-		?assertEqual(?AR(7998), slave_call(ar_node, get_balance, [Pub1])),
-		?assertEqual(?AR(2000), slave_call(ar_node, get_balance, [Pub2]))
+		?assertEqual(?XWE(7998), slave_call(ar_node, get_balance, [Pub1])),
+		?assertEqual(?XWE(2000), slave_call(ar_node, get_balance, [Pub2]))
 	end}.
 
 persisted_mempool_test_() ->
@@ -608,7 +608,7 @@ persisted_mempool_test_() ->
 
 test_persisted_mempool() ->
 	{_, Pub} = Wallet = ar_wallet:new(),
-	[B0] = ar_weave:init([{ar_wallet:to_address(Pub), ?AR(10000), <<>>}]),
+	[B0] = ar_weave:init([{ar_wallet:to_address(Pub), ?XWE(10000), <<>>}]),
 	start(B0),
 	slave_start(B0),
 	disconnect_from_slave(),
@@ -628,7 +628,7 @@ test_persisted_mempool() ->
 	%% Expect the pending transactions to be picked up and distributed.
 	{ok, Config} = application:get_env(chivesweave, config),
 	ok = application:set_env(chivesweave, config, Config#config{
-		start_from_block_index = false,
+		start_from_latest_state = false,
 		peers = [slave_peer()]
 	}),
 	{ok, _} = application:ensure_all_started(chivesweave, permanent),
@@ -637,4 +637,5 @@ test_persisted_mempool() ->
 	ar_node:mine(),
 	[{H, _, _} | _] = assert_slave_wait_until_height(1),
 	B = read_block_when_stored(H),
-	?assertEqual([SignedTX#tx.id], B#block.txs).
+	?assertEqual([SignedTX#tx.id], B#block.txs),
+	ok = application:set_env(chivesweave, config, Config).

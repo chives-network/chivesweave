@@ -60,19 +60,16 @@ maybe_retarget(Height, CurDiff, TS, LastRetargetTS, PrevTS) ->
 		true ->
 			calculate_difficulty(CurDiff, TS, LastRetargetTS, Height, PrevTS);
 		false ->
-			TargetTime = 3 * ?TARGET_TIME,
-			ActualTime = TS - PrevTS,
-			NewDiff = erlang:max(
-				if
-					ActualTime > erlang:trunc(TargetTime) -> CurDiff - erlang:trunc(CurDiff * 0.0001 * ActualTime / TargetTime );
-					true                                           -> CurDiff
-				end,
-				ar_mine:min_difficulty(Height)
-			),
-			?LOG_INFO([{curDiff________________________________, CurDiff}]),
-			?LOG_INFO([{newDiff________________________________, NewDiff}]),
-			NewDiff
+			CurDiff
 	end.
+
+-ifdef(TESTNET).
+	get_testnet_difficulty_drop_height() ->
+		?TESTNET_DIFFICULTY_DROP_HEIGHT.
+-else.
+	get_testnet_difficulty_drop_height() ->
+		infinity.
+-endif.
 
 calculate_difficulty(OldDiff, TS, Last, Height, PrevTS) ->
 	Fork_1_7 = ar_fork:height_1_7(),
@@ -81,12 +78,15 @@ calculate_difficulty(OldDiff, TS, Last, Height, PrevTS) ->
 	Fork_2_4 = ar_fork:height_2_4(),
 	Fork_2_5 = ar_fork:height_2_5(),
 	Fork_2_6 = ar_fork:height_2_6(),
+	TestnetDifficultyDropHeight = get_testnet_difficulty_drop_height(),
 	case Height of
+		_ when Height == TestnetDifficultyDropHeight ->
+			calculate_difficulty_with_drop(OldDiff, TS, Last, Height, PrevTS, 100, 2);
 		_ when Height == Fork_2_6 ->
 			calculate_difficulty_with_drop(OldDiff, TS, Last, Height, PrevTS,
 					?INITIAL_DIFF_DROP_2_6, ?DIFF_DROP_2_6);
 		_ when Height > Fork_2_5 ->
-			calculate_difficulty_before_1_8(OldDiff, TS, Last, Height);
+			calculate_difficulty(OldDiff, TS, Last, Height);
 		_ when Height == Fork_2_5 ->
 			calculate_difficulty_at_2_5(OldDiff, TS, Last, Height, PrevTS);
 		_ when Height > Fork_2_4 ->
@@ -139,9 +139,8 @@ calculate_difficulty(OldDiff, TS, Last, Height) ->
 			OldDiff;
 		false ->
 			MaxDiff = ?MAX_DIFF,
-			MinDiff = ar_mine:min_difficulty(Height),
+			MinDiff = min_difficulty(Height),
 			DiffInverse = (MaxDiff - OldDiff) * ActualTime div TargetTime,
-			?LOG_INFO([{calculate_difficulty_diff_new_130, MaxDiff - DiffInverse},{diffInverse, DiffInverse}]),
 			between(
 				MaxDiff - DiffInverse,
 				MinDiff,
@@ -162,7 +161,7 @@ calculate_difficulty_with_drop(OldDiff, TS, Last, Height, PrevTS, InitialCoeff, 
 	ActualTime2 = ActualTime * InitialCoeff
 			* ar_fraction:pow(Coeff, max(TS - PrevTS, 0) div Step),
 	MaxDiff = ?MAX_DIFF,
-	MinDiff = ar_mine:min_difficulty(Height),
+	MinDiff = min_difficulty(Height),
 	DiffInverse = (MaxDiff - OldDiff) * ActualTime2 div TargetTime,
 	between(MaxDiff - DiffInverse, MinDiff, MaxDiff - 1).
 
@@ -175,7 +174,7 @@ calculate_difficulty_after_2_4_before_2_5(OldDiff, TS, Last, Height) ->
 			OldDiff;
 		false ->
 			MaxDiff = ?MAX_DIFF,
-			MinDiff = ar_mine:min_difficulty(Height),
+			MinDiff = min_difficulty(Height),
 			DiffInverse = erlang:trunc((MaxDiff - OldDiff) * TimeDelta),
 			between(
 				MaxDiff - DiffInverse,
@@ -194,7 +193,7 @@ calculate_difficulty_at_2_4(OldDiff, TS, Last, Height) ->
 	%% reduction in difficulty, it would only take 100 minutes to adjust.
 	TimeDelta = 10 * ActualTime / TargetTime,
 	MaxDiff = ?MAX_DIFF,
-	MinDiff = ar_mine:min_difficulty(Height),
+	MinDiff = min_difficulty(Height),
 	DiffInverse = erlang:trunc((MaxDiff - OldDiff) * TimeDelta),
 	between(
 		MaxDiff - DiffInverse,
@@ -211,7 +210,7 @@ calculate_difficulty_at_and_after_1_9_before_2_4(OldDiff, TS, Last, Height) ->
 			OldDiff;
 		false ->
 			MaxDiff = ?MAX_DIFF,
-			MinDiff = ar_mine:min_difficulty(Height),
+			MinDiff = min_difficulty(Height),
 			EffectiveTimeDelta = between(
 				ActualTime / TargetTime,
 				1 / ?DIFF_ADJUSTMENT_UP_LIMIT,
@@ -234,11 +233,7 @@ calculate_difficulty_after_1_8_before_1_9(OldDiff, TS, Last, Height) ->
 			OldDiff;
 		false ->
 			MaxDiff = ?MAX_DIFF,
-			MinDiff = ar_mine:min_difficulty(Height),
-			?LOG_INFO([{oldDiff________________________________, OldDiff}]),
-			?LOG_INFO([{newDiff________________________________, MaxDiff - (MaxDiff - OldDiff) * ActualTime div TargetTime}]),
-			?LOG_INFO([{minDiff________________________________, MinDiff}]),
-			?LOG_INFO([{maxDiff________________________________, MaxDiff}]),
+			MinDiff = min_difficulty(Height),
 			between(
 				MaxDiff - (MaxDiff - OldDiff) * ActualTime div TargetTime,
 				max(MinDiff, OldDiff div 2),
@@ -250,36 +245,69 @@ calculate_difficulty_after_1_8_before_1_9(OldDiff, TS, Last, Height) ->
 switch_to_randomx_fork_diff(_) ->
 	1.
 -else.
+sha384_diff_to_randomx_diff(Sha384Diff) ->
+	max(Sha384Diff + ?RANDOMX_DIFF_ADJUSTMENT, min_randomx_difficulty()).
+
 switch_to_randomx_fork_diff(OldDiff) ->
-	ar_mine:sha384_diff_to_randomx_diff(OldDiff) - 2.
+	sha384_diff_to_randomx_diff(OldDiff) - 2.
 -endif.
 
 calculate_difficulty_before_1_8(OldDiff, TS, Last, Height) ->
 	TargetTime = ?RETARGET_BLOCKS * ?TARGET_TIME,
 	ActualTime = TS - Last,
+	TimeError = abs(ActualTime - TargetTime),
 	Diff = erlang:max(
 		if
-			ActualTime > erlang:trunc(TargetTime * (1 + ?RETARGET_TOLERANCE) ) -> OldDiff - erlang:trunc(OldDiff * 0.0001 * ActualTime / TargetTime );
-			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 70 ) -> OldDiff + erlang:trunc(OldDiff * 0.0001 * 50);
-			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 50 ) -> OldDiff + erlang:trunc(OldDiff * 0.0001 * 30);
-			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 12 ) -> OldDiff + erlang:trunc(OldDiff * 0.0001 * 5);
-			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 8 ) -> OldDiff + erlang:trunc(OldDiff * 0.0001 * 4);
-			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 4 ) -> OldDiff + erlang:trunc(OldDiff * 0.0001 * 2);
-			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) div 2 ) -> OldDiff + erlang:trunc(OldDiff * 0.0001 * 3 div 2);
-			ActualTime < erlang:trunc(TargetTime * (1 - ?RETARGET_TOLERANCE) ) -> OldDiff + erlang:trunc(OldDiff * 0.0001);
-			true                                           -> OldDiff
+			TimeError < (TargetTime * ?RETARGET_TOLERANCE) -> OldDiff;
+			TargetTime > ActualTime                        -> OldDiff + 1;
+			true                                           -> OldDiff - 1
 		end,
-		ar_mine:min_difficulty(Height)
+		min_difficulty(Height)
 	),
-	?LOG_INFO([{min_difficulty_________________________, ar_mine:min_difficulty(Height)}]),
-	?LOG_INFO([{actualTime_____________________________, ActualTime}]),
-	?LOG_INFO([{oldDiff________________________________, OldDiff}]),
-	?LOG_INFO([{newDiff________________________________, Diff}]),
 	Diff.
 
 between(N, Min, _) when N < Min -> Min;
 between(N, _, Max) when N > Max -> Max;
 between(N, _, _) -> N.
+
+-ifdef(DEBUG).
+min_difficulty(_Height) ->
+	1.
+-else.
+min_spora_difficulty(Height) ->
+	?SPORA_MIN_DIFFICULTY(Height).
+
+min_randomx_difficulty() ->
+	min_sha384_difficulty() + ?RANDOMX_DIFF_ADJUSTMENT.
+
+min_sha384_difficulty() ->
+	31.
+
+min_difficulty(Height) ->
+	Diff =
+		case Height >= ar_fork:height_1_7() of
+			true ->
+				case Height >= ar_fork:height_2_4() of
+					true ->
+						min_spora_difficulty(Height);
+					false ->
+						min_randomx_difficulty()
+				end;
+			false ->
+				min_sha384_difficulty()
+		end,
+	case Height >= ar_fork:height_1_8() of
+		true ->
+			case Height >= ar_fork:height_2_5() of
+				true ->
+					ar_retarget:switch_to_linear_diff(Diff);
+				false ->
+					ar_retarget:switch_to_linear_diff_pre_fork_2_5(Diff)
+			end;
+		false ->
+			Diff
+	end.
+-endif.
 
 %%%===================================================================
 %%% Tests.

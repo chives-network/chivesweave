@@ -16,8 +16,8 @@ test_v1_transactions_after_2_0() ->
 	Key = {_, Pub1} = ar_wallet:new(),
 	Key2 = {_, Pub2} = ar_wallet:new(),
 	[B0] = ar_weave:init([
-		{ar_wallet:to_address(Pub1), ?AR(100), <<>>},
-		{ar_wallet:to_address(Pub2), ?AR(100), <<>>}
+		{ar_wallet:to_address(Pub1), ?XWE(100), <<>>},
+		{ar_wallet:to_address(Pub2), ?XWE(100), <<>>}
 	]),
 	{_Master, _} = start(B0),
 	{_Slave, _} = slave_start(B0),
@@ -74,8 +74,8 @@ test_v2_transactions_after_2_0() ->
 	Key = {_, Pub1} = ar_wallet:new(),
 	Key2 = {_, Pub2} = ar_wallet:new(),
 	[B0] = ar_weave:init([
-		{ar_wallet:to_address(Pub1), ?AR(100), <<>>},
-		{ar_wallet:to_address(Pub2), ?AR(100), <<>>}
+		{ar_wallet:to_address(Pub1), ?XWE(100), <<>>},
+		{ar_wallet:to_address(Pub2), ?XWE(100), <<>>}
 	]),
 	{_Master, _} = start(B0),
 	{_Slave, _} = slave_start(B0),
@@ -131,7 +131,7 @@ recall_byte_on_the_border_test_() ->
 test_recall_byte_on_the_border() ->
 	Key = {_, Pub} = ar_wallet:new(),
 	[B0] = ar_weave:init([
-		{ar_wallet:to_address(Pub), ?AR(100), <<>>}
+		{ar_wallet:to_address(Pub), ?XWE(100), <<>>}
 	]),
 	{_Master, _} = start(B0),
 	{_Slave, _} = slave_start(B0),
@@ -172,7 +172,7 @@ ignores_transactions_with_invalid_data_root_test_() ->
 test_ignores_transactions_with_invalid_data_root() ->
 	Key = {_, Pub} = ar_wallet:new(),
 	[B0] = ar_weave:init([
-		{ar_wallet:to_address(Pub), ?AR(100), <<>>}
+		{ar_wallet:to_address(Pub), ?XWE(100), <<>>}
 	]),
 	{_Master, _} = start(B0),
 	{_Slave, _} = slave_start(B0),

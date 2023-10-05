@@ -33,7 +33,7 @@ webhooks_test_() ->
 
 test_webhooks() ->
 	{_, Pub} = Wallet = ar_wallet:new(),
-	[B0] = ar_weave:init([{ar_wallet:to_address(Pub), ?AR(10000), <<>>}]),
+	[B0] = ar_weave:init([{ar_wallet:to_address(Pub), ?XWE(10000), <<>>}]),
 	{ok, Config} = application:get_env(chivesweave, config),
 	Config2 = Config#config{ webhooks = [
 		#config_webhook{

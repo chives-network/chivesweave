@@ -62,7 +62,7 @@ init([]) ->
 	process_flag(trap_exit, true),
 	[ok, ok] = ar_events:subscribe([tx, disksup]),
 	{ok, Config} = application:get_env(chivesweave, config),
-	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_header_sync_db"), ?MODULE),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "ar_header_sync_db"), ?MODULE),
 	{SyncRecord, Height, CurrentBI} =
 		case ar_storage:read_term(header_sync_state) of
 			not_found ->
@@ -105,8 +105,8 @@ handle_cast({join, Height, RecentBI, Blocks}, State) ->
 				io:format("~nWARNING: the stored block index of the header syncing module "
 						"has no intersection with the "
 						"new one in the most recent blocks. If you have just started a new "
-						"weave using the init option, restart with the start_from_block_index "
-						"option or specify some peers.~n~n"),
+						"weave using the init option, restart from the local state "
+						"or specify some peers.~n~n"),
 					erlang:halt();
 			{_, {IntersectionHeight, _}} ->
 				S = State2#state{
@@ -373,14 +373,7 @@ add_block(B, State) ->
 add_block2(B, #state{ is_disk_space_sufficient = false } = State) ->
 	case ar_storage:update_confirmation_index(B) of
 		ok ->
-			case ar_storage:update_reward_history(B) of
-				ok ->
-					{ok, State};
-				Error ->
-					?LOG_ERROR([{event, failed_to_record_reward_history_update},
-							{reason, io_lib:format("~p", [Error])}]),
-					{Error, State}
-			end;
+			{ok, State};
 		Error ->
 			?LOG_ERROR([{event, failed_to_record_block_confirmations},
 				{reason, io_lib:format("~p", [Error])}]),

@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 -export([start_link/0, pause/0, start_mining/1, set_difficulty/1,
-		pause_performance_reports/1]).
+		set_merkle_rebase_threshold/1, pause_performance_reports/1]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
 
@@ -31,6 +31,7 @@
 	hashing_thread_monitor_refs = #{},
 	session						= #mining_session{},
 	diff						= infinity,
+	merkle_rebase_threshold		= infinity,
 	partitions					= sets:new(),
 	task_queue					= gb_sets:new(),
 	pause_performance_reports	= false,
@@ -63,6 +64,9 @@ start_mining(Args) ->
 %% Also, a mining session may (in practice, almost always will) span several blocks.
 set_difficulty(Diff) ->
 	gen_server:cast(?MODULE, {set_difficulty, Diff}).
+
+set_merkle_rebase_threshold(Threshold) ->
+	gen_server:cast(?MODULE, {set_merkle_rebase_threshold, Threshold}).
 
 %% @doc Stop logging performance reports for the given number of milliseconds.
 pause_performance_reports(Time) ->
@@ -117,7 +121,7 @@ handle_cast(pause, #state{ io_threads = IOThreads,
 	{noreply, State#state{ diff = infinity, session = #mining_session{} }};
 
 handle_cast({start_mining, Args}, State) ->
-	{Diff} = Args,
+	{Diff, RebaseThreshold} = Args,
 	ar:console("Starting mining.~n"),
 	#state{ hashing_threads = HashingThreads, io_threads = IOThreads } = State,
 	Ref = make_ref(),
@@ -129,13 +133,17 @@ handle_cast({start_mining, Args}, State) ->
 	ets:insert(?MODULE, {chunk_cache_size, 0}),
 	prometheus_gauge:set(mining_server_chunk_cache_size, 0),
 	Session = #mining_session{ ref = Ref, chunk_cache_size_limit = CacheSizeLimit },
-	{noreply, State#state{ diff = Diff, session = Session }};
+	{noreply, State#state{ diff = Diff, merkle_rebase_threshold = RebaseThreshold,
+			session = Session }};
 
 handle_cast({set_difficulty, _Diff},
 		#state{ session = #mining_session{ ref = undefined } } = State) ->
 	{noreply, State};
 handle_cast({set_difficulty, Diff}, State) ->
 	{noreply, State#state{ diff = Diff }};
+
+handle_cast({set_merkle_rebase_threshold, Threshold}, State) ->
+	{noreply, State#state{ merkle_rebase_threshold = Threshold }};
 
 handle_cast(handle_task, #state{ task_queue = Q } = State) ->
 	case gb_sets:is_empty(Q) of
@@ -204,8 +212,7 @@ handle_cast(report_performance, #state{ io_threads = IOThreads, session = Sessio
 						Optimal = optimal_performance(StoreID, VdfSpeed),
 						?LOG_INFO([{event, mining_partition_performance_report},
 								{partition, Partition}, {avg, PartitionAvg},
-								{current, CurrentAvg},
-								{vdfSpeed, VdfSpeed}]),
+								{current, CurrentAvg}]),
 						case Optimal of
 							undefined ->
 								{[io_lib:format("Partition ~B avg: ~.2f MiB/s, "
@@ -230,14 +237,9 @@ handle_cast(report_performance, #state{ io_threads = IOThreads, session = Sessio
 		true ->
 			TotalAvg = PartitionsSum / MaxPartitionTime / 4,
 			TotalCurrent = CurrentsSum / MaxCurrentTime / 4,
-			?LOG_INFO([{event, mining_performance_report}, 
-					{total_avg_mibps, TotalAvg},
-					{total_avg_hps, TotalAvg * 4}, 
-					{total_current_mibps, TotalCurrent},
-					{total_current_hps, TotalCurrent * 4},
-					{currentsSum, CurrentsSum},
-					{maxCurrentTime, MaxCurrentTime},
-					{vdfSpeed, VdfSpeed}]),
+			?LOG_INFO([{event, mining_performance_report}, {total_avg_mibps, TotalAvg},
+					{total_avg_hps, TotalAvg * 4}, {total_current_mibps, TotalCurrent},
+					{total_current_hps, TotalCurrent * 4}]),
 			Str =
 				case VdfSpeed of
 					undefined ->
@@ -282,7 +284,7 @@ handle_info({'DOWN', Ref,  process, _, Reason},
 
 handle_info({event, nonce_limiter, {computed_output, _}},
 		#state{ session = #mining_session{ ref = undefined } } = State) ->
-	?LOG_INFO([{event, mining_debug_nonce_limiter_computed_output_session_undefined}]),
+	?LOG_DEBUG([{event, mining_debug_nonce_limiter_computed_output_session_undefined}]),
 	{noreply, State};
 handle_info({event, nonce_limiter, {computed_output, Args}},
 		#state{ task_queue = Q } = State) ->
@@ -586,7 +588,7 @@ read_recall_range(Type, H0, PartitionNumber, RecallRangeStart, NonceLimiterOutpu
 			ReplicaID, StoreID, ar_intervals:new()),
 	ChunkOffsets = ar_chunk_storage:get_range(RecallRangeStart, Size, StoreID),
 	ChunkOffsets2 = filter_by_packing(ChunkOffsets, Intervals, StoreID),
-	?LOG_INFO([{event, mining_debug_read_recall_range},
+	?LOG_DEBUG([{event, mining_debug_read_recall_range},
 			{found_chunks, length(ChunkOffsets)},
 			{found_chunks_with_required_packing, length(ChunkOffsets2)}]),
 	NonceMax = max(0, (Size div ?DATA_CHUNK_SIZE - 1)),
@@ -665,33 +667,33 @@ hashing_thread() ->
 hashing_thread(SessionRef) ->
 	receive
 		stop ->
-			?LOG_INFO([{sessionRef______stop______________________________________________________________________,SessionRef}]),
 			hashing_thread();
-		{compute_h0, {SessionRef, From, Output, PartitionNumber, Seed, PartitionUpperBound, ReplicaID}} ->
+		{compute_h0, {SessionRef, From, Output, PartitionNumber, Seed, PartitionUpperBound,
+				ReplicaID}} ->
 			H0 = ar_block:compute_h0(Output, PartitionNumber, Seed, ReplicaID),
-			?LOG_INFO([{sessionRef______compute_h0______________________________________________________________________,H0}]),
-			From ! {mining_thread_computed_h0, {H0, PartitionNumber, PartitionUpperBound, Output, ReplicaID, SessionRef}},
+			From ! {mining_thread_computed_h0, {H0, PartitionNumber, PartitionUpperBound,
+					Output, ReplicaID, SessionRef}},
 			hashing_thread(SessionRef);
-		{compute_h1, {SessionRef, From, H0, PartitionNumber, Nonce, NonceLimiterOutput, ReplicaID, Chunk, CorrelationRef}} ->
+		{compute_h1, {SessionRef, From, H0, PartitionNumber, Nonce, NonceLimiterOutput,
+				ReplicaID, Chunk, CorrelationRef}} ->
 			{H1, Preimage} = ar_block:compute_h1(H0, Nonce, Chunk),
-			?LOG_INFO([{sessionRef______compute_h1______________________________________________________________________,H1}]),
-			From ! {mining_thread_computed_h1, {H0, PartitionNumber, Nonce, NonceLimiterOutput, ReplicaID, Chunk, H1, Preimage, CorrelationRef, SessionRef}},
+			From ! {mining_thread_computed_h1, {H0, PartitionNumber, Nonce,
+					NonceLimiterOutput, ReplicaID, Chunk, H1, Preimage, CorrelationRef,
+					SessionRef}},
 			hashing_thread(SessionRef);
 		{compute_h1, _} ->
 			 %% Clear the message queue from the requests from the outdated mining session.
-			 ?LOG_INFO([{sessionRef______compute_h1_hashing_thread_______outdated_mining_session_______________________________________________________________,SessionRef}]),
 			 hashing_thread(SessionRef);
-		{compute_h2, {SessionRef, From, H0, PartitionNumber, Nonce, NonceLimiterOutput, ReplicaID, Chunk1, Chunk2, H1}} ->
+		{compute_h2, {SessionRef, From, H0, PartitionNumber, Nonce, NonceLimiterOutput,
+				ReplicaID, Chunk1, Chunk2, H1}} ->
 			{H2, Preimage} = ar_block:compute_h2(H1, Chunk2, H0),
-			From ! {mining_thread_computed_h2, {H0, PartitionNumber, Nonce, NonceLimiterOutput, ReplicaID, Chunk1, Chunk2, H2, Preimage, SessionRef}},
-			?LOG_INFO([{sessionRef______compute_h2______________________________________________________________________,H2}]),
+			From ! {mining_thread_computed_h2, {H0, PartitionNumber, Nonce,
+					NonceLimiterOutput, ReplicaID, Chunk1, Chunk2, H2, Preimage, SessionRef}},
 			hashing_thread(SessionRef);
 		{compute_h2, _} ->
 			 %% Clear the message queue from the requests from the outdated mining session.
-			 ?LOG_INFO([{sessionRef______compute_h2_hashing_thread_______outdated_mining_session_______________________________________________________________,SessionRef}]),
 			 hashing_thread(SessionRef);
 		{new_mining_session, Ref} ->
-			?LOG_INFO([{sessionRef______new_mining_session___________________________________________________________,SessionRef}]),
 			hashing_thread(Ref)
 	end.
 
@@ -790,20 +792,20 @@ priority(nonce_limiter_computed_output, StepNumber) ->
 
 handle_task({computed_output, _},
 		#state{ session = #mining_session{ ref = undefined } } = State) ->
-	?LOG_INFO([{event, mining_debug_handle_task_computed_output_session_undefined}]),
+	?LOG_DEBUG([{event, mining_debug_handle_task_computed_output_session_undefined}]),
 	{noreply, State};
 handle_task({computed_output, Args}, State) ->
 	#state{ session = Session, io_threads = IOThreads, hashing_threads = Threads } = State,
-	{SessionKey, #vdf_session{ seed = Seed, step_number = StepNumber },
+	{SessionKey,
+		#vdf_session{ seed = Seed, step_number = StepNumber } = VDFSession,
 		Output, PartitionUpperBound} = Args,
 	{NextSeed, StartIntervalNumber} = SessionKey,
 	#mining_session{ next_seed = CurrentNextSeed,
 			start_interval_number = CurrentStartIntervalNumber,
 			partition_upper_bound = CurrentPartitionUpperBound } = Session,
-	?LOG_INFO([{currentStartIntervalNumber,CurrentStartIntervalNumber},{currentNextSeed,CurrentNextSeed},{currentPartitionUpperBound,CurrentPartitionUpperBound}]),
-	?LOG_INFO([{startIntervalNumber_______,StartIntervalNumber},{nextSeed,NextSeed},{partitionUpperBound,PartitionUpperBound}]),
 	Session2 =
-		case {CurrentStartIntervalNumber, CurrentNextSeed, CurrentPartitionUpperBound} == {StartIntervalNumber, NextSeed, PartitionUpperBound} of
+		case {CurrentStartIntervalNumber, CurrentNextSeed, CurrentPartitionUpperBound}
+				== {StartIntervalNumber, NextSeed, PartitionUpperBound} of
 			true ->
 				Session;
 			false ->
@@ -822,7 +824,6 @@ handle_task({computed_output, Args}, State) ->
 				log_chunk_cache_size_limit(CacheSizeLimit),
 				ets:insert(?MODULE, {chunk_cache_size, 0}),
 				prometheus_gauge:set(mining_server_chunk_cache_size, 0),
-				?LOG_INFO([{iOThreads______________________,maps:values(IOThreads)},{threads______________________,queue:to_list(Threads)}]),
 				#mining_session{ ref = Ref2, seed = Seed, next_seed = NextSeed,
 						start_interval_number = StartIntervalNumber,
 						partition_upper_bound = PartitionUpperBound,
@@ -833,10 +834,13 @@ handle_task({computed_output, Args}, State) ->
 	Session3 = Session2#mining_session{ step_number_by_output = Map2 },
 	Ref = Session3#mining_session.ref,
 	Iterator = maps:iterator(IOThreads),
-	{N, State2} = distribute_output(Seed, PartitionUpperBound, Output, Iterator, #{}, Ref, State),
-	?LOG_INFO([{computed_output_______________Seed_________,ar_util:encode(Seed)}]),
-	?LOG_INFO([{computed_output_______________Output_______,ar_util:encode(Output)}]),
-	?LOG_INFO([{event, mining_debug_processing_vdf_output}, {found_io_threads, N}]),
+	{N, State2} = distribute_output(Seed, PartitionUpperBound, Output, Iterator, #{}, Ref,
+			State),
+	?LOG_DEBUG([{event, mining_debug_processing_vdf_output}, {found_io_threads, N},
+		{step_number, StepNumber}, {output, ar_util:encode(Output)},
+		{start_interval_number, StartIntervalNumber},
+		{vdf_difficulty, VDFSession#vdf_session.vdf_difficulty},
+		{next_vdf_difficulty, VDFSession#vdf_session.next_vdf_difficulty}]),
 	{noreply, State2#state{ session = Session3 }};
 
 handle_task({io_thread_recall_range_chunk, {H0, PartitionNumber, Nonce, NonceLimiterOutput,
@@ -882,13 +886,11 @@ handle_task({mining_thread_computed_h0, {H0, PartitionNumber, PartitionUpperBoun
 		session = #mining_session{ ref = Ref, chunk_cache_size_limit = Limit,
 		step_number_by_output = Map } } = State) ->
 	[{_, Size}] = ets:lookup(?MODULE, chunk_cache_size),
-	?LOG_INFO([{mining_thread_computed_h0_________Size_True____________, Size}]),
-	?LOG_INFO([{mining_thread_computed_h0_________Limit_True____________, Limit}]),
 	case Size > Limit of
 		true ->
 			case maps:get(Output, Map, not_found) of
 				not_found ->
-					?LOG_INFO([{event, mining_debug_output_not_found_in_step_map}]),
+					?LOG_DEBUG([{event, mining_debug_output_not_found_in_step_map}]),
 					{noreply, State};
 				StepNumber ->
 					Q2 = gb_sets:insert({priority(mining_thread_computed_h0, StepNumber),
@@ -898,28 +900,31 @@ handle_task({mining_thread_computed_h0, {H0, PartitionNumber, PartitionUpperBoun
 			end;
 		false ->
 			#state{ io_threads = Threads } = State,
-			{RecallRange1Start, RecallRange2Start} = ar_block:get_recall_range(H0, PartitionNumber, PartitionUpperBound),
+			{RecallRange1Start, RecallRange2Start} = ar_block:get_recall_range(H0,
+					PartitionNumber, PartitionUpperBound),
 			CorrelationRef = make_ref(),
 			Range1End = RecallRange1Start + ?RECALL_RANGE_SIZE,
-			case find_thread(PartitionNumber, ReplicaID, Range1End, RecallRange1Start, Threads) of
+			case find_thread(PartitionNumber, ReplicaID, Range1End, RecallRange1Start,
+					Threads) of
 				not_found ->
-					?LOG_INFO([{event, mining_debug_no_io_thread_found_for_range}, {range_start, RecallRange1Start}, {range_end, Range1End}]),
+					?LOG_DEBUG([{event, mining_debug_no_io_thread_found_for_range},
+							{range_start, RecallRange1Start},
+							{range_end, Range1End}]),
 					%% We have a storage module smaller than the partition size which
 					%% partially covers this partition but does not include this range.
 					ok;
 				Thread1 ->
-					?LOG_INFO([{mining_thread_computed_h0_________find_thread_Thread1____________, H0}]),
 					reserve_cache_space(),
-					?LOG_INFO([{mining_thread_computed_h0_________read_recall_range____________, H0}]),
-					Thread1 ! {read_recall_range, {Ref, self(), PartitionNumber, RecallRange1Start, H0, Output, CorrelationRef}},
+					Thread1 ! {read_recall_range, {Ref, self(), PartitionNumber,
+							RecallRange1Start, H0, Output, CorrelationRef}},
 					PartitionNumber2 = get_partition_number_by_offset(RecallRange2Start),
 					Range2End = RecallRange2Start + ?RECALL_RANGE_SIZE,
-					case find_thread(PartitionNumber2, ReplicaID, Range2End, RecallRange2Start, Threads) of
+					case find_thread(PartitionNumber2, ReplicaID, Range2End, RecallRange2Start,
+							Threads) of
 						not_found ->
 							signal_cache_cleanup(CorrelationRef, Ref, self());
 						Thread2 ->
 							reserve_cache_space(),
-							?LOG_INFO([{mining_thread_computed_h0_________find_thread_Thread2____________, H0}]),
 							Thread2 ! {read_recall_range2, {Ref, self(), PartitionNumber,
 									RecallRange2Start, H0, Output, CorrelationRef}}
 					end
@@ -929,11 +934,11 @@ handle_task({mining_thread_computed_h0, {H0, PartitionNumber, PartitionUpperBoun
 handle_task({mining_thread_computed_h0, _Args}, State) ->
 	{noreply, State};
 
-handle_task({mining_thread_computed_h1, {H0, PartitionNumber, Nonce, NonceLimiterOutput, ReplicaID, Chunk, H1, Preimage, CorrelationRef, Ref}}, #state{ session = #mining_session{ ref = Ref } } = State) ->
+handle_task({mining_thread_computed_h1, {H0, PartitionNumber, Nonce, NonceLimiterOutput,
+		ReplicaID, Chunk, H1, Preimage, CorrelationRef, Ref}},
+		#state{ session = #mining_session{ ref = Ref } } = State) ->
 	#state{ session = Session, diff = Diff, hashing_threads = Threads } = State,
-	#mining_session{ chunk_cache = Map } = Session,	
-	?LOG_WARNING([{mining_thread_computed_h1, binary:decode_unsigned(H1, big)}]),
-	?LOG_WARNING([{diff_____________________, Diff}]),
+	#mining_session{ chunk_cache = Map } = Session,
 	case binary:decode_unsigned(H1, big) > Diff of
 		true ->
 			Args = {PartitionNumber, Nonce, H0, NonceLimiterOutput, ReplicaID, Chunk,
@@ -1003,8 +1008,6 @@ handle_task({may_be_remove_chunk_from_cache, _Args}, State) ->
 handle_task({mining_thread_computed_h2, {H0, PartitionNumber, Nonce, NonceLimiterOutput,
 		ReplicaID, Chunk1, Chunk2, H2, Preimage, Ref}},
 		#state{ diff = Diff, session = #mining_session{ ref = Ref } } = State) ->
-	?LOG_WARNING([{mining_thread_computed_h2, binary:decode_unsigned(H2, big)}]),
-	?LOG_WARNING([{diff_____________________, Diff}]),
 	case binary:decode_unsigned(H2, big) > Diff of
 		true ->
 			Args = {PartitionNumber, Nonce, H0, NonceLimiterOutput, ReplicaID,
@@ -1082,7 +1085,8 @@ prepare_solution(Args, State, Key) ->
 prepare_solution(Args, State, Key, RecallByte1, RecallByte2, PoA1, PoA2) ->
 	{PartitionNumber, Nonce, _H0, NonceLimiterOutput, ReplicaID, _Chunk1, _Chunk2, H,
 			Preimage, _Ref} = Args,
-	#state{ diff = Diff, session = Session } = State,
+	#state{ diff = Diff, session = Session,
+			merkle_rebase_threshold = RebaseThreshold } = State,
 	#mining_session{ seed = Seed, next_seed = NextSeed,
 			start_interval_number = StartIntervalNumber,
 			partition_upper_bound = PartitionUpperBound,
@@ -1090,7 +1094,7 @@ prepare_solution(Args, State, Key, RecallByte1, RecallByte2, PoA1, PoA2) ->
 	LastStepCheckpoints = ar_nonce_limiter:get_step_checkpoints(
 			StepNumber, NextSeed, StartIntervalNumber),
 	case validate_solution({NonceLimiterOutput, PartitionNumber, Seed, ReplicaID, Nonce,
-			PoA1, PoA2, Diff, PartitionUpperBound}) of
+			PoA1, PoA2, Diff, PartitionUpperBound, RebaseThreshold}) of
 		error ->
 			?LOG_INFO([{event, failed_to_validate_solution},
 					{partition, PartitionNumber},
@@ -1110,10 +1114,11 @@ prepare_solution(Args, State, Key, RecallByte1, RecallByte2, PoA1, PoA2) ->
 					{solution_h, ar_util:encode(H)},
 					{nonce_limiter_output, ar_util:encode(NonceLimiterOutput)}]),
 			State;
-		true ->
+		{true, PoACache, PoA2Cache} ->
 			SolutionArgs = {H, Preimage, PartitionNumber, Nonce, StartIntervalNumber,
 					NextSeed, NonceLimiterOutput, StepNumber, LastStepCheckpoints,
-					RecallByte1, RecallByte2, PoA1, PoA2, Key},
+					RecallByte1, RecallByte2, PoA1, PoA2, PoACache, PoA2Cache, Key,
+					RebaseThreshold},
 			?LOG_INFO([{event, found_mining_solution},
 					{partition, PartitionNumber}, {step_number, StepNumber},
 					{mining_address, ar_util:encode(ReplicaID)},
@@ -1126,31 +1131,51 @@ prepare_solution(Args, State, Key, RecallByte1, RecallByte2, PoA1, PoA2) ->
 
 validate_solution(Args) ->
 	{NonceLimiterOutput, PartitionNumber, Seed, RewardAddr, Nonce, PoA1, PoA2, Diff,
-			PartitionUpperBound} = Args,
+			PartitionUpperBound, RebaseThreshold} = Args,
 	H0 = ar_block:compute_h0(NonceLimiterOutput, PartitionNumber, Seed, RewardAddr),
 	{H1, _Preimage1} = ar_block:compute_h1(H0, Nonce, PoA1#poa.chunk),
 	{RecallRange1Start, RecallRange2Start} = ar_block:get_recall_range(H0,
 			PartitionNumber, PartitionUpperBound),
-	case binary:decode_unsigned(H1, big) > Diff of
-		true ->
-			RecallByte1 = RecallRange1Start + Nonce * ?DATA_CHUNK_SIZE,
-			{BlockStart1, BlockEnd1, TXRoot1} = ar_block_index:get_block_bounds(RecallByte1),
-			BlockSize1 = BlockEnd1 - BlockStart1,
-			ar_poa:validate({BlockStart1, RecallByte1, TXRoot1, BlockSize1, PoA1,
-					?STRICT_DATA_SPLIT_THRESHOLD, {spora_2_6, RewardAddr}});
-		false ->
-			{H2, _Preimage2} = ar_block:compute_h2(H1, PoA2#poa.chunk, H0),
-			case binary:decode_unsigned(H2, big) > Diff of
-				false ->
-					false;
+
+	RecallByte1 = RecallRange1Start + Nonce * ?DATA_CHUNK_SIZE,
+	{BlockStart1, BlockEnd1, TXRoot1} = ar_block_index:get_block_bounds(RecallByte1),
+	BlockSize1 = BlockEnd1 - BlockStart1,
+	case ar_poa:validate({BlockStart1, RecallByte1, TXRoot1, BlockSize1, PoA1,
+			?STRICT_DATA_SPLIT_THRESHOLD, {spora_2_6, RewardAddr}, RebaseThreshold,
+			not_set}) of
+		{true, ChunkID} ->
+			PoACache = {{BlockStart1, RecallByte1, TXRoot1, BlockSize1,
+					?STRICT_DATA_SPLIT_THRESHOLD, {spora_2_6, RewardAddr}, RebaseThreshold},
+					ChunkID},
+			case binary:decode_unsigned(H1, big) > Diff of
 				true ->
-					RecallByte2 = RecallRange2Start + Nonce * ?DATA_CHUNK_SIZE,
-					{BlockStart2, BlockEnd2, TXRoot2} = ar_block_index:get_block_bounds(
-							RecallByte2),
-					BlockSize2 = BlockEnd2 - BlockStart2,
-					ar_poa:validate({BlockStart2, RecallByte2, TXRoot2, BlockSize2, PoA2,
-							?STRICT_DATA_SPLIT_THRESHOLD, {spora_2_6, RewardAddr}})
-			end
+					{true, PoACache, undefined};
+				false ->
+					{H2, _Preimage2} = ar_block:compute_h2(H1, PoA2#poa.chunk, H0),
+					case binary:decode_unsigned(H2, big) > Diff of
+						false ->
+							false;
+						true ->
+							RecallByte2 = RecallRange2Start + Nonce * ?DATA_CHUNK_SIZE,
+							{BlockStart2, BlockEnd2, TXRoot2} =
+									ar_block_index:get_block_bounds(RecallByte2),
+							BlockSize2 = BlockEnd2 - BlockStart2,
+							case ar_poa:validate({BlockStart2, RecallByte2, TXRoot2,
+									BlockSize2, PoA2, ?STRICT_DATA_SPLIT_THRESHOLD,
+									{spora_2_6, RewardAddr}, RebaseThreshold, not_set}) of
+								{true, Chunk2ID} ->
+									PoA2Cache = {{BlockStart2, RecallByte2, TXRoot2,
+											BlockSize2, ?STRICT_DATA_SPLIT_THRESHOLD,
+											{spora_2_6, RewardAddr}, RebaseThreshold},
+											Chunk2ID},
+									{true, PoACache, PoA2Cache};
+								Result2 ->
+									Result2
+							end
+					end
+			end;
+		Result ->
+			Result
 	end.
 
 get_recall_bytes(H0, PartitionNumber, Nonce, PartitionUpperBound) ->

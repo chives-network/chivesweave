@@ -109,14 +109,19 @@
 	invalid_pow, 
 	invalid_poa, 
 	invalid_poa2, 
-	invalid_nonce_limiter
+	invalid_nonce_limiter,
+	invalid_nonce_limiter_cache_mismatch,
+	invalid_chunk_hash,
+	invalid_chunk2_hash
 ]).
 -define(BLOCK_REJECTION_IGNORE, [
 	invalid_signature,
+	invalid_proof_size,
+	invalid_first_chunk,
+	invalid_second_chunk,
 	invalid_hash,
 	invalid_timestamp,
 	invalid_resigned_solution_hash,
-	invalid_nonce_limiter_cache_mismatch,
 	invalid_nonce_limiter_global_step_number
 ]).
 
@@ -164,6 +169,18 @@ get_peer_performances(Peers) ->
 		Peers).
 
 -if(?NETWORK_NAME == "chivesweave.mainnet").
+resolve_peers([]) ->
+	[];
+resolve_peers([RawPeer | Peers]) ->
+	case ar_util:safe_parse_peer(RawPeer) of
+		{ok, Peer} ->
+			[Peer | resolve_peers(Peers)];
+		{error, invalid} ->
+			?LOG_WARNING([{event, failed_to_resolve_trusted_peer},
+					{peer, RawPeer}]),
+			resolve_peers(Peers)
+	end.
+
 get_trusted_peers() ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	Config#config.peers.
@@ -172,17 +189,6 @@ get_trusted_peers() ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	Config#config.peers.
 -endif.
-
-resolve_peers([]) ->
-	[];
-resolve_peers([RawPeer | Peers]) ->
-	case ar_util:safe_parse_peer(RawPeer) of
-		{ok, Peer} ->
-			[Peer | resolve_peers(Peers)];
-		{error, invalid} ->
-			?LOG_WARNING([{event, failed_to_resolve_trusted_peer}, {peer, RawPeer}]),
-			resolve_peers(Peers)
-	end.
 
 %% @doc Return true if the given peer has a public IPv4 address.
 %% https://en.wikipedia.org/wiki/Reserved_IP_addresses.
@@ -342,7 +348,8 @@ handle_cast(ping_peers, State) ->
 	ping_peers(lists:sublist(Peers, 100)),
 	{noreply, State};
 
-handle_cast({valid_data, Peer, _DataType, LatencyMilliseconds, DataSize, Concurrency}, State) ->
+handle_cast({valid_data, Peer, _DataType, LatencyMilliseconds, DataSize, Concurrency},
+		State) ->
 	update_rating(Peer, LatencyMilliseconds, DataSize, Concurrency, true),
 	{noreply, State};
 
@@ -946,8 +953,8 @@ rotate_peer_ports_test() ->
 
 update_rating_test() ->
 	ets:delete_all_objects(?MODULE),
-	Peer1 = {1, 2, 3, 4, 1985},
-	Peer2 = {5, 6, 7, 8, 1985},
+	Peer1 = {1, 2, 3, 4, 1984},
+	Peer2 = {5, 6, 7, 8, 1984},
 
 	?assertEqual(#performance{}, get_or_init_performance(Peer1)),
 	?assertEqual(0, get_total_rating(lifetime)),
@@ -1051,7 +1058,7 @@ test_block_rejected() ->
 
 rate_data_test() ->
 	ets:delete_all_objects(?MODULE),
-	Peer1 = {1, 2, 3, 4, 1985},
+	Peer1 = {1, 2, 3, 4, 1984},
 
 	?assertEqual(#performance{}, get_or_init_performance(Peer1)),
 	?assertEqual(0, get_total_rating(lifetime)),

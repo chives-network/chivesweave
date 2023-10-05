@@ -42,9 +42,9 @@ Post a transaction to be signed and sent to the network.
 {
     "last_tx": "",            // Base64 encoded ID of the last transaction made by this wallet.
     "target": "",             // Base64 encoded SHA256 hash of recipient's public key. Empty for data transactions.
-    "quantity": "",           // Decimal string representation of the amount of sent AR in winston. Empty for data transactions.
+    "quantity": "",           // Decimal string representation of the amount of sent XWE in winston. Empty for data transactions.
     "data": "",               // The Base64 encoded data being store in the transaction. Empty for transfer transactions.
-    "reward": "",             // Decimal string representation of the mining reward AR amount in winston.
+    "reward": "",             // Decimal string representation of the mining reward XWE amount in winston.
     "wallet_access_code": ""  // The wallet access code as returned by the POST /wallet endpoint.
 }
 ```

@@ -3,11 +3,11 @@
 -behaviour(gen_server).
 
 -export([start_link/0, is_ahead_on_the_timeline/2, get_current_step_number/0,
-		get_current_step_number/1, get_seed_data/4, get_step_checkpoints/3,
+		get_current_step_number/1, get_seed_data/2, get_step_checkpoints/3,
 		get_steps/3, validate_last_step_checkpoints/3, request_validation/3,
 		get_or_init_nonce_limiter_info/1, get_or_init_nonce_limiter_info/2,
 		apply_external_update/2, get_session/1, 
-		compute/2, resolve_remote_server_raw_peers/0,
+		compute/3, resolve_remote_server_raw_peers/0,
 		get_entropy_reset_point/2, maybe_add_entropy/4, mix_seed/2]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
@@ -16,6 +16,7 @@
 -include_lib("chivesweave/include/ar_vdf.hrl").
 -include_lib("chivesweave/include/ar_config.hrl").
 -include_lib("chivesweave/include/ar_consensus.hrl").
+-include_lib("chivesweave/include/ar_pricing.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -record(state, {
@@ -26,7 +27,8 @@
 	worker_monitor_ref,
 	autocompute = true,
 	computing = false,
-	last_external_update = {not_set, 0}
+	last_external_update = {not_set, 0},
+	emit_initialized_event = true
 }).
 
 %%%===================================================================
@@ -51,25 +53,44 @@ get_current_step_number() ->
 %% @doc Return the latest known step number in the session of the given (previous) block.
 %% Return not_found if the session is not found.
 get_current_step_number(B) ->
-	#block{ nonce_limiter_info = #nonce_limiter_info{ next_seed = NextSeed,
-			global_step_number = StepNumber } } = B,
-	SessionKey = {NextSeed, StepNumber div ?NONCE_LIMITER_RESET_FREQUENCY},
+	SessionKey = session_key(B#block.nonce_limiter_info),
 	gen_server:call(?MODULE, {get_current_step_number, SessionKey}, infinity).
 
-%% @doc Return {Seed, NextSeed, PartitionUpperBound, NextPartitionUpperBound} for
-%% the block mined at StepNumber considering its previous block is mined with
-%% NonceLimiterInfo. NextSeedOption and NextUpperBoundOption become the new NextSeed and
-%% NextPartitionUpperBound accordingly when we cross a reset line.
-get_seed_data(StepNumber, NonceLimiterInfo, NextSeedOption, NextUpperBoundOption) ->
-	#nonce_limiter_info{ global_step_number = N, seed = Seed, next_seed = NextSeed,
-			partition_upper_bound = PartitionUpperBound,
-			next_partition_upper_bound = NextPartitionUpperBound } = NonceLimiterInfo,
-	true = StepNumber > N,
-	case get_entropy_reset_point(N, StepNumber) of
+%% @doc Return {Seed, NextSeed, PartitionUpperBound, NextPartitionUpperBound, VDFDifficulty}
+%% for the block mined at StepNumber considering its previous block PrevB.
+%% The previous block's independent hash, weave size, and VDF difficulty
+%% become the new NextSeed, NextPartitionUpperBound, and NextVDFDifficulty
+%% accordingly when we cross the next reset line.
+%% Note: next_vdf_difficulty is not part of the seed data as it is computed using the
+%% block_time_history - which is a heavier operation handled separate from the (quick) seed data
+%% retrieval
+get_seed_data(StepNumber, PrevB) ->
+	NonceLimiterInfo = PrevB#block.nonce_limiter_info,
+	#nonce_limiter_info{
+		global_step_number = PrevStepNumber,
+		seed = Seed, next_seed = NextSeed,
+		partition_upper_bound = PartitionUpperBound,
+		next_partition_upper_bound = NextPartitionUpperBound,
+		%% VDF difficulty in use at the previous block
+		vdf_difficulty = VDFDifficulty, 
+		%% Next VDF difficulty scheduled at the previous block
+		next_vdf_difficulty = PrevNextVDFDifficulty 
+	} = NonceLimiterInfo,
+	true = StepNumber > PrevStepNumber,
+	case get_entropy_reset_point(PrevStepNumber, StepNumber) of
 		none ->
-			{Seed, NextSeed, PartitionUpperBound, NextPartitionUpperBound};
+			%% Entropy reset line was not crossed between previous and current block
+			{ Seed, NextSeed, PartitionUpperBound, NextPartitionUpperBound, VDFDifficulty };
 		_ ->
-			{NextSeed, NextSeedOption, NextPartitionUpperBound, NextUpperBoundOption}
+			%% Entropy reset line was crossed between previous and current block
+			{
+				NextSeed, PrevB#block.indep_hash,
+				NextPartitionUpperBound, PrevB#block.weave_size,
+				%% The next VDF difficulty that was scheduled at the previous block
+				%% (PrevNextVDFDifficulty) was applied when we crossed the entropy reset line and
+				%% is now the current VDF difficulty.
+				PrevNextVDFDifficulty
+			}
 	end.
 
 %% @doc Return the cached checkpoints for the given step. Return not_found if
@@ -85,7 +106,7 @@ get_step_checkpoints(StepNumber, SessionKey) ->
 %% computed yet.
 get_steps(StartStepNumber, EndStepNumber, NextSeed)
 		when EndStepNumber > StartStepNumber ->
-	SessionKey = {NextSeed, StartStepNumber div ?NONCE_LIMITER_RESET_FREQUENCY},
+	SessionKey = session_key(NextSeed, StartStepNumber),
 	gen_server:call(?MODULE, {get_steps, StartStepNumber, EndStepNumber, SessionKey},
 			infinity).
 
@@ -98,13 +119,13 @@ validate_last_step_checkpoints(#block{ nonce_limiter_info = #nonce_limiter_info{
 validate_last_step_checkpoints(#block{
 		nonce_limiter_info = #nonce_limiter_info{ output = Output,
 				global_step_number = StepNumber, seed = Seed,
+				vdf_difficulty = VDFDifficulty,
 				last_step_checkpoints = [Output | _] = LastStepCheckpoints } }, PrevB,
 				PrevOutput)
 		when length(LastStepCheckpoints) == ?VDF_CHECKPOINT_COUNT_IN_STEP ->
 	PrevInfo = get_or_init_nonce_limiter_info(PrevB),
-	#nonce_limiter_info{ next_seed = PrevNextSeed,
-			global_step_number = PrevBStepNumber } = PrevInfo,
-	SessionKey = {PrevNextSeed, PrevBStepNumber div ?NONCE_LIMITER_RESET_FREQUENCY},
+	#nonce_limiter_info{ global_step_number = PrevBStepNumber } = PrevInfo,
+	SessionKey = session_key(PrevInfo),
 	case get_step_checkpoints(StepNumber, SessionKey) of
 		LastStepCheckpoints ->
 			{true, cache_match};
@@ -114,7 +135,8 @@ validate_last_step_checkpoints(#block{
 			PrevStepNumber = StepNumber - 1,
 			{ok, Config} = application:get_env(chivesweave, config),
 			ThreadCount = Config#config.max_nonce_limiter_last_step_validation_thread_count,
-			case verify_no_reset(PrevStepNumber, PrevOutput2, 1, lists:reverse(LastStepCheckpoints), ThreadCount) of
+			case verify_no_reset(PrevStepNumber, PrevOutput2, 1,
+					lists:reverse(LastStepCheckpoints), ThreadCount, VDFDifficulty) of
 				{true, _Steps} ->
 					true;
 				false ->
@@ -152,6 +174,9 @@ maybe_add_entropy(PrevOutput, PrevStepNumber, StepNumber, Seed) ->
 %% fast VDF compute. See ?NONCE_LIMITER_RESET_FREQUENCY for more details.
 mix_seed(PrevOutput, Seed) ->
 	SeedH = crypto:hash(sha256, Seed),
+	mix_seed2(PrevOutput, SeedH).
+
+mix_seed2(PrevOutput, SeedH) ->
 	crypto:hash(sha256, << PrevOutput/binary, SeedH/binary >>).
 
 %% @doc Validate the nonce limiter chain between two blocks in the background.
@@ -164,26 +189,19 @@ request_validation(H, #nonce_limiter_info{ global_step_number = N },
 request_validation(H, #nonce_limiter_info{ output = Output,
 		steps = [Output | _] = StepsToValidate } = Info, PrevInfo) ->
 	#nonce_limiter_info{ output = PrevOutput, next_seed = PrevNextSeed,
-			global_step_number = PrevStepNumber } = PrevInfo,
+			global_step_number = PrevStepNumber, vdf_difficulty = PrevVDFDifficulty } = PrevInfo,
 	#nonce_limiter_info{ output = Output, seed = Seed, next_seed = NextSeed,
+			vdf_difficulty = VDFDifficulty, next_vdf_difficulty = NextVDFDifficulty,
 			partition_upper_bound = UpperBound,
 			next_partition_upper_bound = NextUpperBound, global_step_number = StepNumber,
 			steps = StepsToValidate } = Info,
 	EntropyResetPoint = get_entropy_reset_point(PrevStepNumber, StepNumber),
-	SessionKey = {PrevNextSeed, PrevStepNumber div ?NONCE_LIMITER_RESET_FREQUENCY},
+	SessionKey = session_key(PrevInfo),
 	%% The steps that fall at the intersection of the PrevStepNumber to StepNumber range
 	%% and the SessionKey session.
 	SessionSteps = gen_server:call(?MODULE, {get_session_steps, PrevStepNumber, StepNumber,
 			SessionKey}, infinity),
-	NextSessionKey = {NextSeed, StepNumber div ?NONCE_LIMITER_RESET_FREQUENCY},
-
-	?LOG_INFO([{event, vdf_validation_start}, {block, ar_util:encode(H)},
-			{session_key, ar_util:encode(PrevNextSeed)},
-			{next_session_key, ar_util:encode(NextSeed)},
-			{start_step_number, PrevStepNumber}, {step_number, StepNumber},
-			{step_count, StepNumber - PrevStepNumber}, {steps, length(StepsToValidate)},
-			{session_steps, length(SessionSteps)},
-			{pid, self()}]),
+	NextSessionKey = session_key(Info),
 
 	%% We need to validate all the steps from PrevStepNumber to StepNumber:
 	%% PrevStepNumber <--------------------------------------------> StepNumber
@@ -201,6 +219,15 @@ request_validation(H, #nonce_limiter_info{ output = Output,
 	{StartStepNumber, StartOutput, ComputedSteps} =
 		skip_already_computed_steps(PrevStepNumber, StepNumber, PrevOutput,
 			StepsToValidate, SessionSteps),
+	?LOG_INFO([{event, vdf_validation_start}, {block, ar_util:encode(H)},
+			{session_key, ar_util:encode(PrevNextSeed)},
+			{next_session_key, ar_util:encode(NextSeed)},
+			{prev_step_number, PrevStepNumber}, {step_number, StepNumber},
+			{start_step_number, StartStepNumber},
+			{step_count, StepNumber - PrevStepNumber}, {steps, length(StepsToValidate)},
+			{session_steps, length(SessionSteps)}, {prev_vdf_difficulty, PrevVDFDifficulty},
+			{vdf_difficulty, VDFDifficulty}, {next_vdf_difficulty, NextVDFDifficulty},
+			{pid, self()}]),
 	case exclude_computed_steps_from_steps_to_validate(
 			lists:reverse(StepsToValidate), ComputedSteps) of
 		invalid ->
@@ -215,7 +242,7 @@ request_validation(H, #nonce_limiter_info{ output = Output,
 			%% current session
 			LastStepCheckpoints = get_step_checkpoints(StepNumber, SessionKey),
 			Args = {StepNumber, SessionKey, NextSessionKey, Seed, UpperBound, NextUpperBound,
-					SessionSteps, LastStepCheckpoints},
+					VDFDifficulty, NextVDFDifficulty, SessionSteps, LastStepCheckpoints},
 			gen_server:cast(?MODULE, {validated_steps, Args}),
 			spawn(fun() -> ar_events:send(nonce_limiter, {valid, H}) end);
 
@@ -227,12 +254,11 @@ request_validation(H, #nonce_limiter_info{ output = Output,
 					{start_step_number, StartStepNumber}, {shift2, NumAlreadyComputed},
 					{error_dump, ErrorID}]),
 			spawn(fun() -> ar_events:send(nonce_limiter, {invalid, H, 2}) end);
-
 		{RemainingStepsToValidate, NumAlreadyComputed}
 		  		when StartStepNumber + NumAlreadyComputed < StepNumber ->
 			case ar_config:use_remote_vdf_server() of
 				true ->
-					%% Wait for our VDF server(s) to validate the reamining steps.
+					%% Wait for our VDF server(s) to validate the remaining steps.
 					spawn(fun() ->
 						timer:sleep(1000),
 						request_validation(H, Info, PrevInfo) end);
@@ -253,11 +279,13 @@ request_validation(H, #nonce_limiter_info{ output = Output,
 									catch verify(StartStepNumber2, StartOutput2,
 											?VDF_CHECKPOINT_COUNT_IN_STEP,
 											RemainingStepsToValidate, EntropyResetPoint,
-											crypto:hash(sha256, Seed), ThreadCount);
+											crypto:hash(sha256, Seed), ThreadCount,
+											PrevVDFDifficulty, VDFDifficulty);
 								_ ->
 									catch verify_no_reset(StartStepNumber2, StartOutput2,
 											?VDF_CHECKPOINT_COUNT_IN_STEP,
-											RemainingStepsToValidate, ThreadCount)
+											RemainingStepsToValidate, ThreadCount,
+											VDFDifficulty)
 							end,
 						case Result of
 							{'EXIT', Exc} ->
@@ -266,7 +294,7 @@ request_validation(H, #nonce_limiter_info{ output = Output,
 									?VDF_CHECKPOINT_COUNT_IN_STEP,
 									RemainingStepsToValidate,
 									EntropyResetPoint, crypto:hash(sha256, Seed),
-									ThreadCount}),
+									ThreadCount, VDFDifficulty}),
 								?LOG_ERROR([{event, nonce_limiter_validation_failed},
 										{block, ar_util:encode(H)},
 										{start_step_number, StartStepNumber2},
@@ -282,16 +310,16 @@ request_validation(H, #nonce_limiter_info{ output = Output,
 								%% of an earlier call to
 								%% ar_block_pre_validator:pre_validate_nonce_limiter, so
 								%% we can trust them here.
-								LastStepCheckpoints = Info#nonce_limiter_info.last_step_checkpoints,
+								LastStepCheckpoints = get_last_step_checkpoints(Info),
 								Args = {StepNumber, SessionKey, NextSessionKey,
 										Seed, UpperBound, NextUpperBound,
+										VDFDifficulty, NextVDFDifficulty,
 										AllValidatedSteps, LastStepCheckpoints},
 								gen_server:cast(?MODULE, {validated_steps, Args}),
 								ar_events:send(nonce_limiter, {valid, H})
 						end
 					end)
 			end;
-
 		Data ->
 			ErrorID = dump_error(Data),
 			ar_events:send(nonce_limiter, {validation_error, H}),
@@ -300,6 +328,9 @@ request_validation(H, #nonce_limiter_info{ output = Output,
 	end;
 request_validation(H, _Info, _PrevInfo) ->
 	spawn(fun() -> ar_events:send(nonce_limiter, {invalid, H, 4}) end).
+
+get_last_step_checkpoints(Info) ->
+	Info#nonce_limiter_info.last_step_checkpoints.
 
 get_or_init_nonce_limiter_info(#block{ height = Height, indep_hash = H } = B) ->
 	case Height >= ar_fork:height_2_6() of
@@ -465,7 +496,12 @@ handle_cast(check_external_vdf_server_input,
 
 handle_cast(initialized, State) ->
 	gen_server:cast(?MODULE, schedule_step),
-	ar_events:send(nonce_limiter, initialized),
+	case State#state.emit_initialized_event of
+		true ->
+			ar_events:send(nonce_limiter, initialized);
+		false ->
+			ok
+	end,
 	{noreply, State};
 
 handle_cast({initialize, [PrevB, B | Blocks]}, State) ->
@@ -481,10 +517,9 @@ handle_cast({apply_tip, B, PrevB}, State) ->
 	{noreply, apply_tip2(B, PrevB, State)};
 
 handle_cast({validated_steps, Args}, State) ->
-	{StepNumber, SessionKey, NextSessionKey, Seed, UpperBound, NextUpperBound, Steps,
-		LastStepCheckpoints} = Args,
-	#state{ session_by_key = SessionByKey, sessions = Sessions,
-			current_session_key = CurrentSessionKey } = State,
+	{StepNumber, SessionKey, NextSessionKey, Seed, UpperBound, NextUpperBound,
+			VDFDifficulty, NextVDFDifficulty, Steps, LastStepCheckpoints} = Args,
+	#state{ session_by_key = SessionByKey, current_session_key = CurrentSessionKey } = State,
 	case maps:get(SessionKey, SessionByKey, not_found) of
 		not_found ->
 			%% The corresponding fork origin should have just dropped below the
@@ -511,39 +546,10 @@ handle_cast({validated_steps, Args}, State) ->
 					false ->
 						Session
 				end,
-			SessionByKey2 = maps:put(SessionKey, Session2, SessionByKey),
-			may_be_set_vdf_step_metric(SessionKey, CurrentSessionKey,
-					Session2#vdf_session.step_number),
-			Steps3 = Session2#vdf_session.steps,
-			StepNumber2 = Session2#vdf_session.step_number,
-			Session3 =
-				case maps:get(NextSessionKey, SessionByKey2, not_found) of
-					not_found ->
-						{_, Interval} = NextSessionKey,
-						SessionStart = Interval * ?NONCE_LIMITER_RESET_FREQUENCY,
-						SessionEnd = (Interval + 1) * ?NONCE_LIMITER_RESET_FREQUENCY - 1,
-						Steps4 =
-							case StepNumber2 > SessionEnd of
-								true ->
-									lists:nthtail(StepNumber2 - SessionEnd, Steps3);
-								false ->
-									Steps3
-							end,
-						StepNumber3 = min(StepNumber2, SessionEnd),
-						Steps5 = lists:sublist(Steps4, StepNumber3 - SessionStart + 1),
-						#vdf_session{ step_number = StepNumber3, seed = Seed,
-							step_checkpoints_map = #{}, steps = Steps5,
-							upper_bound = UpperBound, next_upper_bound = NextUpperBound,
-							prev_session_key = SessionKey };
-					Session4 ->
-						Session4
-				end,
-			SessionByKey3 = maps:put(NextSessionKey, Session3, SessionByKey2),
-			may_be_set_vdf_step_metric(NextSessionKey, CurrentSessionKey,
-					Session3#vdf_session.step_number),
-			Sessions2 = gb_sets:add_element({element(2, NextSessionKey),
-					element(1, NextSessionKey)}, Sessions),
-			{noreply, State#state{ session_by_key = SessionByKey3, sessions = Sessions2 }}
+			State2 = cache_session(State, SessionKey, CurrentSessionKey, Session2),
+			State3 = cache_block_session(State2, NextSessionKey, SessionKey, CurrentSessionKey,
+					#{}, Seed, UpperBound, NextUpperBound, VDFDifficulty, NextVDFDifficulty),
+			{noreply, State3}
 	end;
 
 handle_cast(schedule_step, #state{ autocompute = false } = State) ->
@@ -558,12 +564,14 @@ handle_cast(reset_and_pause, State) ->
 	{noreply, State#state{ autocompute = false, computing = false,
 			current_session_key = undefined, sessions = gb_sets:new(), session_by_key = #{} }};
 
+handle_cast(turn_off_initialized_event, State) ->
+	{noreply, State#state{ emit_initialized_event = false }};
+
 handle_cast(Cast, State) ->
 	?LOG_WARNING("event: unhandled_cast, cast: ~p", [Cast]),
 	{noreply, State}.
 
-handle_info({event, node_state, initializing}, State) ->
-	[{joined_blocks, Blocks}] = ets:lookup(node_state, joined_blocks),
+handle_info({event, node_state, {initializing, Blocks}}, State) ->
 	{noreply, handle_initialized(lists:sublist(Blocks, ?STORE_BLOCKS_BEHIND_CURRENT), State)};
 
 handle_info({event, node_state, {validated_pre_fork_2_6_block, B}}, State) ->
@@ -617,18 +625,18 @@ handle_info({computed, Args}, State) ->
 	gen_server:cast(?MODULE, schedule_step),
 	case PrevOutput == SessionOutput2 of
 		false ->
-			?LOG_INFO([{event, computed_for_outdated_key}]),
+			?LOG_INFO([{event, computed_for_outdated_key}, {step_number, StepNumber},
+				{output, ar_util:encode(Output)}]),
 			{noreply, State};
 		true ->
 			Map2 = maps:put(StepNumber, Checkpoints, Map),
 			Session2 = Session#vdf_session{ step_number = StepNumber,
 					step_checkpoints_map = Map2, steps = [Output | Steps] },
-			SessionByKey2 = maps:put(CurrentSessionKey, Session2, SessionByKey),
+			State2 = cache_session(State, CurrentSessionKey, CurrentSessionKey, Session2),
 			PrevSession = maps:get(PrevSessionKey, SessionByKey, undefined),
 			ar_events:send(nonce_limiter, {computed_output, {CurrentSessionKey, Session2,
 					PrevSessionKey, PrevSession, Output, UpperBound}}),
-			may_be_set_vdf_step_metric(CurrentSessionKey, CurrentSessionKey, StepNumber),
-			{noreply, State#state{ session_by_key = SessionByKey2 }}
+			{noreply, State2}
 	end;
 
 handle_info(Message, State) ->
@@ -642,6 +650,11 @@ terminate(_Reason, #state{ worker = W }) ->
 %%%===================================================================
 %%% Private functions.
 %%%===================================================================
+
+session_key(#nonce_limiter_info{ next_seed = NextSeed, global_step_number = StepNumber}) ->
+	session_key(NextSeed, StepNumber).
+session_key(NextSeed, StepNumber) ->
+	{NextSeed, StepNumber div ?NONCE_LIMITER_RESET_FREQUENCY}.
 
 dump_error(Data) ->
 	{ok, Config} = application:get_env(chivesweave, config),
@@ -657,7 +670,8 @@ dump_error(Data) ->
 %%                |-------------------------------| NumStepsBefore
 %%                |---------------------------------------------| SessionSteps
 %%
-skip_already_computed_steps(PrevStepNumber, StepNumber, PrevOutput, StepsToValidate, SessionSteps) ->
+skip_already_computed_steps(PrevStepNumber, StepNumber, PrevOutput, StepsToValidate,
+		SessionSteps) ->
 	ComputedSteps = lists:reverse(SessionSteps),
 	%% Number of steps in the PrevStepNumber to StepNumber range that fall before the
 	%% beginning of the StepsToValidate list. To avoid computing these steps we will look for
@@ -679,25 +693,24 @@ exclude_computed_steps_from_steps_to_validate(StepsToValidate, ComputedSteps) ->
 
 exclude_computed_steps_from_steps_to_validate(StepsToValidate, [], _I, NumAlreadyComputed) ->
 	{StepsToValidate, NumAlreadyComputed};
-exclude_computed_steps_from_steps_to_validate(StepsToValidate, [_Step | ComputedSteps], I, NumAlreadyComputed)
-		when I /= 1 ->
-	exclude_computed_steps_from_steps_to_validate(StepsToValidate, ComputedSteps, I + 1, NumAlreadyComputed);
-exclude_computed_steps_from_steps_to_validate([Step], [Step | _ComputedSteps], _I, NumAlreadyComputed) ->
+exclude_computed_steps_from_steps_to_validate(StepsToValidate, [_Step | ComputedSteps], I,
+		NumAlreadyComputed) when I /= 1 ->
+	exclude_computed_steps_from_steps_to_validate(StepsToValidate, ComputedSteps, I + 1,
+			NumAlreadyComputed);
+exclude_computed_steps_from_steps_to_validate([Step], [Step | _ComputedSteps], _I,
+			NumAlreadyComputed) ->
 	{[], NumAlreadyComputed + 1};
-exclude_computed_steps_from_steps_to_validate([Step | StepsToValidate], [Step | ComputedSteps], _I, NumAlreadyComputed) ->
-	exclude_computed_steps_from_steps_to_validate(StepsToValidate, ComputedSteps, 1, NumAlreadyComputed + 1);
-exclude_computed_steps_from_steps_to_validate(_StepsToValidate, _ComputedSteps, _I, _NumAlreadyComputed) ->
+exclude_computed_steps_from_steps_to_validate([Step | StepsToValidate], [Step | ComputedSteps],
+		_I, NumAlreadyComputed) ->
+	exclude_computed_steps_from_steps_to_validate(StepsToValidate, ComputedSteps, 1,
+		NumAlreadyComputed + 1);
+exclude_computed_steps_from_steps_to_validate(_StepsToValidate, _ComputedSteps, _I,
+		_NumAlreadyComputed) ->
 	invalid.
 
-handle_initialized([#block{ height = Height } = B | Blocks], State) ->
-	case Height + 1 < ar_fork:height_2_6() of
-		true ->
-			ar_events:send(nonce_limiter, initialized),
-			State;
-		false ->
-			Blocks2 = take_blocks_after_fork([B | Blocks]),
-			handle_initialized2(lists:reverse(Blocks2), State)
-	end.
+handle_initialized([B | Blocks], State) ->
+	Blocks2 = take_blocks_after_fork([B | Blocks]),
+	handle_initialized2(lists:reverse(Blocks2), State).
 
 take_blocks_after_fork([#block{ height = Height } = B | Blocks]) ->
 	case Height + 1 >= ar_fork:height_2_6() of
@@ -719,12 +732,15 @@ apply_base_block(B, State) ->
 			partition_upper_bound = UpperBound,
 			next_partition_upper_bound = NextUpperBound,
 			global_step_number = StepNumber,
-			last_step_checkpoints = LastStepCheckpoints } = B#block.nonce_limiter_info,
+			last_step_checkpoints = LastStepCheckpoints,
+			vdf_difficulty = VDFDifficulty,
+			next_vdf_difficulty = NextVDFDifficulty } = B#block.nonce_limiter_info,
 	Session = #vdf_session{ step_number = StepNumber,
 			step_checkpoints_map = #{ StepNumber => LastStepCheckpoints },
 			steps = [Output], upper_bound = UpperBound, next_upper_bound = NextUpperBound,
-			seed = Seed },
-	SessionKey = {NextSeed, StepNumber div ?NONCE_LIMITER_RESET_FREQUENCY},
+			seed = Seed, vdf_difficulty = VDFDifficulty,
+			next_vdf_difficulty = NextVDFDifficulty },
+	SessionKey = session_key(B#block.nonce_limiter_info),
 	Sessions = gb_sets:from_list([{StepNumber div ?NONCE_LIMITER_RESET_FREQUENCY, NextSeed}]),
 	SessionByKey = #{ SessionKey => Session },
 	State#state{ current_session_key = SessionKey, sessions = Sessions,
@@ -741,19 +757,20 @@ apply_chain(#nonce_limiter_info{ global_step_number = StepNumber },
 %% @doc Apply the pre-validated / trusted nonce_limiter_info. Since the info is trusted
 %% we don't validate it here.
 apply_chain(Info, PrevInfo) ->
-	#nonce_limiter_info{ next_seed = PrevNextSeed,
-			global_step_number = PrevStepNumber } = PrevInfo,
-	#nonce_limiter_info{ output = Output, seed = Seed, next_seed = NextSeed,
+	#nonce_limiter_info{ global_step_number = PrevStepNumber } = PrevInfo,
+	#nonce_limiter_info{ output = Output, seed = Seed,
+			vdf_difficulty = VDFDifficulty,
+			next_vdf_difficulty = NextVDFDifficulty,
 			partition_upper_bound = UpperBound,
 			next_partition_upper_bound = NextUpperBound, global_step_number = StepNumber,
 			steps = Steps, last_step_checkpoints = LastStepCheckpoints } = Info,
 	Count = StepNumber - PrevStepNumber,
 	Output = hd(Steps),
 	Count = length(Steps),
-	SessionKey = {PrevNextSeed, PrevStepNumber div ?NONCE_LIMITER_RESET_FREQUENCY},
-	NextSessionKey = {NextSeed, StepNumber div ?NONCE_LIMITER_RESET_FREQUENCY},
+	SessionKey = session_key(PrevInfo),
+	NextSessionKey = session_key(Info),
 	Args = {StepNumber, SessionKey, NextSessionKey, Seed, UpperBound, NextUpperBound,
-			Steps, LastStepCheckpoints},
+			VDFDifficulty, NextVDFDifficulty, Steps, LastStepCheckpoints},
 	gen_server:cast(?MODULE, {validated_steps, Args}).
 
 apply_tip(#block{ height = Height } = B, PrevB, #state{ sessions = Sessions } = State) ->
@@ -780,52 +797,17 @@ apply_tip(#block{ height = Height } = B, PrevB, #state{ sessions = Sessions } = 
 	end.
 
 apply_tip2(B, PrevB, State) ->
-	#state{ session_by_key = SessionByKey, sessions = Sessions } = State,
-	#nonce_limiter_info{ next_seed = NextSeed, seed = Seed,
-			partition_upper_bound = UpperBound,
+	#nonce_limiter_info{ seed = Seed, partition_upper_bound = UpperBound,
 			next_partition_upper_bound = NextUpperBound, global_step_number = StepNumber,
-			last_step_checkpoints = LastStepCheckpoints } = B#block.nonce_limiter_info,
-	#nonce_limiter_info{ next_seed = PrevNextSeed,
-			global_step_number = PrevStepNumber } = PrevB#block.nonce_limiter_info,
-	Interval = StepNumber div ?NONCE_LIMITER_RESET_FREQUENCY,
-	SessionKey = {NextSeed, Interval},
-	PrevInterval = PrevStepNumber div ?NONCE_LIMITER_RESET_FREQUENCY,
-	PrevSessionKey = {PrevNextSeed, PrevInterval},
-	PrevSession = maps:get(PrevSessionKey, SessionByKey),
-	ExistingSession = maps:is_key(SessionKey, SessionByKey),
-	Session2 =
-		case maps:get(SessionKey, SessionByKey, not_found) of
-			not_found ->
-				#vdf_session{ steps = Steps, step_number = StepNumber2 } = PrevSession,
-				SessionStart = Interval * ?NONCE_LIMITER_RESET_FREQUENCY,
-				SessionEnd = (Interval + 1) * ?NONCE_LIMITER_RESET_FREQUENCY - 1,
-				Steps2 =
-					case StepNumber2 > SessionEnd of
-						true ->
-							lists:nthtail(StepNumber2 - SessionEnd, Steps);
-						false ->
-							Steps
-					end,
-				StepNumber3 = min(StepNumber2, SessionEnd),
-				Steps3 = lists:sublist(Steps2, StepNumber3 - SessionStart + 1),
-				#vdf_session{ step_number = StepNumber3, seed = Seed,
-						step_checkpoints_map = #{ StepNumber => LastStepCheckpoints },
-						steps = Steps3, upper_bound = UpperBound,
-						next_upper_bound = NextUpperBound, prev_session_key = PrevSessionKey };
-			Session ->
-				Session
-		end,
-	may_be_set_vdf_step_metric(SessionKey, SessionKey, Session2#vdf_session.step_number),
-	case ExistingSession of
-		true ->
-			State#state{ current_session_key = SessionKey };
-		false ->
-			SessionByKey2 = maps:put(SessionKey, Session2, SessionByKey),
-			Sessions2 = gb_sets:add_element({element(2, SessionKey), element(1, SessionKey)},
-					Sessions),
-			State#state{ current_session_key = SessionKey, sessions = Sessions2,
-					session_by_key = SessionByKey2 }
-	end.
+			last_step_checkpoints = LastStepCheckpoints,
+			vdf_difficulty = VDFDifficulty,
+			next_vdf_difficulty = NextVDFDifficulty } = B#block.nonce_limiter_info,
+	SessionKey = session_key(B#block.nonce_limiter_info),
+	PrevSessionKey = session_key(PrevB#block.nonce_limiter_info),
+	State2 = cache_block_session(State, SessionKey, PrevSessionKey, SessionKey,
+			#{ StepNumber => LastStepCheckpoints }, Seed, UpperBound, NextUpperBound,
+			VDFDifficulty, NextVDFDifficulty),
+	State2.
 
 prune_old_sessions(Sessions, SessionByKey, BaseInterval) ->
 	{{Interval, NextSeed}, Sessions2} = gb_sets:take_smallest(Sessions),
@@ -842,39 +824,61 @@ start_worker(State) ->
 	Ref = monitor(process, Worker),
 	State#state{ worker = Worker, worker_monitor_ref = Ref }.
 
-compute(StepNumber, PrevOutput) ->
-	{ok, Output, Checkpoints} = ar_vdf:compute2(StepNumber, PrevOutput, ?VDF_DIFFICULTY),
+compute(StepNumber, PrevOutput, VDFDifficulty) ->
+	{ok, Output, Checkpoints} = ar_vdf:compute2(StepNumber, PrevOutput, VDFDifficulty),
 	debug_double_check(
 		"compute",
 		{ok, Output, Checkpoints},
-		fun ar_vdf:debug_sha2/2,
-		[StepNumber, PrevOutput]).
+		fun ar_vdf:debug_sha2/3,
+		[StepNumber, PrevOutput, VDFDifficulty]).
 
-verify(StartStepNumber, PrevOutput, NumCheckpointsBetweenHashes, Hashes, ResetStepNumber, ResetSeed, ThreadCount) ->
-	Result = ar_vdf:verify2(StartStepNumber, PrevOutput, NumCheckpointsBetweenHashes, Hashes,
-			ResetStepNumber, ResetSeed, ThreadCount,
-			?VDF_DIFFICULTY),
-	debug_double_check(
-		"verify",
-		Result,
-		fun ar_vdf:debug_sha_verify/7,
-		[StartStepNumber, PrevOutput, NumCheckpointsBetweenHashes, Hashes, ResetStepNumber, ResetSeed, ThreadCount]).
+verify(StartStepNumber, PrevOutput, NumCheckpointsBetweenHashes, Hashes, ResetStepNumber,
+		ResetSeed, ThreadCount, VDFDifficulty, NextVDFDifficulty) ->
+	{Result1, PrevOutput2, ValidatedSteps1} =
+		case lists:sublist(Hashes, ResetStepNumber - StartStepNumber - 1) of
+			[] ->
+				{true, mix_seed2(PrevOutput, ResetSeed), []};
+			Hashes1 ->
+				case verify_no_reset(StartStepNumber, PrevOutput,
+						NumCheckpointsBetweenHashes, Hashes1, ThreadCount, VDFDifficulty) of
+					{true, ValidatedSteps} ->
+						{true, mix_seed2(hd(ValidatedSteps), ResetSeed), ValidatedSteps};
+					false ->
+						{false, undefined, undefined}
+				end
+		end,
+	case Result1 of
+		false ->
+			false;
+		true ->
+			Hashes2 = lists:nthtail(ResetStepNumber - StartStepNumber - 1, Hashes),
+			case verify_no_reset(ResetStepNumber - 1, PrevOutput2, NumCheckpointsBetweenHashes,
+					Hashes2, ThreadCount, NextVDFDifficulty) of
+				{true, ValidatedSteps2} ->
+					{true, ValidatedSteps2 ++ ValidatedSteps1};
+				false ->
+					false
+			end
+	end.
 
-verify_no_reset(StartStepNumber, PrevOutput, NumCheckpointsBetweenHashes, Hashes, ThreadCount) ->
+verify_no_reset(StartStepNumber, PrevOutput, NumCheckpointsBetweenHashes, Hashes, ThreadCount,
+		VDFDifficulty) ->
 	Garbage = crypto:strong_rand_bytes(32),
-	Result = ar_vdf:verify2(StartStepNumber, PrevOutput, NumCheckpointsBetweenHashes, Hashes, 0,
-			Garbage, ThreadCount, ?VDF_DIFFICULTY),
+	Result = ar_vdf:verify2(StartStepNumber, PrevOutput, NumCheckpointsBetweenHashes, Hashes,
+			0, Garbage, ThreadCount, VDFDifficulty),
 	debug_double_check(
 		"verify_no_reset",
 		Result,
-		fun ar_vdf:debug_sha_verify_no_reset/5,
-		[StartStepNumber, PrevOutput, NumCheckpointsBetweenHashes, Hashes, ThreadCount]).
+		fun ar_vdf:debug_sha_verify_no_reset/6,
+		[StartStepNumber, PrevOutput, NumCheckpointsBetweenHashes, Hashes, ThreadCount,
+				VDFDifficulty]).
 
 worker() ->
 	receive
-		{compute, {StepNumber, PrevOutput, UpperBound}, From} ->
+		{compute, {StepNumber, PrevOutput, UpperBound, VDFDifficulty}, From} ->
 			{ok, Output, Checkpoints} = prometheus_histogram:observe_duration(
-					vdf_step_time_milliseconds, [], fun() -> compute(StepNumber, PrevOutput) end),
+					vdf_step_time_milliseconds, [], fun() -> compute(StepNumber, PrevOutput,
+							VDFDifficulty) end),
 			From ! {computed, {StepNumber, PrevOutput, Output, UpperBound, Checkpoints}},
 			worker();
 		stop ->
@@ -929,19 +933,25 @@ schedule_step(State) ->
 	#state{ current_session_key = {NextSeed, IntervalNumber} = Key,
 			session_by_key = SessionByKey, worker = Worker } = State,
 	#vdf_session{ step_number = PrevStepNumber, steps = Steps, upper_bound = UpperBound,
-			next_upper_bound = NextUpperBound } = maps:get(Key, SessionByKey),
+			next_upper_bound = NextUpperBound,
+			vdf_difficulty = VDFDifficulty,
+			next_vdf_difficulty = NextVDFDifficulty } = maps:get(Key, SessionByKey),
 	PrevOutput = hd(Steps),
 	StepNumber = PrevStepNumber + 1,
 	IntervalStart = IntervalNumber * ?NONCE_LIMITER_RESET_FREQUENCY,
 	PrevOutput2 = ar_nonce_limiter:maybe_add_entropy(
 		PrevOutput, IntervalStart, StepNumber, NextSeed),
-	UpperBound2 = case get_entropy_reset_point(IntervalStart, StepNumber) of
+	{UpperBound2, VDFDifficulty2} =
+		case get_entropy_reset_point(IntervalStart, StepNumber) of
 			none ->
-				UpperBound;
+				{UpperBound, VDFDifficulty};
 			_ ->
-				NextUpperBound
+				?LOG_DEBUG([{event, entropy_reset_point_found}, {step_number, StepNumber},
+					{interval_start, IntervalStart}, {vdf_difficulty, VDFDifficulty},
+					{next_vdf_difficulty, NextVDFDifficulty}]),
+				{NextUpperBound, NextVDFDifficulty}
 		end,
-	Worker ! {compute, {StepNumber, PrevOutput2, UpperBound2}, self()},
+	Worker ! {compute, {StepNumber, PrevOutput2, UpperBound2, VDFDifficulty2}, self()},
 	State.
 
 get_or_init_nonce_limiter_info(#block{ height = Height } = B, Seed, PartitionUpperBound) ->
@@ -958,72 +968,176 @@ get_or_init_nonce_limiter_info(#block{ height = Height } = B, Seed, PartitionUpp
 	end.
 
 apply_external_update2(Update, State) ->
-	#state{ session_by_key = SessionByKey, current_session_key = CurrentSessionKey,
-			sessions = Sessions } = State,
+	#state{ session_by_key = SessionByKey, current_session_key = CurrentSessionKey } = State,
 	#nonce_limiter_update{ session_key = SessionKey,
 			session = #vdf_session{ upper_bound = UpperBound,
 					prev_session_key = PrevSessionKey,
-					step_number = StepNumber, steps = [Output | _] = Steps } = Session,
+					step_number = StepNumber } = Session,
 			checkpoints = Checkpoints, is_partial = IsPartial } = Update,
+	{SessionSeed, SessionInterval} = SessionKey,
 	case maps:get(SessionKey, SessionByKey, not_found) of
 		not_found ->
 			case IsPartial of
 				true ->
 					%% Inform the peer we have not initialized the corresponding session yet.
+					?LOG_DEBUG([{event, apply_external_vdf},
+						{result, session_not_found},
+						{is_partial, IsPartial},
+						{session_seed, ar_util:encode(SessionSeed)},
+						{session_interval, SessionInterval},
+						{server_step_number, StepNumber}]),
 					{reply, #nonce_limiter_update_response{ session_found = false }, State};
 				false ->
-					SessionByKey2 = maps:put(SessionKey, Session, SessionByKey),
-					Sessions2 = gb_sets:add_element({element(2, SessionKey),
-							element(1, SessionKey)}, Sessions),
-					may_be_set_vdf_step_metric(SessionKey, CurrentSessionKey, StepNumber),
-					PrevSession = maps:get(PrevSessionKey, SessionByKey, undefined),
-					trigger_computed_outputs(SessionKey, Session, PrevSessionKey, PrevSession,
-							UpperBound, Steps),
-					{reply, ok, State#state{ session_by_key = SessionByKey2,
-							sessions = Sessions2 }}
+					%% Handle the case where The VDF server has processed a block and re-allocated
+					%% steps across sessions. Between blocks The VDF server (and all nodes that 
+					%% compute their own VDF) will add all computed steps to the same session -
+					%% *even if* the new steps have crossed the entropy reset line and therefore 
+					%% could be added to a new session. Once a block is processed the server will
+					%% open a new session and re-allocate all the steps past the entropy reset line
+					%% to that new session. When the VDF client sees the new session it will request
+					%% the full session to be resent - which will contain steps it has already seen
+					%% and cached under the previous session key.
+					%% 
+					%% Note: This overlap in session caching is intentional. The intention is to
+					%% quickly access the steps when validating B1 -> reset line -> B2 given the
+					%% current fork of B1 -> B2' -> reset line -> B3 i.e. we can query all steps by
+					%% B1.next_seed even though on our fork the reset line determined a different
+					%% next_seed for the latest session.
+					%%
+					%% To avoid processing those steps twice, the client grabs PrevSessions's most
+					%% recently processed step and ignores it and any lower steps found in Session.
+					PrevStepNumber = case maps:get(PrevSessionKey, SessionByKey, undefined) of
+						undefined -> 0;
+						PrevSession -> PrevSession#vdf_session.step_number
+					end,
+					State2 = apply_external_update3(State,
+						SessionKey, PrevSessionKey, CurrentSessionKey,
+						Session, StepNumber - PrevStepNumber, UpperBound),
+					{reply, ok, State2}
 			end;
 		#vdf_session{ step_number = CurrentStepNumber, steps = CurrentSteps,
 				step_checkpoints_map = Map } = CurrentSession ->
 			case CurrentStepNumber + 1 == StepNumber of
 				true ->
 					Map2 = maps:put(StepNumber, Checkpoints, Map),
+					[Output | _] = Session#vdf_session.steps,
 					CurrentSession2 = CurrentSession#vdf_session{ step_number = StepNumber,
 							step_checkpoints_map = Map2,
 							steps = [Output | CurrentSteps] },
-					SessionByKey2 = maps:put(SessionKey, CurrentSession2, SessionByKey),
-					PrevSession = maps:get(PrevSessionKey, SessionByKey, undefined),
-					trigger_computed_outputs(SessionKey, CurrentSession2, PrevSessionKey,
-							PrevSession, UpperBound, [Output]),
-					may_be_set_vdf_step_metric(SessionKey, CurrentSessionKey, StepNumber),
-					{reply, ok, State#state{ session_by_key = SessionByKey2 }};
+					State2 = apply_external_update3(State,
+							SessionKey, PrevSessionKey, CurrentSessionKey, 
+							CurrentSession2, 1, UpperBound),
+					{reply, ok, State2};
 				false ->
 					case CurrentStepNumber >= StepNumber of
 						true ->
 							%% Inform the peer we are ahead.
+							?LOG_DEBUG([{event, apply_external_vdf},
+								{result, ahead_of_server},
+								{session_seed, ar_util:encode(SessionSeed)},
+								{session_interval, SessionInterval},
+								{client_step_number, CurrentStepNumber},
+								{server_step_number, StepNumber}]),
 							{reply, #nonce_limiter_update_response{
 											step_number = CurrentStepNumber }, State};
 						false ->
 							case IsPartial of
 								true ->
 									%% Inform the peer we miss some steps.
+									?LOG_DEBUG([{event, apply_external_vdf},
+										{result, missing_steps},
+										{is_partial, IsPartial},
+										{session_seed, ar_util:encode(SessionSeed)},
+										{session_interval, SessionInterval},
+										{client_step_number, CurrentStepNumber},
+										{server_step_number, StepNumber}]),
 									{reply, #nonce_limiter_update_response{
 											step_number = CurrentStepNumber }, State};
 								false ->
-									SessionByKey2 = maps:put(SessionKey, Session,
-											SessionByKey),
-									may_be_set_vdf_step_metric(SessionKey, CurrentSessionKey,
-											StepNumber),
-									Steps2 = lists:sublist(Steps,
-											StepNumber - CurrentStepNumber),
-									PrevSession = maps:get(PrevSessionKey, SessionByKey,
-											undefined),
-									trigger_computed_outputs(SessionKey, Session,
-											PrevSessionKey, PrevSession, UpperBound, Steps2),
-									{reply, ok, State#state{ session_by_key = SessionByKey2 }}
+									%% Handle the case where the VDF client has dropped of the
+									%% network briefly and the VDF server has advanced several
+									%% steps within the same session. In this case the client has
+									%% noticed the gap and requested the  full VDF session be sent -
+									%% which may contain previously processed steps in a addition to
+									%% the missing ones.
+									%% 
+									%% To avoid processing those steps twice, the client grabs
+									%% CurrentStepNumber (our most recently processed step number)
+									%% and ignores it and any lower steps found in Session.
+									State2 = apply_external_update3(State,
+										SessionKey, PrevSessionKey, CurrentSessionKey, 
+										Session, StepNumber - CurrentStepNumber, UpperBound),
+									{reply, ok, State2}
 							end
 					end
 			end
 	end.
+
+%% @doc Final step of applying a VDF update pushed by a VDF server
+%% @param CurrentSessionKey Session key of the session currently tracked by ar_nonce_limiter state
+%% @param SessionKey Session key of the session pushed by the VDF server
+%% @param PrevSessionKey Session key of the session before the session pushed by the VDF server
+%% @param Session Session to apply (either the session pushed by the VDF server or the one tracked
+%%                by ar_nonce_limiter state)
+%% @param SessionByKey Session map maintained by ar_nonce_limiter state
+%% @param NumSteps Number of Session steps to apply. Steps are sorted in descending order.
+%% @param UpperBound Upper bound of the session pushed by the VDF server
+%%
+%% Note: an important job of this function is to ensure that VDF steps are only processed once.
+%% We truncate Session.steps such the previously procesed steps are not sent to
+%% trigger_computed_outputs.
+apply_external_update3(
+	State, SessionKey, PrevSessionKey, CurrentSessionKey, Session, NumSteps, UpperBound) ->
+	#state{ session_by_key = SessionByKey } = State,
+	State2 = cache_session(State, SessionKey, CurrentSessionKey, Session),
+	PrevSession = maps:get(PrevSessionKey, SessionByKey, undefined),
+	Steps = lists:sublist(Session#vdf_session.steps, NumSteps),
+	trigger_computed_outputs(SessionKey, Session, PrevSessionKey, PrevSession, UpperBound, Steps),
+	State2.
+
+%% @doc Update the VDF session cache based on new info from a validated block.
+cache_block_session(State, SessionKey, PrevSessionKey, CurrentSessionKey, 
+		StepCheckpointsMap, Seed, UpperBound, NextUpperBound, VDFDifficulty, NextVDFDifficulty) ->
+	#state{ session_by_key = SessionByKey } = State,
+	PrevSession = maps:get(PrevSessionKey, SessionByKey),
+	Session =
+		case maps:get(SessionKey, SessionByKey, not_found) of
+			not_found ->
+				#vdf_session{ steps = PrevSteps, step_number = PrevStepNumber } = PrevSession,
+				{_, Interval} = SessionKey,
+				SessionStart = Interval * ?NONCE_LIMITER_RESET_FREQUENCY,
+				SessionEnd = (Interval + 1) * ?NONCE_LIMITER_RESET_FREQUENCY - 1,
+				Steps =
+					case PrevStepNumber > SessionEnd of
+						true ->
+							lists:nthtail(PrevStepNumber - SessionEnd, PrevSteps);
+						false ->
+							PrevSteps
+					end,
+				StepNumber = min(PrevStepNumber, SessionEnd),
+				Steps2 = lists:sublist(Steps, StepNumber - SessionStart + 1),
+				#vdf_session{ step_number = StepNumber, seed = Seed,
+						step_checkpoints_map = StepCheckpointsMap,
+						steps = Steps2, upper_bound = UpperBound,
+						next_upper_bound = NextUpperBound, prev_session_key = PrevSessionKey,
+						vdf_difficulty = VDFDifficulty,
+						next_vdf_difficulty = NextVDFDifficulty };
+			ExistingSession ->
+				ExistingSession#vdf_session{ vdf_difficulty = VDFDifficulty,
+						next_vdf_difficulty = NextVDFDifficulty }
+		end,
+	cache_session(State, SessionKey, CurrentSessionKey, Session).
+
+cache_session(State, SessionKey, CurrentSessionKey, Session) ->
+	#state{ session_by_key = SessionByKey, sessions = Sessions } = State,
+	{NextSeed, Interval} = SessionKey,
+	may_be_set_vdf_step_metric(SessionKey, CurrentSessionKey, Session#vdf_session.step_number),
+	SessionByKey2 = maps:put(SessionKey, Session, SessionByKey),
+	%% If Session exists, then {Inerval, NextSeed} will already exist in the Sessions set and
+	%% gb_sets:add_element will not cause a change.
+	Sessions2 = gb_sets:add_element({Interval, NextSeed}, Sessions),
+	State#state{ current_session_key = CurrentSessionKey, sessions = Sessions2,
+					session_by_key = SessionByKey2 }.
 
 may_be_set_vdf_step_metric(SessionKey, CurrentSessionKey, StepNumber) ->
 	case SessionKey == CurrentSessionKey of
@@ -1072,6 +1186,10 @@ debug_double_check(Label, Result, Func, Args) ->
 %% @doc Reset the state and stop computing steps automatically. Used in tests.
 reset_and_pause() ->
 	gen_server:cast(?MODULE, reset_and_pause).
+
+%% @doc Do not emit the initialized event. Used in tests.
+turn_off_initialized_event() ->
+	gen_server:cast(?MODULE, turn_off_initialized_event).
 
 %% @doc Get all steps starting from the latest on the current tip. Used in tests.
 get_steps() ->
@@ -1141,12 +1259,19 @@ test_applies_validated_steps() ->
 	NextSeed = crypto:strong_rand_bytes(32),
 	NextSeed2 = crypto:strong_rand_bytes(32),
 	InitialOutput = crypto:strong_rand_bytes(32),
-	B1 = test_block(1, InitialOutput, Seed, NextSeed, [], []),
-	ets:insert(node_state, [{joined_blocks, [B1]}]),
-	ar_events:send(node_state, initializing),
+	B1VDFDifficulty = 3,
+	B1NextVDFDifficulty = 3,
+	B1 = test_block(1, InitialOutput, Seed, NextSeed, [], [],
+			B1VDFDifficulty, B1NextVDFDifficulty),
+	turn_off_initialized_event(),
+	ar_events:send(node_state, {initializing, [B1]}),
 	true = ar_util:do_until(fun() -> get_current_step_number() == 1 end, 100, 1000),
-	{ok, Output2, _} = compute(2, InitialOutput),
-	B2 = test_block(2, Output2, Seed, NextSeed, [], [Output2]),
+	assert_session(B1, B1),
+	{ok, Output2, _} = compute(2, InitialOutput, B1VDFDifficulty),
+	B2VDFDifficulty = 3,
+	B2NextVDFDifficulty = 4,
+	B2 = test_block(2, Output2, Seed, NextSeed, [], [Output2], 
+			B2VDFDifficulty, B2NextVDFDifficulty),
 	ok = ar_events:subscribe(nonce_limiter),
 	assert_validate(B2, B1, valid),
 	assert_validate(B2, B1, valid),
@@ -1162,36 +1287,65 @@ test_applies_validated_steps() ->
 	assert_step_number(5),
 	ar_events:send(node_state, {new_tip, B2, B1}),
 	assert_step_number(5),
-	{ok, Output3, _} = compute(3, Output2),
-	{ok, Output4, _} = compute(4, Output3),
-	B3 = test_block(4, Output4, Seed, NextSeed, [], [Output4, Output3]),
+	assert_session(B2, B1),
+	{ok, Output3, _} = compute(3, Output2, B2VDFDifficulty),
+	{ok, Output4, _} = compute(4, Output3, B2VDFDifficulty),
+	B3VDFDifficulty = 3,
+	B3NextVDFDifficulty = 4,
+	B3 = test_block(4, Output4, Seed, NextSeed, [], [Output4, Output3],
+			B3VDFDifficulty, B3NextVDFDifficulty),
 	assert_validate(B3, B2, valid),
 	assert_validate(B3, B1, valid),
-	{ok, Output5, _} = compute(5, mix_seed(Output4, NextSeed)),
-	B4 = test_block(5, Output5, NextSeed, NextSeed2, [], [Output5]),
+	%% Entropy reset line crossed at step 5, add entropy and apply next_vdf_difficulty
+	{ok, Output5, _} = compute(5, mix_seed(Output4, NextSeed), B3NextVDFDifficulty),
+	B4VDFDifficulty = 4,
+	B4NextVDFDifficulty = 5,
+	B4 = test_block(5, Output5, NextSeed, NextSeed2, [], [Output5],
+			B4VDFDifficulty, B4NextVDFDifficulty),
 	[step() || _ <- lists:seq(1, 6)],
 	assert_step_number(11),
 	assert_validate(B4, B3, valid),
 	ar_events:send(node_state, {new_tip, B4, B3}),
 	assert_step_number(9),
+	assert_session(B4, B3),
 	assert_validate(B4, B4, {invalid, 1}),
-	% 5, 6, 7, 8, 9, 10
-	B5 = test_block(10, <<>>, NextSeed, NextSeed2, [], [<<>>]),
+	% % 5, 6, 7, 8, 9, 10
+	B5VDFDifficulty = 5,
+	B5NextVDFDifficulty = 6,
+	B5 = test_block(10, <<>>, NextSeed, NextSeed2, [], [<<>>],
+			B5VDFDifficulty, B5NextVDFDifficulty),
 	assert_validate(B5, B4, {invalid, 3}),
+	B6VDFDifficulty = 5,
+	B6NextVDFDifficulty = 6,
 	B6 = test_block(10, <<>>, NextSeed, NextSeed2, [],
 			% Steps 10, 9, 8, 7, 6.
-			[<<>> | lists:sublist(get_steps(), 4)]),
+			[<<>> | lists:sublist(get_steps(), 4)],
+			B6VDFDifficulty, B6NextVDFDifficulty),
 	assert_validate(B6, B4, {invalid, 3}),
 	Invalid = crypto:strong_rand_bytes(32),
+	B7VDFDifficulty = 5,
+	B7NextVDFDifficulty = 6,
 	B7 = test_block(10, Invalid, NextSeed, NextSeed2, [],
 			% Steps 10, 9, 8, 7, 6.
-			[Invalid | lists:sublist(get_steps(), 4)]),
+			[Invalid | lists:sublist(get_steps(), 4)],
+			B7VDFDifficulty, B7NextVDFDifficulty),
 	assert_validate(B7, B4, {invalid, 3}),
-	{ok, Output6, _} = compute(6, Output5),
-	{ok, Output7, _} = compute(7, Output6),
-	{ok, Output8, _} = compute(8, Output7),
-	B8 = test_block(8, Output8, NextSeed, NextSeed2, [], [Output8, Output7, Output6]),
-	assert_validate(B8, B4, valid).
+	%% Last valid block was B4, so that's the vdf_difficulty to use (not next_vdf_difficulty cause
+	%% the next entropy reset line isn't until step 10)
+	{ok, Output6, _} = compute(6, Output5, B4VDFDifficulty),
+	{ok, Output7, _} = compute(7, Output6, B4VDFDifficulty),
+	{ok, Output8, _} = compute(8, Output7, B4VDFDifficulty),
+	B8VDFDifficulty = 4,
+	%% Change the next_vdf_difficulty to confirm that apply_tip2 handles updating an
+	%% existing VDF session
+	B8NextVDFDifficulty = 6, 
+	B8 = test_block(8, Output8, NextSeed, NextSeed2, [], [Output8, Output7, Output6],
+			B8VDFDifficulty, B8NextVDFDifficulty),
+	ar_events:send(node_state, {new_tip, B8, B4}),
+	timer:sleep(1000),
+	assert_session(B8, B4),
+	assert_validate(B8, B4, valid),
+	ok.
 
 reorg_after_join_test_() ->
 	{timeout, 120, fun test_reorg_after_join/0}.
@@ -1233,6 +1387,33 @@ test_reorg_after_join2() ->
 	ar_test_node:slave_mine(),
 	ar_test_node:wait_until_height(3).
 
+assert_session(B, PrevB) ->
+	%% vdf_diffic ulty and next_vdf_difficulty in cached VDF sessions should be
+	%% updated whenever a new block is validated.
+	#nonce_limiter_info{
+		vdf_difficulty = PrevBVDFDifficulty, next_vdf_difficulty = PrevBNextVDFDifficulty
+	} = PrevB#block.nonce_limiter_info,
+	#nonce_limiter_info{
+		vdf_difficulty = BVDFDifficulty, next_vdf_difficulty = BNextVDFDifficulty
+	} = B#block.nonce_limiter_info,
+	PrevBSessionKey = session_key(PrevB#block.nonce_limiter_info),
+	BSessionKey = session_key(B#block.nonce_limiter_info),
+
+	BSession = ar_nonce_limiter:get_session(BSessionKey),
+	?assertEqual(BVDFDifficulty, BSession#vdf_session.vdf_difficulty),
+	?assertEqual(BNextVDFDifficulty,
+		BSession#vdf_session.next_vdf_difficulty),
+	case PrevBSessionKey == BSessionKey of
+		true ->
+			ok;
+		false ->
+			PrevBSession = ar_nonce_limiter:get_session(PrevBSessionKey),
+			?assertEqual(PrevBVDFDifficulty,
+				PrevBSession#vdf_session.vdf_difficulty),
+			?assertEqual(PrevBNextVDFDifficulty,
+				PrevBSession#vdf_session.next_vdf_difficulty)
+	end.
+
 assert_validate(B, PrevB, ExpectedResult) ->
 	request_validation(B#block.indep_hash, B#block.nonce_limiter_info,
 			PrevB#block.nonce_limiter_info),
@@ -1241,6 +1422,7 @@ assert_validate(B, PrevB, ExpectedResult) ->
 		{event, nonce_limiter, {valid, BH}} ->
 			case ExpectedResult of
 				valid ->
+					assert_session(B, PrevB),
 					ok;
 				_ ->
 					?assert(false, iolist_to_binary(io_lib:format("Unexpected "
@@ -1263,8 +1445,11 @@ assert_step_number(N) ->
 	timer:sleep(200),
 	?assert(ar_util:do_until(fun() -> get_current_step_number() == N end, 100, 1000)).
 
-test_block(StepNumber, Output, Seed, NextSeed, LastStepCheckpoints, Steps) ->
+test_block(StepNumber, Output, Seed, NextSeed, LastStepCheckpoints, Steps,
+		VDFDifficulty, NextVDFDifficulty) ->
 	#block{ indep_hash = crypto:strong_rand_bytes(32),
 			nonce_limiter_info = #nonce_limiter_info{ output = Output,
 					global_step_number = StepNumber, seed = Seed, next_seed = NextSeed,
-					last_step_checkpoints = LastStepCheckpoints, steps = Steps } }.
+					last_step_checkpoints = LastStepCheckpoints, steps = Steps,
+					vdf_difficulty = VDFDifficulty, next_vdf_difficulty = NextVDFDifficulty }
+	}.

@@ -144,7 +144,7 @@ setup() ->
 	TXIDs = [TX#tx.id || TX <- TXs],
 	BadTXIDs = [lists:nth(1, TXIDs), lists:nth(3, TXIDs)],
 	V1TX = sign_v1_tx(Wallet, #{ data => random_v1_data(3 * ?DATA_CHUNK_SIZE),
-			last_tx => get_tx_anchor(slave), reward => ?AR(10000) }),
+			last_tx => get_tx_anchor(slave), reward => ?XWE(10000) }),
 	DataSizes = [TX#tx.data_size || TX <- TXs],
 	S0 = B0#block.block_size,
 	[S1, S2, S3, S4, S5, S6, S7, S8 | _] = DataSizes,
@@ -209,7 +209,7 @@ setup() ->
 
 setup_slave() ->
 	Wallet = {_, Pub} = ar_wallet:new(),
-	[B0] = ar_weave:init([{ar_wallet:to_address(Pub), ?AR(100000000), <<>>}]),
+	[B0] = ar_weave:init([{ar_wallet:to_address(Pub), ?XWE(100000000), <<>>}]),
 	slave_start(B0),
 	{B0, Wallet}.
 
@@ -229,7 +229,7 @@ create_txs(Wallet) ->
 				{DataRoot, DataTree} = ar_merkle:generate_tree(SizedChunkIDs),
 				TX = sign_tx(Wallet, #{ format => 2, data_root => DataRoot,
 						data_size => 10 * ?DATA_CHUNK_SIZE, last_tx => get_tx_anchor(slave),
-						reward => ?AR(10000), denomination => 1 }),
+						reward => ?XWE(10000), denomination => 1 }),
 				{[TX | TXs], maps:put(TX#tx.id, {DataTree, Chunks}, DataTrees)}
 		end,
 		{[], #{}},

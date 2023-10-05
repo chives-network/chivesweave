@@ -126,13 +126,6 @@
 	diff = ?DEFAULT_DIFF,
 	mining_addr = not_set,
 	max_miners = 0, % DEPRECATED.
-	%% Only takes effect until the fork 2.6.
-	io_threads = ?NUM_IO_MINING_THREADS,
-	%% Only takes effect until the fork 2.6.
-	stage_one_hashing_threads = ?NUM_STAGE_ONE_HASHING_PROCESSES,
-	%% Only takes effect until the fork 2.6.
-	stage_two_hashing_threads = ?NUM_STAGE_TWO_HASHING_PROCESSES,
-	%% Takes effect since the fork 2.6.
 	hashing_threads = ?NUM_HASHING_PROCESSES,
 	mining_server_chunk_cache_size_limit,
 	packing_cache_size_limit,
@@ -148,9 +141,10 @@
 	disk_space,
 	disk_space_check_frequency = ?DISK_SPACE_CHECK_FREQUENCY_MS,
 	storage_modules = [],
-	start_from_block_index = false,
+	start_from_latest_state = false,
+	start_from_block,
 	internal_api_secret = not_set,
-	enable = [serve_wallet_txs, serve_wallet_data, serve_statistics_transaction, serve_statistics_network, serve_statistics_data, serve_statistics_block, serve_statistics_address ],
+	enable = [],
 	disable = [],
 	transaction_blacklist_files = [],
 	transaction_blacklist_urls = [],

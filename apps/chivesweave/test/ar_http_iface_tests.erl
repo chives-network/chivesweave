@@ -19,9 +19,9 @@ start_node() ->
 	%% This wallet is never spent from or deposited to, so the balance is predictable
 	StaticWallet = {_, Pub3} = ar_wallet:new(),
 	[B0] = ar_weave:init([
-		{ar_wallet:to_address(Pub1), ?AR(10000), <<>>},
-		{ar_wallet:to_address(Pub2), ?AR(10000), <<>>},
-		{ar_wallet:to_address(Pub3), ?AR(10), <<"TEST_ID">>}
+		{ar_wallet:to_address(Pub1), ?XWE(10000), <<>>},
+		{ar_wallet:to_address(Pub2), ?XWE(10000), <<>>},
+		{ar_wallet:to_address(Pub3), ?XWE(10), <<"TEST_ID">>}
 	], 0), %% Set difficulty to 0 to speed up tests
 	start(B0),
 	slave_start(B0),
@@ -40,7 +40,7 @@ setup_all_batch() ->
 	{Setup, Cleanup} = ar_test_node:mock_functions([
 		{ar_retarget, is_retarget_height, fun(_Height) -> false end},
 		{ar_retarget, is_retarget_block, fun(_Block) -> false end},
-		{ar_tx, get_tx_fee, fun(_Args) -> ?AR(1) end}
+		{ar_tx, get_tx_fee, fun(_Args) -> ?XWE(1) end}
 		]),
 	Functions = Setup(),
 	GenesisData = start_node(),
@@ -378,7 +378,7 @@ test_get_balance({B0, _, _, {_, Pub1}}) ->
 			peer => master_peer(),
 			path => "/wallet/" ++ Addr ++ "/balance"
 		}),
-	?assertEqual(?AR(10), binary_to_integer(Body)),
+	?assertEqual(?XWE(10), binary_to_integer(Body)),
 	RootHash = binary_to_list(ar_util:encode(B0#block.wallet_list)),
 	{ok, {{<<"200">>, _}, _, Body, _, _}} =
 		ar_http:req(#{
@@ -411,9 +411,9 @@ test_get_wallet_list_in_chunks({B0, {_, Pub1}, {_, Pub2}, {_, StaticPub}}) ->
 	GenesisAddr = ar_wallet:to_address(TX#tx.owner, {?RSA_SIGN_ALG, 65537}),
 	TXID = TX#tx.id,
 	ExpectedWallets = lists:sort([
-			{Addr1, {?AR(10000), <<>>}},
-			{Addr2, {?AR(10000), <<>>}},
-			{StaticAddr, {?AR(10), <<"TEST_ID">>}},
+			{Addr1, {?XWE(10000), <<>>}},
+			{Addr2, {?XWE(10000), <<>>}},
+			{StaticAddr, {?XWE(10), <<"TEST_ID">>}},
 			{GenesisAddr, {0, TXID}}]),
 	{ExpectedWallets1, ExpectedWallets2} = lists:split(2, ExpectedWallets),
 	RootHash = binary_to_list(ar_util:encode(B0#block.wallet_list)),
@@ -464,7 +464,7 @@ test_get_block_by_hash({B0, _, _, _}) ->
 			master_peer(), binary),
 	TXIDs = [TX#tx.id || TX <- B0#block.txs],
 	?assertEqual(B0#block{ size_tagged_txs = unset, account_tree = undefined, txs = TXIDs,
-			reward_history = [] }, B1).
+			reward_history = [], block_time_history = [] }, B1).
 
 %% @doc Ensure that blocks can be received via a height.
 test_get_block_by_height({B0, _, _, _}) ->
@@ -472,7 +472,7 @@ test_get_block_by_height({B0, _, _, _}) ->
 			binary),
 	TXIDs = [TX#tx.id || TX <- B0#block.txs],
 	?assertEqual(B0#block{ size_tagged_txs = unset, account_tree = undefined, txs = TXIDs,
-			reward_history = [] }, B1).
+			reward_history = [], block_time_history = [] }, B1).
 
 test_get_current_block({B0, _, _, _}) ->
 	Peer = master_peer(),
@@ -480,7 +480,7 @@ test_get_current_block({B0, _, _, _}) ->
 	{_Peer, B1, _Time, _Size} = ar_http_iface_client:get_block_shadow(hd(BI), Peer, binary),
 	TXIDs = [TX#tx.id || TX <- B0#block.txs],
 	?assertEqual(B0#block{ size_tagged_txs = unset, txs = TXIDs, reward_history = [],
-			account_tree = undefined }, B1),
+			block_time_history = [], account_tree = undefined }, B1),
 	{ok, {{<<"200">>, _}, _, Body, _, _}} =
 		ar_http:req(#{ method => get, peer => master_peer(), path => "/block/current" }),
 	{JSONStruct} = jiffy:decode(Body),
@@ -665,8 +665,8 @@ test_add_tx_and_get_last({_B0, Wallet1, Wallet2, _StaticWallet}) ->
 	{_Priv2, Pub2} = Wallet2,
 	SignedTX = sign_tx(Wallet1, #{
 		target => ar_wallet:to_address(Pub2),
-		quantity => ?AR(2),
-		reward => ?AR(1)}),
+		quantity => ?XWE(2),
+		reward => ?XWE(1)}),
 	ID = SignedTX#tx.id,
 	ar_http_iface_client:send_tx_binary(master_peer(), SignedTX#tx.id,
 			ar_serialize:tx_to_binary(SignedTX)),
@@ -809,8 +809,8 @@ test_post_unsigned_tx({_B0, Wallet1, _Wallet2, _StaticWallet}) ->
 	TopUpTX = sign_tx(Wallet, #{
 		owner => Pub,
 		target => ar_util:decode(Address),
-		quantity => ?AR(100),
-		reward => ?AR(1)
+		quantity => ?XWE(100),
+		reward => ?XWE(1)
 		}),
 	{ok, {{<<"200">>, _}, _, _, _, _}} =
 		ar_http:req(#{
@@ -823,7 +823,7 @@ test_post_unsigned_tx({_B0, Wallet1, _Wallet2, _StaticWallet}) ->
 	ar_node:mine(),
 	wait_until_height(LocalHeight + 1),
 	%% Send an unsigned transaction to be signed with the generated key.
-	TX = (ar_tx:new())#tx{reward = ?AR(1), last_tx = TopUpTX#tx.id},
+	TX = (ar_tx:new())#tx{reward = ?XWE(1), last_tx = TopUpTX#tx.id},
 	UnsignedTXProps = [
 		{<<"last_tx">>, <<>>},
 		{<<"target">>, TX#tx.target},

@@ -21,7 +21,7 @@
 -define(CLIENT_VERSION, 5).
 
 %% The current build number -- incremented for every release.
--define(RELEASE_NUMBER, 65).
+-define(RELEASE_NUMBER, 66).
 
 -define(DEFAULT_REQUEST_HEADERS,
 	[
@@ -68,7 +68,7 @@
 -endif.
 
 -ifndef(RETARGET_BLOCKS).
--define(RETARGET_BLOCKS, 5).
+-define(RETARGET_BLOCKS, 10).
 -endif.
 
 %% We only do retarget if the time it took to mine ?RETARGET_BLOCKS is bigger than
@@ -84,7 +84,7 @@
 %% We only do retarget if the time it took to mine ?RETARGET_BLOCKS is more than
 %% 1.1 times bigger or smaller than ?TARGET_TIME * ?RETARGET_BLOCKS. Was used before
 %% the fork 2.5 where we got rid of the floating point calculations.
--define(RETARGET_TOLERANCE, 0.2).
+-define(RETARGET_TOLERANCE, 0.1).
 
 -define(JOIN_CLOCK_TOLERANCE, 15).
 
@@ -92,16 +92,10 @@
 
 -define(CLOCK_DRIFT_MAX, 5).
 
--ifdef(DEBUG).
--define(MINING_TIMESTAMP_REFRESH_INTERVAL, 1).
--else.
--define(MINING_TIMESTAMP_REFRESH_INTERVAL, 10).
--endif.
-
 %% The total supply of tokens in the Genesis block.
 -define(GENESIS_TOKENS, 55000000).
 
-%% Winstons per AR.
+%% Winstons per XWE.
 -define(WINSTON_PER_AR, 1000000000000).
 
 %% How far into the past or future the block can be in order to be accepted for
@@ -225,7 +219,7 @@
 -define(BLOCK_PROPAGATION_PARALLELIZATION, 20).
 
 %% The maximum number of peers to propagate txs to, by default.
--define(DEFAULT_MAX_PROPAGATION_PEERS, 64).
+-define(DEFAULT_MAX_PROPAGATION_PEERS, 16).
 
 %% The maximum number of peers to propagate blocks to, by default.
 -define(DEFAULT_MAX_BLOCK_PROPAGATION_PEERS, 1000).
@@ -269,7 +263,7 @@
 -define(METRICS_DIR, "metrics").
 
 %% Default TCP port.
--define(DEFAULT_HTTP_IFACE_PORT, 1985).
+-define(DEFAULT_HTTP_IFACE_PORT, 1984).
 
 %% Number of transaction propagation processes to spawn.
 %% Each emitter picks the most valued transaction from the queue
@@ -334,6 +328,12 @@
 %% picked as recall chunks and therefore equally incentivize the storage.
 -define(PADDING_NODE_DATA_ROOT, <<>>).
 
+-ifdef(DEBUG).
+-define(INITIAL_VDF_DIFFICULTY, 2).
+-else.
+-define(INITIAL_VDF_DIFFICULTY, 600_000).
+-endif.
+
 %% @doc A chunk with the proofs of its presence in the weave at a particular offset.
 -record(poa, {
 	%% DEPRECATED. Not used since the fork 2.4.
@@ -370,7 +370,17 @@
 	last_step_checkpoints = [],
 	%% A list of the output of each step of the nonce limiting process. Note: each step
 	%% has ?VDF_CHECKPOINT_COUNT_IN_STEP checkpoints, the last of which is that step's output.
-	steps = []
+	steps = [],
+
+	%% The fields added at the fork 2.7
+
+	%% The number of SHA2-256 iterations in a single VDF checkpoint. The protocol aims to keep the
+	%% checkoint calculation time to around 40ms by varying this paramter. Note: there are
+	%% 25 checkpoints in a single VDF step - so the protocol aims to keep the step calculation at
+	%% 1 second by varying this parameter.
+	vdf_difficulty = ?INITIAL_VDF_DIFFICULTY,
+	%% The VDF difficulty scheduled for to be applied after the next VDF reset line.
+	next_vdf_difficulty = ?INITIAL_VDF_DIFFICULTY
 }).
 
 %% @doc A VDF session.
@@ -381,7 +391,9 @@
 	steps,
 	prev_session_key,
 	upper_bound,
-	next_upper_bound
+	next_upper_bound,
+	vdf_difficulty,
+	next_vdf_difficulty
 }).
 
 %% @doc The format of the nonce limiter update provided by the configured trusted peer.
@@ -471,11 +483,11 @@
 	size_tagged_txs = unset,
 	%% The first proof of access.
 	poa = #poa{},
-	%% The estimated USD to AR conversion rate used in the pricing calculations.
+	%% The estimated USD to XWE conversion rate used in the pricing calculations.
 	%% A tuple {Dividend, Divisor}.
 	%% Used until the transition to the new fee calculation method is complete.
 	usd_to_ar_rate,
-	%% The estimated USD to AR conversion rate scheduled to be used a bit later, used to
+	%% The estimated USD to XWE conversion rate scheduled to be used a bit later, used to
 	%% compute the necessary fee for the currently signed txs. A tuple {Dividend, Divisor}.
 	%% Used until the transition to the new fee calculation method is complete.
 	scheduled_usd_to_ar_rate,
@@ -550,7 +562,7 @@
 	%% ?RESET_KRYDER_PLUS_LATCH_THRESHOLD (redenominated according to the denomination
 	%% used at the time).
 	kryder_plus_rate_multiplier_latch = 0,
-	%% The code for the denomination of AR in base units.
+	%% The code for the denomination of XWE in base units.
 	%% 1 is the default which corresponds to the original denomination of 1^12 base units.
 	%% Every time the available supply falls below ?REDENOMINATION_THRESHOLD,
 	%% the denomination is multiplied by 1000, the code is incremented.
@@ -561,7 +573,44 @@
 	%% The proof of signing the same block several times or extending two equal forks.
 	double_signing_proof,
 	%% The cumulative difficulty of the previous block.
-	previous_cumulative_diff = 0
+	previous_cumulative_diff = 0,
+
+	%%
+	%% The fields below were added at the fork 2.7 (note that 2.6.8 was a hard fork too).
+	%%
+
+	%% The merkle trees of the data written after this weave offset may be constructed
+	%% in a way where some subtrees are "rebased", i.e., their offsets start from 0 as if
+	%% they were the leftmost subtree of the entire tree. The merkle paths for the chunks
+	%% belonging to the subtrees will include a 32-byte 0-sequence preceding the pivot to
+	%% the corresponding subtree. The rebases allow for flexible combination of data before
+	%% registering it on the weave, extremely useful e.g., for the bundling services.
+	merkle_rebase_support_threshold,
+	%% The SHA2-256 of the packed chunk.
+	chunk_hash,
+	%% The SHA2-256 of the packed chunk2, when present.
+	chunk2_hash,
+
+	%% The hashes of the history of block times (in seconds), VDF times (in steps),
+	%% and solution types (one-chunk vs two-chunk) of the latest
+	%% ?BLOCK_TIME_HISTORY_BLOCKS blocks.
+	block_time_history_hash,
+	%% The block times (in seconds), VDF times (in steps), and solution types (one-chunk vs
+	%% two-chunk) of the latest ?BLOCK_TIME_HISTORY_BLOCKS blocks.
+	%% Used internally, not gossiped.
+	block_time_history = [], % {block_interval, vdf_interval, chunk_count}
+
+	%% Used internally, not gossiped. Convenient for validating potentially non-unique
+	%% merkle proofs assigned to the different signatures of the same solution
+	%% (see validate_poa_against_cached_poa in ar_block_pre_validator.erl).
+	poa_cache,
+	%% Used internally, not gossiped. Convenient for validating potentially non-unique
+	%% merkle proofs assigned to the different signatures of the same solution
+	%% (see validate_poa_against_cached_poa in ar_block_pre_validator.erl).
+	poa2_cache,
+
+	%% Used internally, not gossiped.
+	receive_timestamp
 }).
 
 %% @doc A transaction.
@@ -597,7 +646,7 @@
 	%% The fee in Winstons.
 	reward = 0,
 
-	%% The code for the denomination of AR in base units.
+	%% The code for the denomination of XWE in base units.
 	%%
 	%% 1 corresponds to the original denomination of 1^12 base units.
 	%% Every time the available supply falls below ?REDENOMINATION_THRESHOLD,
@@ -621,8 +670,8 @@
 	signature_type = ?DEFAULT_KEY_TYPE
 }).
 
-%% A macro to convert AR into Winstons.
--define(AR(AR), (?WINSTON_PER_AR * AR)).
+%% A macro to convert XWE into Winstons.
+-define(XWE(XWE), (?WINSTON_PER_AR * XWE)).
 
 %% A macro to return whether a term is a block record.
 -define(IS_BLOCK(X), (is_record(X, block))).
@@ -634,7 +683,7 @@
 -define(OK(Tuple), begin (case (Tuple) of {ok, SuccessValue} -> (SuccessValue) end) end).
 
 %% The messages to be stored inside the genesis block.
--define(GENESIS_BLOCK_MESSAGES, ["Thanks you Sam Williams"]).
+-define(GENESIS_BLOCK_MESSAGES, []).
 
 %% Minimum number of characters for internal API secret. Used in the optional HTTP API
 %% for signing transactions.

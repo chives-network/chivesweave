@@ -70,7 +70,7 @@ test_missing_txs_fork_recovery() ->
 	%% but do not gossip the transaction. The master node
 	%% is expected fetch the missing transaction and apply the block.
 	Key = {_, Pub} = ar_wallet:new(),
-	[B0] = ar_weave:init([{ar_wallet:to_address(Pub), ?AR(20), <<>>}]),
+	[B0] = ar_weave:init([{ar_wallet:to_address(Pub), ?XWE(20), <<>>}]),
 	{_SlaveNode, _} = slave_start(B0),
 	{_MasterNode, _} = start(B0),
 	disconnect_from_slave(),
@@ -92,11 +92,11 @@ test_orphaned_txs_are_remined_after_fork_recovery() ->
 	%% make the transaction orphaned. Mine a block on slave and
 	%% assert the transaction is re-mined.
 	Key = {_, Pub} = ar_wallet:new(),
-	[B0] = ar_weave:init([{ar_wallet:to_address(Pub), ?AR(20), <<>>}]),
+	[B0] = ar_weave:init([{ar_wallet:to_address(Pub), ?XWE(20), <<>>}]),
 	{_SlaveNode, _} = slave_start(B0),
 	{_MasterNode, _} = start(B0),
 	disconnect_from_slave(),
-	TX = #tx{ id = TXID } = sign_tx(Key, #{ denomination => 1, reward => ?AR(1) }),
+	TX = #tx{ id = TXID } = sign_tx(Key, #{ denomination => 1, reward => ?XWE(1) }),
 	assert_post_tx_to_slave(TX),
 	slave_mine(),
 	[{H1, _, _} | _] = slave_wait_until_height(1),
@@ -188,7 +188,8 @@ fake_block_with_strong_cumulative_difficulty(B, PrevB, CDiff) ->
 			B3 = B2#block{ hash = H1, hash_preimage = Preimage, reward_addr = RewardAddr2,
 					reward_key = element(2, Wallet), recall_byte = RecallByte, nonce = 0,
 					recall_byte2 = undefined, poa = #poa{ chunk = Chunk, data_path = DataPath,
-							tx_path = TXPath } },
+							tx_path = TXPath },
+					chunk_hash = crypto:hash(sha256, Chunk) },
 			PrevCDiff = PrevB#block.cumulative_diff,
 			SignedH = ar_block:generate_signed_hash(B3),
 			SignaturePreimage = << (ar_serialize:encode_int(CDiff, 16))/binary,

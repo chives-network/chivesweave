@@ -21,7 +21,7 @@ accepts_gossips_and_mines_test_() ->
 			%% we can get the correct price estimations according
 			%% to the new pricinig model.
 			Key = {_, Pub} = ar_wallet:new(),
-			Wallets = [{ar_wallet:to_address(Pub), ?AR(5), <<>>}],
+			Wallets = [{ar_wallet:to_address(Pub), ?XWE(5), <<>>}],
 			[B0] = ar_weave:init(Wallets),
 			accepts_gossips_and_mines(B0, BuildTXSetFun(Key, B0))
 		end
@@ -41,7 +41,7 @@ keeps_txs_after_new_block_test_() ->
 	PrepareTestFor = fun(BuildFirstTXSetFun, BuildSecondTXSetFun) ->
 		fun() ->
 			Key = {_, Pub} = ar_wallet:new(),
-			Wallets = [{ar_wallet:to_address(Pub), ?AR(5), <<>>}],
+			Wallets = [{ar_wallet:to_address(Pub), ?XWE(5), <<>>}],
 			[B0] = ar_weave:init(Wallets),
 			keeps_txs_after_new_block(
 				B0,
@@ -267,8 +267,8 @@ test_rejects_transactions_above_the_size_limit() ->
 	Key1 = {_, Pub1} = ar_wallet:new(),
 	Key2 = {_, Pub2} = ar_wallet:new(),
 	[B0] = ar_weave:init([
-		{ar_wallet:to_address(Pub1), ?AR(20), <<>>},
-		{ar_wallet:to_address(Pub2), ?AR(20), <<>>}
+		{ar_wallet:to_address(Pub1), ?XWE(20), <<>>},
+		{ar_wallet:to_address(Pub2), ?XWE(20), <<>>}
 	]),
 	%% Start the node.
 	{_Slave, _} = slave_start(B0),
@@ -302,7 +302,7 @@ test_accepts_at_most_one_wallet_list_anchored_tx_per_block() ->
 	%% Expect the fourth TX to be accepted and mined into a block.
 	Key = {_, Pub} = ar_wallet:new(),
 	[B0] = ar_weave:init([
-		{ar_wallet:to_address(Pub), ?AR(20), <<>>}
+		{ar_wallet:to_address(Pub), ?XWE(20), <<>>}
 	]),
 	{_Slave, _} = slave_start(B0),
 	connect_to_slave(),
@@ -337,20 +337,20 @@ test_does_not_allow_to_spend_mempool_tokens() ->
 	Key1 = {_, Pub1} = ar_wallet:new(),
 	Key2 = {_, Pub2} = ar_wallet:new(),
 	[B0] = ar_weave:init([
-		{ar_wallet:to_address(Pub1), ?AR(20), <<>>},
-		{ar_wallet:to_address(Pub2), ?AR(0), <<>>}
+		{ar_wallet:to_address(Pub1), ?XWE(20), <<>>},
+		{ar_wallet:to_address(Pub2), ?XWE(0), <<>>}
 	]),
 	{_Slave, _} = slave_start(B0),
 	connect_to_slave(),
-	TX1 = sign_v1_tx(Key1, #{ target => ar_wallet:to_address(Pub2), reward => ?AR(1),
-			quantity => ?AR(2) }),
+	TX1 = sign_v1_tx(Key1, #{ target => ar_wallet:to_address(Pub2), reward => ?XWE(1),
+			quantity => ?XWE(2) }),
 	assert_post_tx_to_slave(TX1),
 	TX2 = sign_v1_tx(
 		Key2,
 		#{
 			target => ar_wallet:to_address(Pub1),
-			reward => ?AR(1),
-			quantity => ?AR(1),
+			reward => ?XWE(1),
+			quantity => ?XWE(1),
 			last_tx => B0#block.indep_hash,
 			tags => [{<<"nonce">>, <<"1">>}]
 		}
@@ -365,8 +365,8 @@ test_does_not_allow_to_spend_mempool_tokens() ->
 		Key2,
 		#{
 			target => ar_wallet:to_address(Pub1),
-			reward => ?AR(1),
-			quantity => ?AR(1),
+			reward => ?XWE(1),
+			quantity => ?XWE(1),
 			last_tx => B1#block.indep_hash,
 			tags => [{<<"nonce">>, <<"3">>}]
 		}
@@ -390,11 +390,11 @@ test_does_not_allow_to_replay_empty_wallet_txs() ->
 	Key1 = {_, Pub1} = ar_wallet:new(),
 	Key2 = {_, Pub2} = ar_wallet:new(),
 	[B0] = ar_weave:init([
-		{ar_wallet:to_address(Pub1), ?AR(50), <<>>}
+		{ar_wallet:to_address(Pub1), ?XWE(50), <<>>}
 	]),
 	{_Slave, _} = slave_start(B0),
-	TX1 = sign_v1_tx(Key1, #{ target => ar_wallet:to_address(Pub2), reward => ?AR(6),
-			quantity => ?AR(2), last_tx => <<>> }),
+	TX1 = sign_v1_tx(Key1, #{ target => ar_wallet:to_address(Pub2), reward => ?XWE(6),
+			quantity => ?XWE(2), last_tx => <<>> }),
 	assert_post_tx_to_slave(TX1),
 	slave_mine(),
 	assert_slave_wait_until_height(1),
@@ -406,8 +406,8 @@ test_does_not_allow_to_replay_empty_wallet_txs() ->
 			path => "/wallet/" ++ GetBalancePath ++ "/balance"
 		}),
 	Balance = binary_to_integer(Body),
-	TX2 = sign_v1_tx(Key2, #{ target => ar_wallet:to_address(Pub1), reward => Balance - ?AR(1),
-			quantity => ?AR(1), last_tx => <<>> }),
+	TX2 = sign_v1_tx(Key2, #{ target => ar_wallet:to_address(Pub1), reward => Balance - ?XWE(1),
+			quantity => ?XWE(1), last_tx => <<>> }),
 	assert_post_tx_to_slave(TX2),
 	slave_mine(),
 	assert_slave_wait_until_height(2),
@@ -418,8 +418,8 @@ test_does_not_allow_to_replay_empty_wallet_txs() ->
 			path => "/wallet/" ++ GetBalancePath ++ "/balance"
 		}),
 	?assertEqual(0, binary_to_integer(Body2)),
-	TX3 = sign_v1_tx(Key1, #{ target => ar_wallet:to_address(Pub2), reward => ?AR(6),
-			quantity => ?AR(2), last_tx => TX1#tx.id }),
+	TX3 = sign_v1_tx(Key1, #{ target => ar_wallet:to_address(Pub2), reward => ?XWE(6),
+			quantity => ?XWE(2), last_tx => TX1#tx.id }),
 	assert_post_tx_to_slave(TX3),
 	slave_mine(),
 	assert_slave_wait_until_height(3),
@@ -475,7 +475,7 @@ assert_slave_wait_until_txs_are_stored(TXIDs) ->
 mines_format_2_txs_without_size_limit() ->
 	Key = {_, Pub} = ar_wallet:new(),
 	[B0] = ar_weave:init([
-		{ar_wallet:to_address(Pub), ?AR(20), <<>>}
+		{ar_wallet:to_address(Pub), ?XWE(20), <<>>}
 	]),
 	{_Master, _} = start(B0),
 	{_Slave, _} = slave_start(B0),
@@ -510,7 +510,7 @@ rejects_txs_with_outdated_anchors_test_() ->
 		%% Expect the transaction to be rejected.
 		Key = {_, Pub} = ar_wallet:new(),
 		[B0] = ar_weave:init([
-			{ar_wallet:to_address(Pub), ?AR(20), <<>>}
+			{ar_wallet:to_address(Pub), ?XWE(20), <<>>}
 		]),
 		{_Slave, _} = slave_start(B0),
 		slave_mine_blocks(?MAX_TX_ANCHOR_DEPTH),
@@ -529,7 +529,7 @@ test_drops_v1_txs_exceeding_mempool_limit() ->
 	%% Expect the exceeding transaction to be dropped.
 	Key = {_, Pub} = ar_wallet:new(),
 	[B0] = ar_weave:init([
-		{ar_wallet:to_address(Pub), ?AR(20), <<>>}
+		{ar_wallet:to_address(Pub), ?XWE(20), <<>>}
 	]),
 	{_Slave, _} = slave_start(B0),
 	BigChunk = random_v1_data(?TX_DATA_SIZE_LIMIT - ?TX_SIZE_BASE),
@@ -562,7 +562,7 @@ drops_v2_txs_exceeding_mempool_limit_test_() ->
 drops_v2_txs_exceeding_mempool_limit() ->
 	Key = {_, Pub} = ar_wallet:new(),
 	[B0] = ar_weave:init([
-		{ar_wallet:to_address(Pub), ?AR(20), <<>>}
+		{ar_wallet:to_address(Pub), ?XWE(20), <<>>}
 	]),
 	{_Slave, _} = slave_start(B0),
 	BigChunk = crypto:strong_rand_bytes(?TX_DATA_SIZE_LIMIT div 2),
@@ -619,25 +619,25 @@ joins_network_successfully() ->
 	%% Expect master to fork recover successfully.
 	Key = {_, Pub} = ar_wallet:new(),
 	[B0] = ar_weave:init([
-		{ar_wallet:to_address(Pub), ?AR(200000000), <<>>},
-		{Addr = crypto:strong_rand_bytes(32), ?AR(200000000), <<>>},
-		{crypto:strong_rand_bytes(32), ?AR(200000000), <<>>}
+		{ar_wallet:to_address(Pub), ?XWE(200000000), <<>>},
+		{Addr = crypto:strong_rand_bytes(32), ?XWE(200000000), <<>>},
+		{crypto:strong_rand_bytes(32), ?XWE(200000000), <<>>}
 	]),
 	{_Slave, _} = slave_start(B0),
 	{TXs, _} = lists:foldl(
 		fun(Height, {TXs, LastTX}) ->
 			{TX, AnchorType} = case rand:uniform(4) of
 				1 ->
-					{sign_v1_tx(Key, #{ last_tx => LastTX, reward => ?AR(10000) }), tx_anchor};
+					{sign_v1_tx(Key, #{ last_tx => LastTX, reward => ?XWE(10000) }), tx_anchor};
 				2 ->
-					{sign_v1_tx(Key, #{ last_tx => get_tx_anchor(), reward => ?AR(10000),
+					{sign_v1_tx(Key, #{ last_tx => get_tx_anchor(), reward => ?XWE(10000),
 							tags => [{<<"nonce">>, integer_to_binary(rand:uniform(100))}] }),
 							block_anchor};
 				3 ->
 					{sign_tx(Key, #{ last_tx => LastTX, target => Addr,
-							reward => ?AR(10000) }), tx_anchor};
+							reward => ?XWE(10000) }), tx_anchor};
 				4 ->
-					{sign_tx(Key, #{ last_tx => get_tx_anchor(), reward => ?AR(10000),
+					{sign_tx(Key, #{ last_tx => get_tx_anchor(), reward => ?XWE(10000),
 							tags => [{<<"nonce">>, integer_to_binary(rand:uniform(100))}]}),
 							block_anchor}
 			end,
@@ -730,7 +730,7 @@ recovers_from_forks(ForkHeight) ->
 	%% and successfully mined into a block.
 	Key = {_, Pub} = ar_wallet:new(),
 	[B0] = ar_weave:init([
-		{ar_wallet:to_address(Pub), ?AR(20), <<>>}
+		{ar_wallet:to_address(Pub), ?XWE(20), <<>>}
 	]),
 	{_Slave, _} = slave_start(B0),
 	{_Master, _} = start(B0),
@@ -754,7 +754,7 @@ recovers_from_forks(ForkHeight) ->
 	PostTXToMaster =
 		fun() ->
 			UnsignedTX = #{ last_tx => get_tx_anchor(master),
-					tags => [{<<"nonce">>, random_nonce()}], reward => ?AR(1) },
+					tags => [{<<"nonce">>, random_nonce()}], reward => ?XWE(1) },
 			TX = case rand:uniform(2) of
 				1 ->
 					sign_tx(master, Key, UnsignedTX);
@@ -833,9 +833,9 @@ recovers_from_forks(ForkHeight) ->
 			{ok, {{<<"208">>, _}, _, <<"Transaction already processed.">>, _, _}} =
 				ar_http:req(#{
 					method => post,
-					peer => {127, 0, 0, 1, 1985},
+					peer => {127, 0, 0, 1, 1984},
 					path => "/tx",
-					headers => [{<<"X-P2p-Port">>, <<"1985">>}],
+					headers => [{<<"X-P2p-Port">>, <<"1984">>}],
 					body => ar_serialize:jsonify(ar_serialize:tx_to_json_struct(TX))
 				})
 		end,
@@ -845,17 +845,17 @@ recovers_from_forks(ForkHeight) ->
 one_wallet_list_one_block_anchored_txs(Key, B0) ->
 	%% Sign only after the node has started to get the correct price
 	%% estimation from it.
-	TX1Fun = fun() -> sign_v1_tx(Key, #{ reward => ?AR(1) }) end,
-	TX2Fun = fun() -> sign_v1_tx(Key, #{ reward => ?AR(1),
+	TX1Fun = fun() -> sign_v1_tx(Key, #{ reward => ?XWE(1) }) end,
+	TX2Fun = fun() -> sign_v1_tx(Key, #{ reward => ?XWE(1),
 			last_tx => B0#block.indep_hash }) end,
 	[TX1Fun, TX2Fun].
 
 two_block_anchored_txs(Key, B0) ->
 	%% Sign only after the node has started to get the correct price
 	%% estimation from it.
-	TX1Fun = fun() -> sign_v1_tx(Key, #{ reward => ?AR(1),
+	TX1Fun = fun() -> sign_v1_tx(Key, #{ reward => ?XWE(1),
 			last_tx => B0#block.indep_hash }) end,
-	TX2Fun = fun() -> sign_v1_tx(Key, #{ reward => ?AR(1),
+	TX2Fun = fun() -> sign_v1_tx(Key, #{ reward => ?XWE(1),
 			last_tx => B0#block.indep_hash }) end,
 	[TX1Fun, TX2Fun].
 
@@ -864,41 +864,41 @@ empty_tx_set(_Key, _B0) ->
 
 block_anchor_txs_spending_balance_plus_one_more() ->
 	Key = {_, Pub} = ar_wallet:new(),
-	[B0] = ar_weave:init([{ar_wallet:to_address(Pub), ?AR(20), <<>>}]),
+	[B0] = ar_weave:init([{ar_wallet:to_address(Pub), ?XWE(20), <<>>}]),
 	TX1 = sign_v1_tx(Key, #{ denomination => 1,
-			reward => ?AR(10), last_tx => B0#block.indep_hash }),
+			reward => ?XWE(10), last_tx => B0#block.indep_hash }),
 	TX2 = sign_v1_tx(Key, #{ denomination => 1,
-			reward => ?AR(10), last_tx => B0#block.indep_hash }),
+			reward => ?XWE(10), last_tx => B0#block.indep_hash }),
 	TX3 = sign_v1_tx(Key, #{ denomination => 1,
-			reward => ?AR(1), last_tx => B0#block.indep_hash }),
+			reward => ?XWE(1), last_tx => B0#block.indep_hash }),
 	{B0, [TX1, TX2, TX3]}.
 
 mixed_anchor_txs_spending_balance_plus_one_more() ->
 	Key = {_, Pub} = ar_wallet:new(),
-	[B0] = ar_weave:init([{ar_wallet:to_address(Pub), ?AR(20), <<>>}]),
-	TX1 = sign_v1_tx(Key, #{ denomination => 1, reward => ?AR(10), last_tx => <<>> }),
-	TX2 = sign_v1_tx(Key, #{ denomination => 1, reward => ?AR(5),
+	[B0] = ar_weave:init([{ar_wallet:to_address(Pub), ?XWE(20), <<>>}]),
+	TX1 = sign_v1_tx(Key, #{ denomination => 1, reward => ?XWE(10), last_tx => <<>> }),
+	TX2 = sign_v1_tx(Key, #{ denomination => 1, reward => ?XWE(5),
 			last_tx => B0#block.indep_hash }),
-	TX3 = sign_v1_tx(Key, #{ denomination => 1, reward => ?AR(2),
+	TX3 = sign_v1_tx(Key, #{ denomination => 1, reward => ?XWE(2),
 			last_tx => B0#block.indep_hash }),
 	TX4 = sign_v1_tx(Key, #{ denomination => 1,
-			reward => ?AR(3), last_tx => B0#block.indep_hash }),
+			reward => ?XWE(3), last_tx => B0#block.indep_hash }),
 	TX5 = sign_v1_tx(Key, #{ denomination => 1,
-			reward => ?AR(1), last_tx => B0#block.indep_hash }),
+			reward => ?XWE(1), last_tx => B0#block.indep_hash }),
 	{B0, [TX1, TX2, TX3, TX4, TX5]}.
 
 grouped_txs() ->
 	Key1 = {_, Pub1} = ar_wallet:new(),
 	Key2 = {_, Pub2} = ar_wallet:new(),
 	Wallets = [
-		{ar_wallet:to_address(Pub1), ?AR(100), <<>>},
-		{ar_wallet:to_address(Pub2), ?AR(100), <<>>}
+		{ar_wallet:to_address(Pub1), ?XWE(100), <<>>},
+		{ar_wallet:to_address(Pub2), ?XWE(100), <<>>}
 	],
 	[B0] = ar_weave:init(Wallets),
 	Chunk1 = random_v1_data(?TX_DATA_SIZE_LIMIT),
 	Chunk2 = <<"a">>,
-	TX1 = sign_v1_tx(Key1, #{ reward => ?AR(1), data => Chunk1, last_tx => <<>> }),
-	TX2 = sign_v1_tx(Key2, #{ reward => ?AR(1), data => Chunk2,
+	TX1 = sign_v1_tx(Key1, #{ reward => ?XWE(1), data => Chunk1, last_tx => <<>> }),
+	TX2 = sign_v1_tx(Key2, #{ reward => ?XWE(1), data => Chunk2,
 			last_tx => B0#block.indep_hash }),
 	%% TX1 is expected to be mined first because wallet list anchors are mined first while
 	%% the price per byte should be the same since we assigned the minimum required fees.

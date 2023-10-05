@@ -735,7 +735,8 @@ test_empty_rates_endpoint() ->
 	?assertEqual(
 		#{<<"endpoints">> => [],<<"payment_methods">> => #{}},
 		DecodedBody
-	).
+	),
+	ok = application:set_env(chivesweave, config, BaseConfig).
 
 test_empty_payments_and_services_rates_endpoint() ->
 	RewardAddress = ar_wallet:to_address(ar_wallet:new_keyfile()),
@@ -750,7 +751,8 @@ test_empty_payments_and_services_rates_endpoint() ->
 	?assertEqual(
 		#{<<"endpoints">> => [],<<"payment_methods">> => #{}},
 		DecodedBody
-	).
+	),
+	ok = application:set_env(chivesweave, config, BaseConfig).
 
 test_rates_endpoint() ->
 	{_, Pub1} = ar_wallet:new(),
@@ -768,7 +770,7 @@ test_rates_endpoint() ->
 		#{
 			<<"payment_methods">> => #{
 				<<"chivesweave">> => #{
-					<<"AR">> => #{
+					<<"XWE">> => #{
 						<<"minimum_balance">> => -100,
 						<<"confirmations">> => 3,
 						<<"address">> => EncodedDepositAddress
@@ -780,7 +782,7 @@ test_rates_endpoint() ->
 					<<"rates">> => #{
 						<<"description">> => <<"Price per request">>,
 						<<"chivesweave">> => #{
-							<<"AR">> => #{
+							<<"XWE">> => #{
 								<<"price">> => 1000,
 								<<"address">> => EncodedDepositAddress
 							}
@@ -793,7 +795,7 @@ test_rates_endpoint() ->
 					<<"rates">> => #{
 						<<"description">> => <<"Price per request">>,
 						<<"chivesweave">> => #{
-							<<"AR">> => #{
+							<<"XWE">> => #{
 								<<"price">> => 100000,
 								<<"address">> => EncodedDepositAddress
 							}
@@ -805,7 +807,8 @@ test_rates_endpoint() ->
 			]
 		},
 		DecodedBody
-	).
+	),
+	ok = application:set_env(chivesweave, config, BaseConfig).
 
 %% ------------------------------------------------------------------
 %% Helper functions

@@ -14,7 +14,7 @@ polling_test_() ->
 
 test_polling() ->
 	{_, Pub} = Wallet = ar_wallet:new(),
-	[B0] = ar_weave:init([{ar_wallet:to_address(Pub), ?AR(10000), <<>>}]),
+	[B0] = ar_weave:init([{ar_wallet:to_address(Pub), ?XWE(10000), <<>>}]),
 	start(B0),
 	slave_start(B0),
 	disconnect_from_slave(),

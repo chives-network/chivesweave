@@ -288,7 +288,7 @@ register(MetricsDir) ->
 	prometheus_gauge:new([
 		{name, legacy_price_per_gibibyte_minute},
 		{help, "The price of storing 1 GiB for one minute as estimated by the previous ("
-				"USD to AR benchmark-based) version of the protocol."}
+				"USD to XWE benchmark-based) version of the protocol."}
 	]),
 	prometheus_gauge:new([
 		{name, endowment_pool},
@@ -316,7 +316,7 @@ register(MetricsDir) ->
 	prometheus_gauge:new([
 		{name, network_burden_10_usd_ar},
 		{help, "The legacy (2.5) estimation of the cost of storing the current weave "
-				"assuming the 0.5% storage costs decline rate and 10 $/AR, in Winston."}
+				"assuming the 0.5% storage costs decline rate and 10 $/XWE, in Winston."}
 	]),
 	prometheus_gauge:new([
 		{name, network_burden_200_years},
@@ -326,7 +326,7 @@ register(MetricsDir) ->
 	prometheus_gauge:new([
 		{name, network_burden_200_years_10_usd_ar},
 		{help, "The legacy (2.5) estimation of the cost of storing the current weave for "
-				"200 years assuming the 0.5% storage costs decline rate and 10 $/AR, "
+				"200 years assuming the 0.5% storage costs decline rate and 10 $/XWE, "
 				"in Winston."}
 	]),
 	prometheus_gauge:new([
@@ -338,7 +338,7 @@ register(MetricsDir) ->
 		{name, expected_minimum_200_years_storage_costs_decline_rate_10_usd_ar},
 		{help, "The expected minimum decline rate sufficient to subsidize storage of "
 				"the current weave for 200 years according to the legacy (2.6) estimations"
-				"and assuming 10 $/AR."}
+				"and assuming 10 $/XWE."}
 	]),
 
 	%% Packing.

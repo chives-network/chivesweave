@@ -401,21 +401,21 @@ test_balance_endpoint() ->
 	BadChecksum = crypto:strong_rand_bytes(6),
 	?assertEqual(
 		{<<"400">>, <<"Invalid address.">>},
-		get_balance(BadAddress, BadChecksum, <<"chivesweave">>, <<"AR">>)),
+		get_balance(BadAddress, BadChecksum, <<"chivesweave">>, <<"XWE">>)),
 
 	?assertEqual(
 		{<<"200">>, <<"0">>},
-		get_balance(crypto:strong_rand_bytes(32), <<"chivesweave">>, <<"AR">>)),
+		get_balance(crypto:strong_rand_bytes(32), <<"chivesweave">>, <<"XWE">>)),
 
 	TXID = crypto:strong_rand_bytes(32),
 	{ok, _} = ar_p3_db:post_deposit(Address, 10, TXID),
 	?assertEqual(
 		{<<"200">>, <<"10">>},
-		get_balance(Address, <<"chivesweave">>, <<"AR">>)),
+		get_balance(Address, <<"chivesweave">>, <<"XWE">>)),
 
 	?assertEqual(
 		{<<"200">>, <<"10">>},
-		get_balance(Address, Checksum, <<"chivesweave">>, <<"AR">>)),
+		get_balance(Address, Checksum, <<"chivesweave">>, <<"XWE">>)),
 
 	?assertEqual(
 		{<<"200">>, <<"0">>},
@@ -474,9 +474,9 @@ e2e_deposit_before_charge() ->
 	DepositAddress = ar_wallet:to_address(Pub3),
 	OtherAddress = ar_wallet:to_address(Pub4),
 	[B0] = ar_weave:init([
-		{Sender1Address, ?AR(10000), <<>>},
-		{Sender2Address, ?AR(10000), <<>>},
-		{DepositAddress, ?AR(10000), <<>>}
+		{Sender1Address, ?XWE(10000), <<>>},
+		{Sender2Address, ?XWE(10000), <<>>},
+		{DepositAddress, ?XWE(10000), <<>>}
 	]),
 	{ok, BaseConfig} = application:get_env(chivesweave, config),
 	Config = BaseConfig#config{ p3 = sample_p3_config(DepositAddress, -100, 3) },
@@ -685,7 +685,8 @@ e2e_deposit_before_charge() ->
 		"No balance change expected"),
 	?assertEqual(
 		{<<"200">>, <<"0">>}, get_balance(Sender2Address),
-		"No balance change expected").
+		"No balance change expected"),
+	ok = application:set_env(chivesweave, config, BaseConfig).
 
 e2e_charge_before_deposit() ->
 	Wallet1 = {Priv1, Pub1} = ar_wallet:new(),
@@ -698,7 +699,7 @@ e2e_charge_before_deposit() ->
 	Address2 = ar_wallet:to_address(Pub2),
 	DepositAddress = ar_wallet:to_address(Pub3),
 	[B0] = ar_weave:init([
-		{Address1, ?AR(10000), <<>>}
+		{Address1, ?XWE(10000), <<>>}
 	]),
 	{ok, BaseConfig} = application:get_env(chivesweave, config),
 	Config = BaseConfig#config{ p3 = sample_p3_config(DepositAddress, -2000, 2) },
@@ -771,9 +772,8 @@ e2e_charge_before_deposit() ->
 		"Requesting P3 endpoint after deposit"
 	),
 
-	?assertEqual({<<"200">>, <<"-800">>}, get_balance(Address1)).
-
-
+	?assertEqual({<<"200">>, <<"-800">>}, get_balance(Address1)),
+	ok = application:set_env(chivesweave, config, BaseConfig).
 
 %% @doc Test that nodes correctly scan old blocks that came in while they were offline.
 e2e_restart_p3_service() ->
@@ -783,8 +783,8 @@ e2e_restart_p3_service() ->
 	Sender1Address = ar_wallet:to_address(Pub1),
 	DepositAddress = ar_wallet:to_address(Pub3),
 	[B0] = ar_weave:init([
-		{Sender1Address, ?AR(10000), <<>>},
-		{DepositAddress, ?AR(10000), <<>>}
+		{Sender1Address, ?XWE(10000), <<>>},
+		{DepositAddress, ?XWE(10000), <<>>}
 	]),
 	{ok, BaseConfig} = application:get_env(chivesweave, config),
 	Config = BaseConfig#config{ p3 = sample_p3_config(DepositAddress, -100, 1) },
@@ -794,7 +794,7 @@ e2e_restart_p3_service() ->
 	disconnect_from_slave(),
 
 	%% This deposit will be too old and will not be scanned when the master node comes back up.
-	TX1 = sign_tx(Wallet1, #{ target => DepositAddress, reward => ?AR(1), quantity => 100 }),
+	TX1 = sign_tx(Wallet1, #{ target => DepositAddress, reward => ?XWE(1), quantity => 100 }),
 	assert_post_tx_to_slave(TX1),
 
 	slave_mine(),
@@ -803,7 +803,7 @@ e2e_restart_p3_service() ->
 	slave_mine(),
 	assert_slave_wait_until_height(2),
 
-	TX2 = sign_tx(Wallet1, #{ target => DepositAddress, reward => ?AR(5), quantity => 500 }),
+	TX2 = sign_tx(Wallet1, #{ target => DepositAddress, reward => ?XWE(5), quantity => 500 }),
 	assert_post_tx_to_slave(TX2),
 	slave_mine(),
 	assert_slave_wait_until_height(3),
@@ -843,8 +843,9 @@ e2e_restart_p3_service() ->
 	stop(),
 	rejoin_on_slave(),
 	?assertEqual(5, ar_p3_db:get_scan_height(),
-		"Restarting node should not have reset scan height db: scan height 5").
-
+		"Restarting node should not have reset scan height db: scan height 5"),
+	
+	ok = application:set_env(chivesweave, config, BaseConfig).
 
 %% @doc Test that a bunch of concurrent requests don't overspend the P3 account and that they
 %% are gated before they are processed (i.e. if the account does not have sufficient balance,
@@ -857,8 +858,8 @@ e2e_concurrent_requests() ->
 	EncodedAddress1 = ar_util:encode(Address1),
 	DepositAddress = ar_wallet:to_address(Pub3),
 	[B0] = ar_weave:init([
-		{Address1, ?AR(10000), <<>>},
-		{DepositAddress, ?AR(10000), <<>>}
+		{Address1, ?XWE(10000), <<>>},
+		{DepositAddress, ?XWE(10000), <<>>}
 	]),
 	{ok, BaseConfig} = application:get_env(chivesweave, config),
 	Config = BaseConfig#config{ p3 = sample_p3_config(DepositAddress, 0, 1, 100) },
@@ -926,7 +927,9 @@ e2e_concurrent_requests() ->
 	?assertEqual({<<"200">>, <<"0">>}, get_balance(Address1)),
 
 	{ok, AccountValid} = ar_p3_db:get_account(Address1),
-	?assertEqual(Count+1, AccountValid#p3_account.count).
+	?assertEqual(Count+1, AccountValid#p3_account.count),
+
+	ok = application:set_env(chivesweave, config, BaseConfig).
 
 %% ------------------------------------------------------------------
 %% Private helper functions
@@ -955,7 +958,7 @@ concat(Elements) ->
     lists:concat(NonBinaryElements).
 
 get_balance(Address) ->
-	get_balance(Address, <<"chivesweave">>, <<"AR">>).
+	get_balance(Address, <<"chivesweave">>, <<"XWE">>).
 
 get_balance(Address, Checksum, Network, Token) ->
 	EncodedAddress = list_to_binary([ar_util:encode(Address), ":", ar_util:encode(Checksum)]),

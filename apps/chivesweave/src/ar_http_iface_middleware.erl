@@ -2500,6 +2500,7 @@ decode_block(Bin, binary) ->
 return_info(Req) ->
 	{Time, Current} =
 		timer:tc(fun() -> ar_node:get_current_block_hash() end),
+	B = ar_node:get_current_block(),
 	{Time2, Height} =
 		timer:tc(fun() -> ar_node:get_height() end),
 	[{_, BlockCount}] = ets:lookup(ar_header_sync, synced_blocks),
@@ -2525,6 +2526,10 @@ return_info(Req) ->
 					{blocks, BlockCount},
 					{peers, prometheus_gauge:value(arweave_peer_count)},
 					{time, integer_to_binary(os:system_time(second))},
+					{miningtime, integer_to_binary(os:system_time(second) - B#block.timestamp) },
+					{weave_size, integer_to_binary(B#block.weave_size)},
+					{denomination, integer_to_binary(B#block.denomination)},
+					{diff, integer_to_binary(B#block.diff)},
 					{queue_length,
 						element(
 							2,

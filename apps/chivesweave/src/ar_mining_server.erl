@@ -667,33 +667,34 @@ hashing_thread() ->
 hashing_thread(SessionRef) ->
 	receive
 		stop ->
+			?LOG_INFO([{sessionRef______stop______________________________________________________________________,SessionRef}]),
 			hashing_thread();
-		{compute_h0, {SessionRef, From, Output, PartitionNumber, Seed, PartitionUpperBound,
-				ReplicaID}} ->
+		{compute_h0, {SessionRef, From, Output, PartitionNumber, Seed, PartitionUpperBound, ReplicaID}} ->
 			H0 = ar_block:compute_h0(Output, PartitionNumber, Seed, ReplicaID),
-			From ! {mining_thread_computed_h0, {H0, PartitionNumber, PartitionUpperBound,
-					Output, ReplicaID, SessionRef}},
+			?LOG_INFO([{sessionRef______compute_h0______________________________________________________________________,H0}]),
+			From ! {mining_thread_computed_h0, {H0, PartitionNumber, PartitionUpperBound, Output, ReplicaID, SessionRef}},
 			hashing_thread(SessionRef);
-		{compute_h1, {SessionRef, From, H0, PartitionNumber, Nonce, NonceLimiterOutput,
-				ReplicaID, Chunk, CorrelationRef}} ->
+		{compute_h1, {SessionRef, From, H0, PartitionNumber, Nonce, NonceLimiterOutput, ReplicaID, Chunk, CorrelationRef}} ->
 			{H1, Preimage} = ar_block:compute_h1(H0, Nonce, Chunk),
+			?LOG_INFO([{sessionRef______compute_h1______________________________________________________________________,H1}]),
 			From ! {mining_thread_computed_h1, {H0, PartitionNumber, Nonce,
-					NonceLimiterOutput, ReplicaID, Chunk, H1, Preimage, CorrelationRef,
-					SessionRef}},
+					NonceLimiterOutput, ReplicaID, Chunk, H1, Preimage, CorrelationRef, SessionRef}},
 			hashing_thread(SessionRef);
 		{compute_h1, _} ->
+			 ?LOG_INFO([{sessionRef______compute_h1_hashing_thread_______outdated_mining_session_______________________________________________________________,SessionRef}]),
 			 %% Clear the message queue from the requests from the outdated mining session.
 			 hashing_thread(SessionRef);
-		{compute_h2, {SessionRef, From, H0, PartitionNumber, Nonce, NonceLimiterOutput,
-				ReplicaID, Chunk1, Chunk2, H1}} ->
+		{compute_h2, {SessionRef, From, H0, PartitionNumber, Nonce, NonceLimiterOutput, ReplicaID, Chunk1, Chunk2, H1}} ->
 			{H2, Preimage} = ar_block:compute_h2(H1, Chunk2, H0),
-			From ! {mining_thread_computed_h2, {H0, PartitionNumber, Nonce,
-					NonceLimiterOutput, ReplicaID, Chunk1, Chunk2, H2, Preimage, SessionRef}},
+			?LOG_INFO([{sessionRef______compute_h2______________________________________________________________________,H2}]),
+			From ! {mining_thread_computed_h2, {H0, PartitionNumber, Nonce, NonceLimiterOutput, ReplicaID, Chunk1, Chunk2, H2, Preimage, SessionRef}},
 			hashing_thread(SessionRef);
 		{compute_h2, _} ->
+			 ?LOG_INFO([{sessionRef______compute_h2_hashing_thread_______outdated_mining_session_______________________________________________________________,SessionRef}]),
 			 %% Clear the message queue from the requests from the outdated mining session.
 			 hashing_thread(SessionRef);
 		{new_mining_session, Ref} ->
+			?LOG_INFO([{sessionRef______new_mining_session___________________________________________________________,SessionRef}]),
 			hashing_thread(Ref)
 	end.
 

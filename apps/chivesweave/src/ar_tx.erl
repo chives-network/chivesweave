@@ -558,13 +558,12 @@ get_tx_fee(Args) ->
 	Fork_2_6_8 = ar_fork:height_2_6_8(),
 	Args2 = {DataSize, PricePerGiBMinute, KryderPlusRateMultiplier, Addr, Accounts, Height},
 	TransitionStart_2_6_8 = Fork_2_6_8 + ?PRICE_2_6_8_TRANSITION_START,
-	true = Height >= Fork_2_6_8,
 	case Height >= TransitionStart_2_6_8 of
 		false ->
 			%% Pre-2.6.8 transition period. Use a static fee-based pricing + new account fee.
 			get_static_2_6_8_tx_fee(DataSize, Addr, Accounts);
 		true ->
-			get_static_2_6_8_tx_fee(DataSize, Addr, Accounts)
+			get_tx_fee2(Args2)
 	end.
 
 get_static_2_6_8_tx_fee(DataSize, Addr, Accounts) ->

@@ -671,12 +671,12 @@ hashing_thread(SessionRef) ->
 			hashing_thread();
 		{compute_h0, {SessionRef, From, Output, PartitionNumber, Seed, PartitionUpperBound, ReplicaID}} ->
 			H0 = ar_block:compute_h0(Output, PartitionNumber, Seed, ReplicaID),
-			?LOG_INFO([{sessionRef______compute_h0______________________________________________________________________,H0}]),
+			?LOG_INFO([{sessionRef______compute_h0______________________________________________________________________,ar_util:encode(H0)}]),
 			From ! {mining_thread_computed_h0, {H0, PartitionNumber, PartitionUpperBound, Output, ReplicaID, SessionRef}},
 			hashing_thread(SessionRef);
 		{compute_h1, {SessionRef, From, H0, PartitionNumber, Nonce, NonceLimiterOutput, ReplicaID, Chunk, CorrelationRef}} ->
 			{H1, Preimage} = ar_block:compute_h1(H0, Nonce, Chunk),
-			?LOG_INFO([{sessionRef______compute_h1______________________________________________________________________,H1}]),
+			?LOG_INFO([{sessionRef______compute_h1______________________________________________________________________,ar_util:encode(H1)}]),
 			From ! {mining_thread_computed_h1, {H0, PartitionNumber, Nonce,
 					NonceLimiterOutput, ReplicaID, Chunk, H1, Preimage, CorrelationRef, SessionRef}},
 			hashing_thread(SessionRef);
@@ -686,7 +686,7 @@ hashing_thread(SessionRef) ->
 			 hashing_thread(SessionRef);
 		{compute_h2, {SessionRef, From, H0, PartitionNumber, Nonce, NonceLimiterOutput, ReplicaID, Chunk1, Chunk2, H1}} ->
 			{H2, Preimage} = ar_block:compute_h2(H1, Chunk2, H0),
-			?LOG_INFO([{sessionRef______compute_h2______________________________________________________________________,H2}]),
+			?LOG_INFO([{sessionRef______compute_h2______________________________________________________________________,ar_util:encode(H2)}]),
 			From ! {mining_thread_computed_h2, {H0, PartitionNumber, Nonce, NonceLimiterOutput, ReplicaID, Chunk1, Chunk2, H2, Preimage, SessionRef}},
 			hashing_thread(SessionRef);
 		{compute_h2, _} ->

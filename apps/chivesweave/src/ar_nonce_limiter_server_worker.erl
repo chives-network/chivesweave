@@ -70,8 +70,7 @@ handle_info({event, nonce_limiter, {computed_output, Args}}, State) ->
 				true ->
 					{noreply, State};
 				false ->
-					{noreply, push_update(SessionKey, Session, PrevSessionKey, PrevSession, Output,
-							PartitionUpperBound, Peer, State)}
+					{noreply, push_update(SessionKey, Session, PrevSessionKey, PrevSession, Output, PartitionUpperBound, Peer, State)}
 			end
 	end;
 

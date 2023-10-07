@@ -216,8 +216,7 @@ init(StoreID) ->
 		end,
 		FileIndex
 	),
-	{ok, #state{ file_index = FileIndex2, store_id = StoreID,
-			repack_cursor = read_repack_cursor(StoreID) }}.
+	{ok, #state{ file_index = FileIndex2, store_id = StoreID, repack_cursor = read_repack_cursor(StoreID) }}.
 
 handle_cast(store_repack_cursor, #state{ repacking_complete = true } = State) ->
 	{noreply, State};

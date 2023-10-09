@@ -2516,7 +2516,8 @@ write_chunk(Offset, ChunkDataKey, Chunk, ChunkSize, DataPath, Packing, State) ->
 write_not_blacklisted_chunk(Offset, ChunkDataKey, Chunk, ChunkSize, DataPath, Packing,
 		State) ->
 	#sync_data_state{ chunk_data_db = ChunkDataDB, store_id = StoreID } = State,
-	ShouldStoreInChunkStorage = should_store_in_chunk_storage(Offset, ChunkSize, Packing),
+	ShouldStoreInChunkStorage = should_store_in_chunk_storage(Offset, ChunkSize, Packing),	
+	?LOG_INFO([{write_not_blacklisted_chunk______________ShouldStoreInChunkStorage____________, ShouldStoreInChunkStorage}]),
 	Result =
 		case ShouldStoreInChunkStorage of
 			true ->

@@ -64,7 +64,7 @@
 -define(DEFAULT_DIFF, 6).
 
 -ifndef(TARGET_TIME).
--define(TARGET_TIME, 120).
+-define(TARGET_TIME, 60).
 -endif.
 
 -ifndef(RETARGET_BLOCKS).

@@ -227,9 +227,6 @@ get_intersection_size(End, Start, ID, StoreID) ->
 		[] ->
 			0;
 		[{_, TID}] ->
-			?LOG_INFO([{get_intersection_size_________TID______________, TID}]),
-			?LOG_INFO([{get_intersection_size_________Start______________, Start}]),
-			?LOG_INFO([{get_intersection_size_________End______________, End}]),
 			ar_ets_intervals:get_intersection_size(TID, End, Start)
 	end.
 

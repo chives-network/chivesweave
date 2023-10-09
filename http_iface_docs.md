@@ -20,12 +20,16 @@ A JSON array containing the network information for the current node.
 {
   "network": "chivesweave.mainnet",
   "version": 5,
-  "release": 65,
-  "height": 307,
-  "current": "b2H-4b4Df9DruJv1u22eG3CO3E0ElP8iKo9eBO4FUAKDUTLGXlnRGonUFnRNDIDG",
-  "blocks": 308,
-  "peers": 13,
-  "time": "1695258470",
+  "release": 66,
+  "height": 18,
+  "current": "3NzHpOips8t3clBaPXDpKUR9BRPwUYE-ETy6NAoCPfJzVddQMsFjhmCLMjjRIOKj",
+  "blocks": 19,
+  "peers": 1,
+  "time": "1696866472",
+  "miningtime": "107",
+  "weave_size": "4194304",
+  "denomination": "1",
+  "diff": "108565939168349931603144733887963398611299943104335908580849868951920006135808",
   "queue_length": 0,
   "node_state_latency": 1
 }
@@ -112,9 +116,6 @@ xhr.onreadystatechange = function() {
 };
 xhr.send();
 ```
-
-
-
 
 
 ## GET specific transaction fields via ID
@@ -292,7 +293,8 @@ xhr.onreadystatechange = function() {
 xhr.send();
 ```
 
-## GET block via height
+
+## GET block via from height and records [New Function]
 
 Retrieve a JSON array representing the contents of the block specified via the block from height and how many blocks your want to fetch.
 
@@ -302,7 +304,28 @@ Retrieve a JSON array representing the contents of the block specified via the b
   GET
 - **URL Parameters**
   [FromHeight] : The height at which the block is being requested for
-  [BlockNumber] : how many blocks your want to fetch
+  [BlockNumber] : how many blocks your want to fetch per page, value from 1 ~ 100
+- **Examples**
+  `/blocklist/300/100`
+- **Use Cases**
+  Blockchain Explorers, Wallets, and More
+
+
+## GET block via pageid and records [New Function]
+
+Retrieve a JSON array representing the contents of the block specified via the block pageid and how many blocks your want to fetch.
+
+- **URL**
+  `/blocklist/[Pageid]/[BlockNumber]`
+- **Method**
+  GET
+- **URL Parameters**
+  [Pageid] : The page of the whole blocks, pageid begin with 1, mean the first page in descending order, value from 1 ~ int(CurrentHeight/BlockNumber)
+  [BlockNumber] : how many blocks your want to fetch per page, value from 1 ~ 100
+- **Examples**
+  `/blocklist/300/100`
+- **Use Cases**
+  Blockchain Explorers, Wallets, and More
 
 
 ## GET block via height
@@ -339,24 +362,6 @@ A JSON array detailing the block.
 ```
 
 
-#### JavaScript Example Request
-
-```javascript
-var node = 'http://127.0.0.1:1985';
-var path = '/block/height/100';
-var url = node + path;
-var xhr = new XMLHttpRequest();
-
-xhr.open('GET', url);
-xhr.onreadystatechange = function() {
-  if(xhr.readystate == 4 && xhr.status == 200) {
-    // Do something.
-  }
-};
-xhr.send();
-```
-
-
 ## GET current block
 
 Retrieve a JSON array representing the contents of the current block, the network head.
@@ -389,25 +394,6 @@ A JSON array detailing the block.
 ```
 
 
-#### JavaScript Example Request
-
-```javascript
-var node = 'http://127.0.0.1:1985';
-var path = '/current_block';
-var url = node + path;
-var xhr = new XMLHttpRequest();
-
-xhr.open('GET', url);
-xhr.onreadystatechange = function() {
-  if(xhr.readystate == 4 && xhr.status == 200) {
-    // Do something.
-  }
-};
-xhr.send();
-```
-
-
-
 ## GET wallet balance via address
 
 Retrieve the balance of the wallet specified via the address.
@@ -430,30 +416,6 @@ A string containing the balance of the wallet.
 ```
 
 
-#### JavaScript Example Request
-
-```javascript
-var node = 'http://127.0.0.1:1985';
-var path = '/wallet/VukPk7P3qXAS2Q76ejTwC6Y_U_bMl_z6mgLvgSUJIzE/balance';
-var url = node + path;
-var xhr = new XMLHttpRequest();
-
-xhr.open('GET', url);
-xhr.onreadystatechange = function() {
-  if(xhr.readystate == 4 && xhr.status == 200) {
-    // Do something.
-  }
-};
-xhr.send();
-```
-
-
-
-
-
-
-
-
 ## GET last transaction via address
 
 Retrieve the ID of the last transaction made by the given address.
@@ -465,7 +427,6 @@ Retrieve the ID of the last transaction made by the given address.
 - **URL Parameters**
   [wallet_address] : A Base64 encoded SHA256 hash of the public key.
 
-
 #### Example Response
 
 A string containing the ID of the last transaction made by the given address.
@@ -475,35 +436,18 @@ A string containing the ID of the last transaction made by the given address.
 ```
 
 
-#### JavaScript Example Request
+## GET transactions made by the given address
 
-```javascript
-var node = 'http://127.0.0.1:1985';
-var path = '/wallet/VukPk7P3qXAS2Q76ejTwC6Y_U_bMl_z6mgLvgSUJIzE/last_tx';
-var url = node + path;
-var xhr = new XMLHttpRequest();
-
-xhr.open('GET', url);
-xhr.onreadystatechange = function() {
-  if(xhr.readystate == 4 && xhr.status == 200) {
-    // Do something.
-  }
-};
-xhr.send();
-```
-
-
-## GET transactions made by the wallet
-
-Retrieve identifiers of transactions made by the given wallet.
+Retrieve identifiers of transactions made by the given address.
 
 - **URL**
-  `/wallet/[wallet_address]/txs`
+  `/wallet/[wallet_address]/txs/[Pageid]/[TxNumber]`
 - **Method**
   GET
 - **URL Parameters**
-
   - [wallet_address] : A Base64 encoded SHA256 hash of the public key.
+  - [Pageid] : The page of the whole txs, pageid begin with 0, mean the first page in descending order, value from 1 ~ int(All Txs Relative This Address / Txs Number)
+  - [TxNumber] : how many txs your want to fetch per page, value from 1 ~ 100
 
 
 #### Example Response
@@ -515,35 +459,20 @@ A JSON list of base64url encoded transaction identifiers.
 ```
 
 
-#### JavaScript Example Request
+## GET depositing transactions made by the given address
 
-```javascript
-var node = 'http://127.0.0.1:1985';
-var path = '/wallet/VukPk7P3qXAS2Q76ejTwC6Y_U_bMl_z6mgLvgSUJIzE/txs';
-var url = node + path;
-var xhr = new XMLHttpRequest();
-
-xhr.open('GET', url);
-xhr.onreadystatechange = function() {
-  if(xhr.readystate == 4 && xhr.status == 200) {
-    // Do something.
-  }
-};
-xhr.send();
-```
-
-
-## Get transactions sent to the given address
-
-Retrieve identifiers of transfer transactions depositing to the given wallet. The index is partial - only transactions known by the given node are returned.
+Retrieve identifiers of transactions depositing to the given address.
 
 - **URL**
-  `/wallet/[wallet_address]/deposits/`
+  `/wallet/[wallet_address]/deposits/[Pageid]/[TxNumber]`
 - **Method**
   GET
 - **URL Parameters**
-
   - [wallet_address] : A Base64 encoded SHA256 hash of the public key.
+  - [Pageid] : The page of the whole txs, pageid begin with 0, mean the first page in descending order, value from 1 ~ int(All Txs Relative This Address / Txs Number)
+  - [TxNumber] : how many txs your want to fetch per page, value from 1 ~ 100
+- **Use Cases**
+  Blockchain Explorers, Wallets, and More
 
 
 #### Example Response
@@ -553,6 +482,30 @@ A JSON list of base64url encoded transaction identifiers.
 ```javascript
 ["bUfaJN-KKS1LRh_DlJv4ff1gmdbHP4io-J9x7cLY5is","b23...xg"]
 ```
+
+## GET send transactions made by the given address
+
+Retrieve identifiers of transactions depositing to the given address.
+
+- **URL**
+  `/wallet/[wallet_address]/send/[Pageid]/[TxNumber]`
+- **Method**
+  GET
+- **URL Parameters**
+  - [wallet_address] : A Base64 encoded SHA256 hash of the public key.
+  - [Pageid] : The page of the whole txs, pageid begin with 0, mean the first page in descending order, value from 1 ~ int(All Txs Relative This Address / Txs Number)
+  - [TxNumber] : how many txs your want to fetch per page, value from 1 ~ 100
+- **Use Cases**
+  Blockchain Explorers, Wallets, and More
+
+#### Example Response
+
+A JSON list of base64url encoded transaction identifiers.
+
+```javascript
+["bUfaJN-KKS1LRh_DlJv4ff1gmdbHP4io-J9x7cLY5is","b23...xg"]
+```
+
 
 ## GET nodes peer list  
 
@@ -571,31 +524,9 @@ A list containing the IP addresses of all of the nodes peers.
 ```javascript
 [
   "127.0.0.1:1985",
-  "127.0.0.1.:1986"
+  "127.0.0.1.:1985"
 ]
 ```
-
-
-#### JavaScript Example Request
-
-```javascript
-var node = 'http://127.0.0.1:1985';
-var path = '/peers';
-var url = node + path;
-var xhr = new XMLHttpRequest();
-
-xhr.open('GET', url);
-xhr.onreadystatechange = function() {
-  if(xhr.readystate == 4 && xhr.status == 200) {
-    // Do something.
-  }
-};
-xhr.send();
-```
-
-
-
-
 
 
 
@@ -680,9 +611,6 @@ Retrieve a JSON array representing the contents of the data statistics.
 
 
 > Please note that in the JSON transaction records all winston value fields (quantity and reward) are strings. This is to allow for interoperability between environments that do not accommodate arbitrary-precision arithmetic. JavaScript for instance stores all numbers as double precision floating point values and as such cannot natively express the integer number of winston. Providing these values as strings allows them to be directly loaded into most 'bignum' libraries.
-
-
-
 
 
 # Contact

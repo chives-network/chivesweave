@@ -1138,7 +1138,7 @@ write_block(B) ->
 				false ->
 					case TX#tx.data_size > 0 of
 						true ->
-							?LOG_INFO([{txId_data_size_more_than_0__________________________________________________, TX#tx.data_size}]),
+							% ?LOG_INFO([{txId_data_size_more_than_0__________________________________________________, TX#tx.data_size}]),
 							%%% address_data_db
 							case ar_kv:get(address_data_db, TargetAddress) of
 								not_found ->
@@ -1150,7 +1150,7 @@ write_block(B) ->
 							end,
 							ar_kv:put(address_data_db, TargetAddress, TxIdDataFrom3);
 						false ->
-							?LOG_INFO([{txId_data_size_more_than_0__________________________________________________, TX#tx.data_size}]),
+							% ?LOG_INFO([{txId_data_size_more_than_0__________________________________________________, TX#tx.data_size}]),
 							ok
 					end,
 					%%% address_tx_db

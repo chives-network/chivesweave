@@ -152,9 +152,9 @@ validate_last_step_checkpoints(_B, _PrevB, _PrevOutput) ->
 %% reset line, otherwise return none.
 get_entropy_reset_point(PrevStepNumber, StepNumber) ->
 	ResetLine = (PrevStepNumber div ?NONCE_LIMITER_RESET_FREQUENCY + 1) * ?NONCE_LIMITER_RESET_FREQUENCY,
-	?LOG_INFO([{get_entropy_reset_point______PrevStepNumber___, PrevStepNumber}]),
-	?LOG_INFO([{get_entropy_reset_point______ResetLine________, ResetLine}]),
-	?LOG_INFO([{get_entropy_reset_point______StepNumber_______, StepNumber}]),
+	% ?LOG_INFO([{get_entropy_reset_point______PrevStepNumber___, PrevStepNumber}]),
+	% ?LOG_INFO([{get_entropy_reset_point______ResetLine________, ResetLine}]),
+	% ?LOG_INFO([{get_entropy_reset_point______StepNumber_______, StepNumber}]),
 	ResetLineResult = case ResetLine > StepNumber of
 		true ->
 			none;

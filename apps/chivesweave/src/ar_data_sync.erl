@@ -112,7 +112,7 @@ add_chunk(DataRoot, DataPath, Chunk, Offset, TXSize) ->
 						{ok, {ChunkSize, Timestamp, not_set}}
 				end
 		end,
-	?LOG_INFO([{add_chunk______________CheckDiskPool____________, CheckDiskPool}]),
+	% ?LOG_INFO([{add_chunk______________CheckDiskPool____________, CheckDiskPool}]),
 	ValidateProof =
 		case CheckDiskPool of
 			{error, _} = Error ->
@@ -126,7 +126,7 @@ add_chunk(DataRoot, DataPath, Chunk, Offset, TXSize) ->
 								DiskPoolDataRootValue}}
 				end
 		end,
-	?LOG_INFO([{add_chunk______________ValidateProof____________, ValidateProof}]),
+	% ?LOG_INFO([{add_chunk______________ValidateProof____________, ValidateProof}]),
 	CheckSynced =
 		case ValidateProof of
 			{error, _} = Error2 ->
@@ -165,7 +165,7 @@ add_chunk(DataRoot, DataPath, Chunk, Offset, TXSize) ->
 						{error, failed_to_store_chunk}
 				end
 		end,
-	?LOG_INFO([{add_chunk______________CheckSynced____________, CheckSynced}]),
+	% ?LOG_INFO([{add_chunk______________CheckSynced____________, CheckSynced}]),
 	case CheckSynced of
 		synced ->
 			ok;
@@ -2660,8 +2660,8 @@ pack_and_store_chunk(Args, State) ->
 			{DifferentPacking, _} ->
 				{need_packing, DifferentPacking}
 		end,
-	?LOG_INFO([{pack_and_store_chunk______________ChunkSize____________, ChunkSize}]),
-	?LOG_INFO([{pack_and_store_chunk______________PackingStatus____________, PackingStatus}]),
+	% ?LOG_INFO([{pack_and_store_chunk______________ChunkSize____________, ChunkSize}]),
+	% ?LOG_INFO([{pack_and_store_chunk______________PackingStatus____________, PackingStatus}]),
 	case PackingStatus of
 		{ready, {StoredPacking, StoredChunk}} ->
 			ChunkArgs = {StoredPacking, StoredChunk, AbsoluteOffset, TXRoot, ChunkSize},
@@ -2725,11 +2725,11 @@ process_store_chunk_queue(State) ->
 						Threshold
 				end
 		end,
-	?LOG_INFO([{store_chunk2______________Len______________________, Len}]),
-	?LOG_INFO([{store_chunk2______________Len______________________, Len}]),
-	?LOG_INFO([{store_chunk2______________Len______________________, Len}]),
-	?LOG_INFO([{store_chunk2______________Threshold2_______________, Threshold2}]),
-	?LOG_INFO([{store_chunk2______________Now_Timestamp____________, Now - Timestamp}]),
+	% ?LOG_INFO([{store_chunk2______________Len______________________, Len}]),
+	% ?LOG_INFO([{store_chunk2______________Len______________________, Len}]),
+	% ?LOG_INFO([{store_chunk2______________Len______________________, Len}]),
+	% ?LOG_INFO([{store_chunk2______________Threshold2_______________, Threshold2}]),
+	% ?LOG_INFO([{store_chunk2______________Now_Timestamp____________, Now - Timestamp}]),
 	case Len > Threshold2
 			orelse Now - Timestamp > ?STORE_CHUNK_QUEUE_FLUSH_TIME_THRESHOLD of
 		true ->
@@ -2740,8 +2740,8 @@ process_store_chunk_queue(State) ->
 					store_chunk_queue_len = Len - 1,
 					store_chunk_queue_threshold = min(Threshold2 + 1,
 							?STORE_CHUNK_QUEUE_FLUSH_SIZE_THRESHOLD) },
-			?LOG_INFO([{store_chunk2______________store_chunk_queue_len______________________, Len - 1}]),
-			?LOG_INFO([{store_chunk2______________store_chunk_queue_threshold______________________, min(Threshold2 + 1, ?STORE_CHUNK_QUEUE_FLUSH_SIZE_THRESHOLD)}]),
+			% ?LOG_INFO([{store_chunk2______________store_chunk_queue_len______________________, Len - 1}]),
+			% ?LOG_INFO([{store_chunk2______________store_chunk_queue_threshold______________________, min(Threshold2 + 1, ?STORE_CHUNK_QUEUE_FLUSH_SIZE_THRESHOLD)}]),
 			process_store_chunk_queue(State2);
 		false ->
 			State

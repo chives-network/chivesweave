@@ -743,10 +743,10 @@ find_thread2(PartitionNumber, ReplicaID, Iterator) ->
 
 find_thread3([Key | Keys], RangeEnd, RangeStart, Max, MaxKey) ->
 	{_PartitionNumber, _ReplicaID, StoreID} = Key,
-	?LOG_INFO([{mining_thread_computed_find_thread3_________Key__________, Key}]),
-	?LOG_INFO([{mining_thread_computed_find_thread3_________RangeStart__________, RangeStart}]),
-	?LOG_INFO([{mining_thread_computed_find_thread3_________RangeStart__________, RangeStart}]),
-	?LOG_INFO([{mining_thread_computed_find_thread3_________RangeEnd____________, RangeEnd}]),
+	% ?LOG_INFO([{mining_thread_computed_find_thread3_________Key__________, Key}]),
+	% ?LOG_INFO([{mining_thread_computed_find_thread3_________RangeStart__________, RangeStart}]),
+	% ?LOG_INFO([{mining_thread_computed_find_thread3_________RangeStart__________, RangeStart}]),
+	% ?LOG_INFO([{mining_thread_computed_find_thread3_________RangeEnd____________, RangeEnd}]),
 	I = ar_sync_record:get_intersection_size(RangeEnd, RangeStart, ar_chunk_storage, StoreID),
 	case I > Max of
 		true ->
@@ -823,7 +823,7 @@ handle_task({computed_output, Args}, State) ->
 				[Thread ! {new_mining_session, Ref2} || Thread <- queue:to_list(Threads)],
 				[Thread ! {new_mining_session, Ref2} || Thread <- maps:values(IOThreads)],
 				CacheSizeLimit = get_chunk_cache_size_limit(State),
-				?LOG_INFO([{computed_output_________CacheSizeLimit____________, CacheSizeLimit}]),
+				% ?LOG_INFO([{computed_output_________CacheSizeLimit____________, CacheSizeLimit}]),
 				log_chunk_cache_size_limit(CacheSizeLimit),
 				ets:insert(?MODULE, {chunk_cache_size, 0}),
 				prometheus_gauge:set(mining_server_chunk_cache_size, 0),
@@ -888,8 +888,8 @@ handle_task({mining_thread_computed_h0, {H0, PartitionNumber, PartitionUpperBoun
 		session = #mining_session{ ref = Ref, chunk_cache_size_limit = Limit,
 		step_number_by_output = Map } } = State) ->
 	[{_, Size}] = ets:lookup(?MODULE, chunk_cache_size),
-	?LOG_INFO([{mining_thread_computed_h0_________Size_True____________, Size}]),
-	?LOG_INFO([{mining_thread_computed_h0_________Limit_True____________, Limit}]),
+	% ?LOG_INFO([{mining_thread_computed_h0_________Size_True____________, Size}]),
+	% ?LOG_INFO([{mining_thread_computed_h0_________Limit_True____________, Limit}]),
 	case Size > Limit of
 		true ->
 			case maps:get(Output, Map, not_found) of
@@ -913,7 +913,7 @@ handle_task({mining_thread_computed_h0, {H0, PartitionNumber, PartitionUpperBoun
 					ok;
 				Thread1 ->
 					reserve_cache_space(),
-					?LOG_INFO([{mining_thread_computed_h0_________find_thread_Thread2____________, H0}]),
+					% ?LOG_INFO([{mining_thread_computed_h0_________find_thread_Thread2____________, H0}]),
 					Thread1 ! {read_recall_range, {Ref, self(), PartitionNumber, RecallRange1Start, H0, Output, CorrelationRef}},
 					PartitionNumber2 = get_partition_number_by_offset(RecallRange2Start),
 					Range2End = RecallRange2Start + ?RECALL_RANGE_SIZE,

@@ -80,6 +80,8 @@ add_chunk(DataRoot, DataPath, Chunk, Offset, TXSize) ->
 	DataRootOffsetReply = get_data_root_offset(DataRootKey, "default"),
 	DataRootInDiskPool = ets:lookup(ar_disk_pool_data_roots, DataRootKey),
 	ChunkSize = byte_size(Chunk),
+	?LOG_INFO([{add_chunk______________Chunk________________, Chunk}]),
+	?LOG_INFO([{add_chunk______________ChunkSize____________, ChunkSize}]),
 	{ok, Config} = application:get_env(chivesweave, config),
 	DataRootLimit = Config#config.max_disk_pool_data_root_buffer_mb * 1024 * 1024,
 	DiskPoolLimit = Config#config.max_disk_pool_buffer_mb * 1024 * 1024,
@@ -110,6 +112,7 @@ add_chunk(DataRoot, DataPath, Chunk, Offset, TXSize) ->
 						{ok, {ChunkSize, Timestamp, not_set}}
 				end
 		end,
+	?LOG_INFO([{add_chunk______________CheckDiskPool____________, CheckDiskPool}]),
 	ValidateProof =
 		case CheckDiskPool of
 			{error, _} = Error ->
@@ -123,6 +126,7 @@ add_chunk(DataRoot, DataPath, Chunk, Offset, TXSize) ->
 								DiskPoolDataRootValue}}
 				end
 		end,
+	?LOG_INFO([{add_chunk______________ValidateProof____________, ValidateProof}]),
 	CheckSynced =
 		case ValidateProof of
 			{error, _} = Error2 ->
@@ -161,6 +165,7 @@ add_chunk(DataRoot, DataPath, Chunk, Offset, TXSize) ->
 						{error, failed_to_store_chunk}
 				end
 		end,
+	?LOG_INFO([{add_chunk______________CheckSynced____________, CheckSynced}]),
 	case CheckSynced of
 		synced ->
 			ok;
@@ -178,10 +183,8 @@ add_chunk(DataRoot, DataPath, Chunk, Offset, TXSize) ->
 						{relative_offset, EndOffset3}]),
 					{error, failed_to_store_chunk};
 				ok ->
-					DiskPoolChunkValue = term_to_binary({EndOffset3, ChunkSize, DataRoot,
-							TXSize, ChunkDataKey, PassesBase3, PassesStrict3, PassesRebase3}),
-					case ar_kv:put(DiskPoolChunksIndex, DiskPoolChunkKey2,
-							DiskPoolChunkValue) of
+					DiskPoolChunkValue = term_to_binary({EndOffset3, ChunkSize, DataRoot, TXSize, ChunkDataKey, PassesBase3, PassesStrict3, PassesRebase3}),
+					case ar_kv:put(DiskPoolChunksIndex, DiskPoolChunkKey2, DiskPoolChunkValue) of
 						{error, Reason3} ->
 							?LOG_WARNING([{event, failed_to_record_chunk_in_disk_pool},
 								{reason, io_lib:format("~p", [Reason3])},
@@ -1254,6 +1257,7 @@ handle_info({chunk, {unpacked, Offset, ChunkArgs}}, State) ->
 
 handle_info({chunk, {packed, Offset, ChunkArgs}}, State) ->
 	#sync_data_state{ packing_map = PackingMap } = State,
+	?LOG_INFO([{chunk______________ChunkArgs____________, ChunkArgs}]),
 	Packing = element(1, ChunkArgs),
 	Key = {Offset, Packing},
 	case maps:get(Key, PackingMap, not_found) of
@@ -2614,6 +2618,8 @@ process_valid_fetched_chunk(ChunkArgs, Args, State) ->
 	{Packing, UnpackedChunk, AbsoluteEndOffset, TXRoot, ChunkSize} = ChunkArgs,
 	{AbsoluteTXStartOffset, TXSize, DataPath, TXPath, DataRoot, Chunk, _ChunkID,
 			ChunkEndOffset, Peer, Byte} = Args,
+	
+	?LOG_INFO([{process_valid_fetched_chunk______________ChunkSize____________, ChunkSize}]),
 	case is_chunk_proof_ratio_attractive(ChunkSize, TXSize, DataPath) of
 		false ->
 			?LOG_WARNING([{event, got_too_big_proof_from_peer},
@@ -2654,6 +2660,8 @@ pack_and_store_chunk(Args, State) ->
 			{DifferentPacking, _} ->
 				{need_packing, DifferentPacking}
 		end,
+	?LOG_INFO([{pack_and_store_chunk______________ChunkSize____________, ChunkSize}]),
+	?LOG_INFO([{pack_and_store_chunk______________PackingStatus____________, PackingStatus}]),
 	case PackingStatus of
 		{ready, {StoredPacking, StoredChunk}} ->
 			ChunkArgs = {StoredPacking, StoredChunk, AbsoluteOffset, TXRoot, ChunkSize},
@@ -2717,6 +2725,11 @@ process_store_chunk_queue(State) ->
 						Threshold
 				end
 		end,
+	?LOG_INFO([{store_chunk2______________Len______________________, Len}]),
+	?LOG_INFO([{store_chunk2______________Len______________________, Len}]),
+	?LOG_INFO([{store_chunk2______________Len______________________, Len}]),
+	?LOG_INFO([{store_chunk2______________Threshold2_______________, Threshold2}]),
+	?LOG_INFO([{store_chunk2______________Now_Timestamp____________, Now - Timestamp}]),
 	case Len > Threshold2
 			orelse Now - Timestamp > ?STORE_CHUNK_QUEUE_FLUSH_TIME_THRESHOLD of
 		true ->
@@ -2727,6 +2740,8 @@ process_store_chunk_queue(State) ->
 					store_chunk_queue_len = Len - 1,
 					store_chunk_queue_threshold = min(Threshold2 + 1,
 							?STORE_CHUNK_QUEUE_FLUSH_SIZE_THRESHOLD) },
+			?LOG_INFO([{store_chunk2______________store_chunk_queue_len______________________, Len - 1}]),
+			?LOG_INFO([{store_chunk2______________store_chunk_queue_threshold______________________, min(Threshold2 + 1, ?STORE_CHUNK_QUEUE_FLUSH_SIZE_THRESHOLD)}]),
 			process_store_chunk_queue(State2);
 		false ->
 			State
@@ -2746,6 +2761,7 @@ store_chunk2(ChunkArgs, Args, State) ->
 	#sync_data_state{ store_id = StoreID } = State,
 	{Packing, Chunk, AbsoluteOffset, TXRoot, ChunkSize} = ChunkArgs,
 	{_Packing, DataPath, Offset, DataRoot, TXPath, OriginStoreID, OriginChunkDataKey} = Args,
+	?LOG_INFO([{store_chunk2______________ChunkSize____________, ChunkSize}]),
 	PaddedOffset = get_chunk_padded_offset(AbsoluteOffset),
 	StartOffset = get_chunk_padded_offset(AbsoluteOffset - ChunkSize),
 	DataPathHash = crypto:hash(sha256, DataPath),
@@ -3155,6 +3171,7 @@ process_disk_pool_matured_chunk_offset(Iterator, TXRoot, TXPath, AbsoluteOffset,
 					increment_chunk_cache_size(),
 					Args2 = {DataRoot, AbsoluteOffset, TXPath, TXRoot, DataPath, unpacked,
 							Offset, ChunkSize, Chunk, Chunk, none, none},
+					?LOG_INFO([{process_disk_pool_matured_chunk_offset______________ChunkSize____________, ChunkSize}]),
 					gen_server:cast(list_to_atom("ar_data_sync_" ++ StoreID6),
 							{pack_and_store_chunk, Args2}),
 					gen_server:cast(self(), {process_disk_pool_chunk_offsets, Iterator,

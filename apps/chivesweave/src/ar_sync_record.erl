@@ -222,11 +222,14 @@ get_interval(Offset, ID, StoreID) ->
 
 %% @doc Return the size of the intersection between the intervals and the given range.
 %% Return 0 if the given ID and StoreID are not found.
-get_intersection_size(End, Start, ID, StoreID) ->
+get_intersection_size(End, Start, ID, StoreID) ->	
+	?LOG_INFO([{get_intersection_size_________StoreID_______, StoreID}]),
+	?LOG_INFO([{get_intersection_size_________ID____________, ID}]),
 	case ets:lookup(sync_records, {ID, StoreID}) of
 		[] ->
 			0;
 		[{_, TID}] ->
+			?LOG_INFO([{get_intersection_size_________TID____________, TID}]),
 			ar_ets_intervals:get_intersection_size(TID, End, Start)
 	end.
 
@@ -320,7 +323,10 @@ handle_call({delete, End, Start, ID}, _From, State) ->
 	ets:foldl(
 		fun
 			({{ID2, _, SID}, TypeTID}, _) when ID2 == ID, SID == StoreID ->
-				ar_ets_intervals:delete(TypeTID, End, Start);
+				?LOG_INFO([{delete_______delete_______delete_______delete_______Start____, Start}]),
+				?LOG_INFO([{delete_______delete_______delete_______delete_______End____, End}]),
+				?LOG_INFO([{delete_______delete_______delete_______delete_______TypeTID____, TypeTID}]);
+				% ar_ets_intervals:delete(TypeTID, End, Start);
 			(_, _) ->
 				ok
 		end,

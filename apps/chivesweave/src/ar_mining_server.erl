@@ -743,6 +743,8 @@ find_thread2(PartitionNumber, ReplicaID, Iterator) ->
 
 find_thread3([Key | Keys], RangeEnd, RangeStart, Max, MaxKey) ->
 	{_PartitionNumber, _ReplicaID, StoreID} = Key,
+	?LOG_INFO([{mining_thread_computed_find_thread3_________Key__________, Key}]),
+	?LOG_INFO([{mining_thread_computed_find_thread3_________RangeStart__________, RangeStart}]),
 	?LOG_INFO([{mining_thread_computed_find_thread3_________RangeStart__________, RangeStart}]),
 	?LOG_INFO([{mining_thread_computed_find_thread3_________RangeEnd____________, RangeEnd}]),
 	I = ar_sync_record:get_intersection_size(RangeEnd, RangeStart, ar_chunk_storage, StoreID),

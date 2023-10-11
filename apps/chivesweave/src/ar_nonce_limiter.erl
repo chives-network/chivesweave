@@ -151,14 +151,18 @@ validate_last_step_checkpoints(_B, _PrevB, _PrevOutput) ->
 %% @doc Determine whether StepNumber has passed the entropy reset line. If it has return the
 %% reset line, otherwise return none.
 get_entropy_reset_point(PrevStepNumber, StepNumber) ->
-	ResetLine = (PrevStepNumber div ?NONCE_LIMITER_RESET_FREQUENCY + 1)
-			* ?NONCE_LIMITER_RESET_FREQUENCY,
-	case ResetLine > StepNumber of
+	ResetLine = (PrevStepNumber div ?NONCE_LIMITER_RESET_FREQUENCY + 1) * ?NONCE_LIMITER_RESET_FREQUENCY,
+	?LOG_INFO([{get_entropy_reset_point______PrevStepNumber___, PrevStepNumber}]),
+	?LOG_INFO([{get_entropy_reset_point______ResetLine________, ResetLine}]),
+	?LOG_INFO([{get_entropy_reset_point______StepNumber_______, StepNumber}]),
+	ResetLineResult = case ResetLine > StepNumber of
 		true ->
 			none;
 		false ->
 			ResetLine
-	end.
+	end,	
+	?LOG_INFO([{get_entropy_reset_point______ResetLineResult_______, ResetLineResult}]),
+	ResetLineResult.
 
 %% @doc Conditionally add entropy to PrevOutput if the configured number of steps have
 %% passed. See ?NONCE_LIMITER_RESET_FREQUENCY for more details.

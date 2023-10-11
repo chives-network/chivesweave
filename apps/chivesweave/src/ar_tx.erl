@@ -563,7 +563,7 @@ get_tx_fee(Args) ->
 			%% Pre-2.6.8 transition period. Use a static fee-based pricing + new account fee.
 			get_static_2_6_8_tx_fee(DataSize, Addr, Accounts);
 		true ->
-			get_tx_fee2(Args2)
+			get_static_2_6_8_tx_fee(DataSize, Addr, Accounts)
 	end.
 
 get_static_2_6_8_tx_fee(DataSize, Addr, Accounts) ->

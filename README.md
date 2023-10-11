@@ -60,13 +60,13 @@ Step 3: Make a mainnet build:
 
 ```
 
-Step 4: You will get your wallet and address.
+Step 4: You will get your wallet and address(Only absolute paths can be used).
 ```sh
-mkdir mainnet_data_dir
-./_build/mainnet/rel/chivesweave/bin/create-wallet mainnet_data_dir
+mkdir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir
+./_build/mainnet/rel/chivesweave/bin/create-wallet /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir
 
 ```
-You will get your wallet key file in the directory "mainnet_data_dir/wallets/", and the wallet address will show in the console.
+You will get your wallet key file in the directory "/home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir/wallets/", and the wallet address will show in the console.
 
 Format as "Created a wallet with address [YOUR_WALLET_ADDRESS]."
 
@@ -75,21 +75,21 @@ You will then find the gzipped tarball at `_build/mainnet/rel/chivesweave/chives
 Step 5: Running your node:
 
 ```sh
-./_build/mainnet/rel/chivesweave/bin/start mine data_dir mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] peer node1.chivesweave.net peer node2.chivesweave.net
+./_build/mainnet/rel/chivesweave/bin/start mine data_dir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] peer node1.chivesweave.net
 
 ```
 
 If you have small disk free space, you can use this command to start mine job:
 
 ```sh
-./_build/mainnet/rel/chivesweave/bin/start mine data_dir mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] max_disk_pool_buffer_mb 10000 peer node1.chivesweave.net peer node2.chivesweave.net
+./_build/mainnet/rel/chivesweave/bin/start mine data_dir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] max_disk_pool_buffer_mb 10000 peer node1.chivesweave.net
 
 ```
 
 If you want to execute mine in the background:
 
 ```sh
-nohup _build/mainnet/rel/chivesweave/bin/start mine data_dir mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] max_disk_pool_buffer_mb 10000 peer node1.chivesweave.net peer node2.chivesweave.net > output.log 2>&1 &
+nohup _build/mainnet/rel/chivesweave/bin/start mine data_dir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] max_disk_pool_buffer_mb 10000 peer node1.chivesweave.net > output.log 2>&1 &
 
 ```
 
@@ -107,7 +107,7 @@ Step 7: Stop the node:
 
 ```
 
-As with mainnet peers, each peer must be run in its own physical or virtual environment (e.g. on its own machine or in its own container or virtual machine). If you try to run two nodes within the same environment you will get an error like `Protocol 'inet_tcp': the name chivesweave@127.0.0.1 seems to be in use by another Erlang node`
+As with mainnet peers, each peer must be run in its own physical or virtual environment (e.g. on its own machine or in its own container or virtual machine). If you try to run two nodes within the same environment you will get an error like `Protocol 'inet_tcp': the name chivesweave@127.0.0.1 seems to be in use by another Erlang node`, stop and restart your node, will slove this issue.
 
 
 # HTTP API

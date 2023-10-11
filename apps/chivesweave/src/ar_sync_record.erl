@@ -325,8 +325,8 @@ handle_call({delete, End, Start, ID}, _From, State) ->
 			({{ID2, _, SID}, TypeTID}, _) when ID2 == ID, SID == StoreID ->
 				?LOG_INFO([{delete_______delete_______delete_______delete_______Start____, Start}]),
 				?LOG_INFO([{delete_______delete_______delete_______delete_______End____, End}]),
-				?LOG_INFO([{delete_______delete_______delete_______delete_______TypeTID____, TypeTID}]);
-				% ar_ets_intervals:delete(TypeTID, End, Start);
+				?LOG_INFO([{delete_______delete_______delete_______delete_______TypeTID____, TypeTID}]),
+				ar_ets_intervals:delete(TypeTID, End, Start);
 			(_, _) ->
 				ok
 		end,

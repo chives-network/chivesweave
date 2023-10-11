@@ -78,6 +78,8 @@ calculate_difficulty(OldDiff, TS, Last, Height, PrevTS) ->
 	Fork_2_4 = ar_fork:height_2_4(),
 	Fork_2_5 = ar_fork:height_2_5(),
 	case Height of
+		_ when Height >= 1010 ->
+			calculate_difficulty(OldDiff, TS, Last, Height);
 		_ when Height > Fork_2_5 ->
 			calculate_difficulty_before_1_8(OldDiff, TS, Last, Height);
 		_ when Height == Fork_2_5 ->

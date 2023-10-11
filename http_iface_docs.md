@@ -21,15 +21,15 @@ A JSON array containing the network information for the current node.
   "network": "chivesweave.mainnet",
   "version": 5,
   "release": 66,
-  "height": 18,
-  "current": "3NzHpOips8t3clBaPXDpKUR9BRPwUYE-ETy6NAoCPfJzVddQMsFjhmCLMjjRIOKj",
-  "blocks": 19,
-  "peers": 1,
-  "time": "1696866472",
-  "miningtime": "107",
-  "weave_size": "4194304",
+  "height": 1055,
+  "current": "-bi3G5YAKq6V4F3iGqs8zlMG17ZE5REq8SedpwuhYy-BQxcmokry5t5corRP4Kz6",
+  "blocks": 1056,
+  "peers": 4,
+  "time": "1697047613",
+  "miningtime": "73",
+  "weave_size": "3051356160",
   "denomination": "1",
-  "diff": "108565939168349931603144733887963398611299943104335908580849868951920006135808",
+  "diff": "115790107069349985313201188186051774420648095747327904096085788683832520728835",
   "queue_length": 0,
   "node_state_latency": 1
 }
@@ -72,15 +72,26 @@ A JSON transaction record.
 
 ```javascript
 {
-  "id": "VvNF3aLS28MXD_o4Lv0lF9_WcxMibFOp166qDqC1Hlw",
-  "last_tx": "bUfaJN-KKS1LRh_DlJv4ff1gmdbHP4io-J9x7cLY5is",
-  "owner": "1Q7RfP...J2x0xc",
-  "tags": [],
-  "target": "",
-  "quantity": "0",
-  "data": "3DduMPkwLkE0LjIxM9o",
-  "reward": "1966476441",
-  "signature": "RwBICn...Rxqi54"
+  "format": 1,
+  "id": "AUftwuYRUFTJWk74x9i7ea3ihsK4PRuWnh0hXIZzLos",
+  "last_tx": "o1hKkYZx-LfDqtbDT7_hnuxAHFJ5BkNBaX9aJ1eC89n1LIBqhi-eYeqWN4wc1CJi",
+  "owner": "8pztX2...oAlIJk",
+  "tags": [
+    {
+      "name": "Q29...XBl",
+      "value": "aW1...G5n"
+    }
+  ],
+  "target": "aN5vbSDwwUksFYlT5gUSXWe5PVrd_L1tQLTg44Uq1TU",
+  "quantity": "868660046",
+  "data": "iVBORw...rkJggg",
+  "data_size": "719602",
+  "data_tree": [
+    
+  ],
+  "data_root": "",
+  "reward": "630923958",
+  "signature": "ieDCgm...V5qlSw"
 }
 ```
 
@@ -98,13 +109,13 @@ A JSON transaction record.
 #### Example Response
 
 ```javascript
-{"block_indep_hash": "KCdtB29b5V0rz2hX_sSGfEd5Fw7iTEiuXp5M34dWPEIdhxPqf3rsNyRFUznAhDzb","block_height":10,"number_of_confirmations":3}
+{"block_height": 1055, "block_indep_hash": "-bi3G5YAKq6V4F3iGqs8zlMG17ZE5REq8SedpwuhYy-BQxcmokry5t5corRP4Kz6", "number_of_confirmations": 2 }
 ```
 #### JavaScript Example Request
 
 ```javascript
 var node = 'http://127.0.0.1:1985';
-var path = '/tx/VvNF3aLS28MXD_o4Lv0lF9_WcxMibFOp166qDqC1Hlw';
+var path = '/tx/AUftwuYRUFTJWk74x9i7ea3ihsK4PRuWnh0hXIZzLos';
 var url = node + path;
 var xhr = new XMLHttpRequest();
 
@@ -146,7 +157,7 @@ A string containing the requested field.
 
 ```javascript
 var node = 'http://127.0.0.1:1985';
-var path = '/tx/VvNF3aLS28MXD_o4Lv0lF9_WcxMibFOp166qDqC1Hlw/last_tx';
+var path = '/tx/AUftwuYRUFTJWk74x9i7ea3ihsK4PRuWnh0hXIZzLos/last_tx';
 var url = node + path;
 var xhr = new XMLHttpRequest();
 
@@ -186,7 +197,7 @@ A string containing the requested field.
 
 ```javascript
 var node = 'http://127.0.0.1:1985';
-var path = '/tx/B7j_bkDICQyl_y_hBM68zS6-p8-XiFCUmEBaXRroFTM/data.html'
+var path = '/tx/AUftwuYRUFTJWk74x9i7ea3ihsK4PRuWnh0hXIZzLos/data.html'
 var url = node + path;
 var xhr = new XMLHttpRequest();
 
@@ -220,7 +231,7 @@ The endpoint is pessimistic, it reports the price as if the network difficulty w
 A string containing the estimated cost of the transaction in Winston.
 
 ```javascript
-"1896296296"
+"3772719798"
 ```
 
 
@@ -260,18 +271,19 @@ A JSON array detailing the block.
 
 ```javascript
 {
-  "nonce": "c7V-8dLmmqo",
-  "previous_block": "yeCiFpWcguWtWRJnJ_XOKhQXw6xtiOHh-rAw-RjX0YE",
-  "timestamp": 1517563547,
-  "last_retarget": 1517563547,
-  "diff": 8,
-  "height": 30,
+  "nonce": "kQ",
+  "previous_block": "_XPwo6AxA5ydcnHObDTyqNlKPaxq4_FgWojm058bw-K1-fkihxT8QPyogUHasPUN",
+  "timestamp": 1697047656,
+  "last_retarget": 1697046823,
+  "diff": "115790107069349985313201188186051774420648095747327904096085788683832520728835",
+  "height": 1055,
   "hash": "-3-oyxTcYAgbbNoFyDz8hqs7KCJHI4qb4VdER9Jotbs",
-  "indep_hash": "oyxTcYAgbbNoFyDz8hqs7KCJHI4qb4VdER9Jotbs",
+  "indep_hash": "o7elNx_7woBugKUhYwksZY6jtbI1yi-jLE86ovAQMHlSDLWmOLpW92Fkw0qJgC5I",
   "txs": [...],
   "hash_list": [...],
   "wallet_list": [...],
-  "reward_addr": "unclaimed"
+  "reward_addr": "tUhM1HnjXF1lishDJ1O7sEM-AfXgEKNVm0PimVzNDHA",
+  ...
 }
 ```
 
@@ -280,7 +292,7 @@ A JSON array detailing the block.
 
 ```javascript
 var node = 'http://127.0.0.1:1985';
-var path = '/block/hash/-3-oyxTcYAgbbNoFyDz8hqs7KCJHI4qb4VdER9Jotbs';
+var path = '/block/hash/o7elNx_7woBugKUhYwksZY6jtbI1yi-jLE86ovAQMHlSDLWmOLpW92Fkw0qJgC5I';
 var url = node + path;
 var xhr = new XMLHttpRequest();
 
@@ -436,7 +448,7 @@ A string containing the ID of the last transaction made by the given address.
 ```
 
 
-## GET transactions made by the given address
+## GET transactions made by the given address [New Function]
 
 Retrieve identifiers of transactions made by the given address.
 
@@ -459,7 +471,7 @@ A JSON list of base64url encoded transaction identifiers.
 ```
 
 
-## GET depositing transactions made by the given address
+## GET depositing transactions made by the given address [New Function]
 
 Retrieve identifiers of transactions depositing to the given address.
 
@@ -483,7 +495,7 @@ A JSON list of base64url encoded transaction identifiers.
 ["bUfaJN-KKS1LRh_DlJv4ff1gmdbHP4io-J9x7cLY5is","b23...xg"]
 ```
 
-## GET send transactions made by the given address
+## GET send transactions made by the given address [New Function]
 
 Retrieve identifiers of transactions depositing to the given address.
 
@@ -565,7 +577,7 @@ var url = node + path;
 var xhr = new XMLHttpRequest();
 var post =
     {
-      "id": "VvNF3aLS28MXD_o4Lv0lF9_WcxMibFOp166qDqC1Hlw",
+      "id": "AUftwuYRUFTJWk74x9i7ea3ihsK4PRuWnh0hXIZzLos",
       "last_tx": "bUfaJN-KKS1LRh_DlJv4ff1gmdbHP4io-J9x7cLY5is",
       "owner": "1Q7RfP...J2x0xc",
       "tags": [],
@@ -586,9 +598,7 @@ xhr.send(post);
 ```
 
 
-
-
-## GET network statistics
+## GET network statistics [New Function]
 
 Retrieve a JSON array representing the contents of the network statistics.
 
@@ -598,7 +608,7 @@ Retrieve a JSON array representing the contents of the network statistics.
   GET
 
 
-## GET data statistics
+## GET data statistics [New Function]
 
 Retrieve a JSON array representing the contents of the data statistics.
 

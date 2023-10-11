@@ -161,7 +161,7 @@ get_entropy_reset_point(PrevStepNumber, StepNumber) ->
 		false ->
 			ResetLine
 	end,	
-	?LOG_INFO([{get_entropy_reset_point______ResetLineResult_______, ResetLineResult}]),
+	% ?LOG_INFO([{get_entropy_reset_point______ResetLineResult_______, ResetLineResult}]),
 	ResetLineResult.
 
 %% @doc Conditionally add entropy to PrevOutput if the configured number of steps have

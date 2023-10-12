@@ -1040,6 +1040,7 @@ init([]) ->
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "statistics_contract"), statistics_contract),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "statistics_token"), statistics_token),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "statistics_summary"), statistics_summary),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "statistics_ipaddress"), statistics_ipaddress),
 
 	ets:insert(?MODULE, [{same_disk_storage_modules_total_size,
 			get_same_disk_storage_modules_total_size()}]),

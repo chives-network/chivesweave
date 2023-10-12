@@ -611,6 +611,43 @@ handle(<<"GET">>, [<<"peers">>], Req, _Pid) ->
 		),
 	Req};
 
+%% Return the list of peers detail held by the node.
+%% GET request to endpoint /peers.
+handle(<<"GET">>, [<<"peersinfo">>], Req, _Pid) ->
+	IpList = [
+				list_to_binary(ar_util:format_peer(P))
+			||
+				P <- ar_peers:get_peers(lifetime),
+				P /= ar_http_util:arweave_peer(Req),
+				ar_peers:is_public_peer(P)
+			],
+	IpInfoList = lists:map(
+		fun(IPPort) ->
+			?LOG_INFO([{ip______________________________________, IPPort}]),
+			[IPStr, _] = string:split(IPPort, ":"),
+			case ar_kv:get(statistics_ipaddress, IPStr) of
+				not_found ->
+					Response = httpc:request(post, {"https://nordvpn.com/wp-admin/admin-ajax.php?action=get_user_info_data&ip=" ++ IPStr, [], "application/json", "" }, [], []),
+					case Response of
+						{ok, {_, _, ResponseBody}} ->
+							ar_kv:put(statistics_ipaddress, IPStr, term_to_binary(jiffy:decode(ResponseBody))),
+							ResponseBody;
+						Error ->
+							Error
+					end;
+				{ok, IpInfoBinary} ->
+					IpInfo = binary_to_term(IpInfoBinary),	
+					IpInfo			
+			end
+        end,
+		IpList
+	),
+	?LOG_INFO([{ipInfoList, IpInfoList}]),
+
+	{200, #{},
+		ar_serialize:jsonify(IpInfoList),
+	Req};
+
 %% Return the inflation reward emitted at the given block.
 %% GET request to endpoint /price/{height}.
 handle(<<"GET">>, [<<"inflation">>, EncodedHeight], Req, _Pid) ->

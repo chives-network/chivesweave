@@ -107,6 +107,28 @@ Step 7: Stop the node:
 
 ```
 
+Step 8: How to check your wallet balance? 
+
+If you are a miner, the block reward you receive will be retained in 30*24 blocks, and you can use it normally after that.
+Enter the following url into your local machine's browser to check reserved rewards balance:
+
+```sh
+http://127.0.0.1:1985/wallet/[YOUR_WALLET_ADDRESS]/reserved_rewards_total
+```
+
+Enter the following url into your local machine's browser to check wallet balance:
+
+```sh
+http://127.0.0.1:1985/wallet/[YOUR_WALLET_ADDRESS]/balance
+```
+
+You can also use public nodes to check wallet balances:
+
+```sh
+https://api.chivesweave.net/wallet/[YOUR_WALLET_ADDRESS]/reserved_rewards_total
+https://api.chivesweave.net/wallet/[YOUR_WALLET_ADDRESS]/balance
+```
+
 As with mainnet peers, each peer must be run in its own physical or virtual environment (e.g. on its own machine or in its own container or virtual machine). If you try to run two nodes within the same environment you will get an error like `Protocol 'inet_tcp': the name chivesweave@127.0.0.1 seems to be in use by another Erlang node`, stop and restart your node, will slove this issue.
 
 

@@ -129,6 +129,24 @@ https://api.chivesweave.net/wallet/[YOUR_WALLET_ADDRESS]/reserved_rewards_total
 https://api.chivesweave.net/wallet/[YOUR_WALLET_ADDRESS]/balance
 ```
 
+
+Step 8: How to check if my node is mining?
+
+- 1 The hard disk partition where the directory specified (/home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir) when the mining program is started requires at least 300G space, You can set this directory to another partition or path.
+- 2 The smaller the value of VDF, the better. It is usually required to be less than 1.4. Most nodes are around 1.
+- 3 When the node first starts, about half an hour later, the following data will appear:
+```sh
+Mining performance report:
+Total avg: 75.71 MiB/s,  302.86 h/s; current: 83.49 MiB/s, 333.97 h/s; VDF: 1.25 s.
+Partition 0 avg: 75.71 MiB/s, current: 83.49 MiB/s, optimum: 0.04 MiB/s, 0.09 MiB/s (full weave).
+
+Mining performance report:
+Total avg: 75.71 MiB/s,  302.85 h/s; current: 74.09 MiB/s, 296.34 h/s; VDF: 1.11 s.
+Partition 0 avg: 75.71 MiB/s, current: 74.09 MiB/s, optimum: 0.05 MiB/s, 0.10 MiB/s (full weave).
+```
+It means that the mining program is already working.
+
+
 As with mainnet peers, each peer must be run in its own physical or virtual environment (e.g. on its own machine or in its own container or virtual machine). If you try to run two nodes within the same environment you will get an error like `Protocol 'inet_tcp': the name chivesweave@127.0.0.1 seems to be in use by another Erlang node`, stop and restart your node, will slove this issue.
 
 

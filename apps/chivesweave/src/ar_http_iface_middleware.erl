@@ -2460,7 +2460,7 @@ handle_post_chunk(validate_proof, Proof, Req) ->
 			Parent ! ar_data_sync:add_chunk(DataRoot, DataPath, Chunk, Offset, TXSize) end),
 	receive
 		ok ->
-			{200, #{}, <<>>, Req};
+			{200, #{}, <<"OK">>, Req};
 		{error, data_root_not_found} ->
 			{400, #{}, jiffy:encode(#{ error => data_root_not_found }), Req};
 		{error, exceeds_disk_pool_size_limit} ->

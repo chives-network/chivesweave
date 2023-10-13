@@ -193,6 +193,9 @@ handle(<<"HEAD">>, [<<"info">>], Req, _Pid) ->
 	{200, #{}, <<>>, Req};
 
 %% Return permissive CORS headers for all endpoints.
+handle(<<"OPTIONS">>, [<<"chunk">>], Req, _Pid) ->
+	{200, #{<<"access-control-allow-methods">> => <<"GET, POST">>,
+			<<"access-control-allow-headers">> => <<"Content-Type">>}, <<"OK">>, Req};
 handle(<<"OPTIONS">>, [<<"block">>], Req, _Pid) ->
 	{200, #{<<"access-control-allow-methods">> => <<"GET, POST">>,
 			<<"access-control-allow-headers">> => <<"Content-Type">>}, <<"OK">>, Req};

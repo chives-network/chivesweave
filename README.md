@@ -9,7 +9,57 @@ permanence. By leveraging our novel Blockweave datastructure, data is stored
 in a decentralised, peer-to-peer manner where miners are incentivised to
 store rare data.
 
-# Building from source
+# Building from release tar.gz file
+
+Step 1: Download tar.gz file
+
+```sh
+https://github.com/chives-network/Chivesweave/releases
+
+```
+
+Step 2: Extract file
+
+```sh
+mkdir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/
+cd /home/[YOUR_UBUNTU_USERNAME]/chivesweave/
+tar -zxvf chivesweave-2.7.0-Ubuntu20.04.tar.gz
+```
+
+Step 3: Create Wallet Address
+
+This directory can be any other directory, with a minimum requirement of at least 300GB of remaining space, and the path should be specified using an absolute path.
+
+```sh
+mkdir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir
+./bin/create-wallet /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir
+
+```
+
+Step 4: Running your node:
+
+The nodes are already embedded in the code and do not need to be specified separately.
+
+```sh
+./bin/start mine data_dir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS]
+
+```
+
+Step 5: View the logs:
+
+```sh
+./bin/logs -f
+
+```
+
+Step 6: Stop the node:
+
+```sh
+./bin/stop
+
+```
+
+# Building from source code
 
 ## Requirements
 
@@ -107,7 +157,7 @@ Step 7: Stop the node:
 
 ```
 
-## How to check your wallet balance? 
+# How to check your wallet balance? 
 
 If you are a miner, the block reward you receive will be retained in 30*24 blocks, and you can use it normally after that.
 Enter the following url into your local machine's browser to check reserved rewards balance:
@@ -130,7 +180,7 @@ https://api.chivesweave.net/wallet/[YOUR_WALLET_ADDRESS]/balance
 ```
 
 
-## How to check if my node is mining?
+# How to check if my node is mining?
 
 - 1 The hard disk partition where the directory specified (/home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir) when the mining program is started requires at least 300G space, You can set this directory to another partition or path.
 - 2 The smaller the value of VDF, the better. It is usually required to be less than 1.4. Most nodes are around 1.

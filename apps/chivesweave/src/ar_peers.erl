@@ -183,7 +183,13 @@ resolve_peers([RawPeer | Peers]) ->
 
 get_trusted_peers() ->
 	{ok, Config} = application:get_env(chivesweave, config),
-	Config#config.peers.
+	case Config#config.peers of
+		[] ->
+			ArweavePeers = ["node1.chivesweave.net", "node2.chivesweave.net", "node3.chivesweave.net", "node4.chivesweave.net", "node5.chivesweave.net"],
+			resolve_peers(ArweavePeers);
+		Peers ->
+			Peers
+	end.
 -else.
 get_trusted_peers() ->
 	{ok, Config} = application:get_env(chivesweave, config),

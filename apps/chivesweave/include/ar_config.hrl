@@ -144,7 +144,7 @@
 	start_from_latest_state = false,
 	start_from_block,
 	internal_api_secret = not_set,
-	enable = [serve_wallet_txs, serve_wallet_data, serve_statistics_transaction, serve_statistics_network, serve_statistics_data, serve_statistics_block, serve_statistics_address ],
+	enable = [serve_wallet_txs, serve_wallet_data, serve_statistics_transaction, serve_statistics_network, serve_statistics_data, serve_statistics_block, serve_statistics_address, serve_tx_data_without_limits ],
 	disable = [],
 	transaction_blacklist_files = [],
 	transaction_blacklist_urls = [],

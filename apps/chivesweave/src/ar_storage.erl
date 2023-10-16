@@ -14,7 +14,7 @@
 		read_migrated_v1_tx_file/1, ensure_directories/1, write_file_atomic/2,
 		write_term/2, write_term/3, read_term/1, read_term/2, delete_term/1, is_file/1,
 		migrate_tx_record/1, migrate_block_record/1, read_account/2,
-		read_txsrecord_function/1, read_txs_by_addr/3, read_txrecord_by_txid/1, read_txsrecord_by_addr/3, read_data_by_addr/3, read_datarecord_by_addr/3, read_txsrecord_by_addr_deposits/3, read_txsrecord_by_addr_send/3, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0, read_datarecord_function/1, get_mempool_tx_records_target/1
+		read_txsrecord_function/1, read_txs_by_addr/3, read_txrecord_by_txid/1, read_txsrecord_by_addr/3, read_data_by_addr/3, read_datarecord_by_addr/3, read_txsrecord_by_addr_deposits/3, read_txsrecord_by_addr_send/3, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0, read_datarecord_function/1, get_mempool_tx_data_records/1, get_mempool_tx_send_records/1, get_mempool_tx_deposits_records/1, get_mempool_tx_txs_records/1
 	]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
@@ -1528,7 +1528,35 @@ read_txrecord_by_txid(TxId) ->
 			?LOG_INFO([{txId, TxId},{iD___________________, ID}]),
 			case ar_storage:read_tx(ID) of
 				unavailable ->
-					unavailable;
+					case ar_mempool:get_tx(ID) of
+						TX ->
+							FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+							TargetAddress = ar_util:encode(TX#tx.target),									
+							Tags = lists:map(
+									fun({Name, Value}) ->
+										{[{name, Name},{value, Value}]}
+									end,
+									TX#tx.tags),
+							TagsMap = lists:map(
+									fun({Name, Value}) ->
+										{Name, Value}
+									end,
+									TX#tx.tags),
+							DataType = find_value(<<"Content-Type">>, TagsMap),
+							TxListMap = #{
+								<<"id">> => ar_util:encode(TX#tx.id),
+								<<"owner">> => #{<<"address">> => FromAddress},
+								<<"recipient">> => TargetAddress,
+								<<"quantity">> => #{<<"winston">> => TX#tx.quantity, <<"xwe">>=> float(TX#tx.quantity) / float(?WINSTON_PER_AR)},
+								<<"fee">> => #{<<"winston">> => TX#tx.reward, <<"xwe">>=> float(TX#tx.reward) / float(?WINSTON_PER_AR)},
+								<<"data">> => #{<<"size">> => TX#tx.data_size, <<"type">> => DataType},
+								<<"block">> => #{},
+								<<"tags">> => Tags
+							},
+							TxListMap;
+						_ -> 
+							[]
+					end;
 				#tx{} = TX ->
 					FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
 					TargetAddress = ar_util:encode(TX#tx.target),									
@@ -1757,7 +1785,122 @@ read_datarecord_function(TxIdList) ->
 					end
 				end, TxIdList).
 
-get_mempool_tx_records_target(Addr) ->
+get_mempool_tx_data_records(Addr) ->
+	IsMySelfTx = fun(TxId) ->
+		case ar_mempool:get_tx(TxId) of
+			not_found ->
+				false;
+			TX ->
+				FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+				TargetAddress = ar_util:encode(TX#tx.target),	
+				% ?LOG_INFO([{get_mempool_tx_data_records_______________________TargetAddress_______________________________, TargetAddress}]),
+				case TX#tx.data_size > 0 of
+					true -> 
+						case TargetAddress of
+							Addr -> true;
+							<<>> -> 
+								case FromAddress of
+									Addr -> true;
+									_ -> 
+										false
+								end;
+							_ -> false
+						end;
+					false -> false
+				end
+		end
+	end,
+	MyPendingTxs = lists:filter(
+		IsMySelfTx,
+		ar_mempool:get_all_txids()
+	),
+	MyPendingTxsRecord = lists:map(
+		fun(TxId) ->
+			case ar_mempool:get_tx(TxId) of
+				TX ->
+					FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+					TargetAddress = ar_util:encode(TX#tx.target),									
+					Tags = lists:map(
+							fun({Name, Value}) ->
+								{[{name, Name},{value, Value}]}
+							end,
+							TX#tx.tags),
+					TagsMap = lists:map(
+							fun({Name, Value}) ->
+								{Name, Value}
+							end,
+							TX#tx.tags),
+					DataType = find_value(<<"Content-Type">>, TagsMap),
+					TxListMap = #{
+						<<"id">> => ar_util:encode(TX#tx.id),
+						<<"owner">> => #{<<"address">> => FromAddress},
+						<<"recipient">> => TargetAddress,
+						<<"quantity">> => #{<<"winston">> => TX#tx.quantity, <<"xwe">>=> float(TX#tx.quantity) / float(?WINSTON_PER_AR)},
+						<<"fee">> => #{<<"winston">> => TX#tx.reward, <<"xwe">>=> float(TX#tx.reward) / float(?WINSTON_PER_AR)},
+						<<"data">> => #{<<"size">> => TX#tx.data_size, <<"type">> => DataType},
+						<<"block">> => #{},
+						<<"tags">> => Tags
+					},
+					TxListMap
+			end
+		end,
+		MyPendingTxs
+	),
+	MyPendingTxsRecord.
+
+get_mempool_tx_send_records(Addr) ->
+	IsMySelfTx = fun(TxId) ->
+		case ar_mempool:get_tx(TxId) of
+			not_found ->
+				false;
+			TX ->
+				FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+				% ?LOG_INFO([{get_mempool_tx_send_recordss____________FromAddress__________________________________________, FromAddress}]),
+				case FromAddress of
+					Addr -> true;
+					_ -> false
+				end
+		end
+	end,
+	MyPendingTxs = lists:filter(
+		IsMySelfTx,
+		ar_mempool:get_all_txids()
+	),
+	MyPendingTxsRecord = lists:map(
+		fun(TxId) ->
+			case ar_mempool:get_tx(TxId) of
+				TX ->
+					FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+					TargetAddress = ar_util:encode(TX#tx.target),									
+					Tags = lists:map(
+							fun({Name, Value}) ->
+								{[{name, Name},{value, Value}]}
+							end,
+							TX#tx.tags),
+					TagsMap = lists:map(
+							fun({Name, Value}) ->
+								{Name, Value}
+							end,
+							TX#tx.tags),
+					DataType = find_value(<<"Content-Type">>, TagsMap),
+					TxListMap = #{
+						<<"id">> => ar_util:encode(TX#tx.id),
+						<<"owner">> => #{<<"address">> => FromAddress},
+						<<"recipient">> => TargetAddress,
+						<<"quantity">> => #{<<"winston">> => TX#tx.quantity, <<"xwe">>=> float(TX#tx.quantity) / float(?WINSTON_PER_AR)},
+						<<"fee">> => #{<<"winston">> => TX#tx.reward, <<"xwe">>=> float(TX#tx.reward) / float(?WINSTON_PER_AR)},
+						<<"data">> => #{<<"size">> => TX#tx.data_size, <<"type">> => DataType},
+						<<"block">> => #{},
+						<<"tags">> => Tags
+					},
+					TxListMap
+			end
+		end,
+		MyPendingTxs
+	),
+	MyPendingTxsRecord.
+
+get_mempool_tx_deposits_records(Addr) ->
 	IsMySelfTx = fun(TxId) ->
 		case ar_mempool:get_tx(TxId) of
 			not_found ->
@@ -1765,11 +1908,69 @@ get_mempool_tx_records_target(Addr) ->
 			TX ->
 				% FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
 				TargetAddress = ar_util:encode(TX#tx.target),	
+				% ?LOG_INFO([{get_mempool_tx_deposits_records_______________________TargetAddress_______________________________, TargetAddress}]),
 				case TargetAddress of
 					Addr -> true;
-					"" -> true;
 					_ -> false
 				end
+		end
+	end,
+	MyPendingTxs = lists:filter(
+		IsMySelfTx,
+		ar_mempool:get_all_txids()
+	),
+	MyPendingTxsRecord = lists:map(
+		fun(TxId) ->
+			case ar_mempool:get_tx(TxId) of
+				TX ->
+					FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+					TargetAddress = ar_util:encode(TX#tx.target),									
+					Tags = lists:map(
+							fun({Name, Value}) ->
+								{[{name, Name},{value, Value}]}
+							end,
+							TX#tx.tags),
+					TagsMap = lists:map(
+							fun({Name, Value}) ->
+								{Name, Value}
+							end,
+							TX#tx.tags),
+					DataType = find_value(<<"Content-Type">>, TagsMap),
+					TxListMap = #{
+						<<"id">> => ar_util:encode(TX#tx.id),
+						<<"owner">> => #{<<"address">> => FromAddress},
+						<<"recipient">> => TargetAddress,
+						<<"quantity">> => #{<<"winston">> => TX#tx.quantity, <<"xwe">>=> float(TX#tx.quantity) / float(?WINSTON_PER_AR)},
+						<<"fee">> => #{<<"winston">> => TX#tx.reward, <<"xwe">>=> float(TX#tx.reward) / float(?WINSTON_PER_AR)},
+						<<"data">> => #{<<"size">> => TX#tx.data_size, <<"type">> => DataType},
+						<<"block">> => #{},
+						<<"tags">> => Tags
+					},
+					TxListMap
+			end
+		end,
+		MyPendingTxs
+	),
+	MyPendingTxsRecord.
+
+
+get_mempool_tx_txs_records(Addr) ->
+	IsMySelfTx = fun(TxId) ->
+		case ar_mempool:get_tx(TxId) of
+			not_found ->
+				false;
+			TX ->
+				FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+				TargetAddress = ar_util:encode(TX#tx.target),	
+				% ?LOG_INFO([{targetAddress___________________________, TargetAddress}]),
+				case FromAddress of
+					Addr -> true;
+					_ -> 
+						case TargetAddress of
+							Addr -> true;
+							_ -> false
+						end
+				end				
 		end
 	end,
 	MyPendingTxs = lists:filter(

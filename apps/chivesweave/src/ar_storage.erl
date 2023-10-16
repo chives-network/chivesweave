@@ -14,7 +14,7 @@
 		read_migrated_v1_tx_file/1, ensure_directories/1, write_file_atomic/2,
 		write_term/2, write_term/3, read_term/1, read_term/2, delete_term/1, is_file/1,
 		migrate_tx_record/1, migrate_block_record/1, read_account/2,
-		read_txsrecord_function/1, read_txs_by_addr/3, read_txrecord_by_txid/1, read_txsrecord_by_addr/3, read_data_by_addr/3, read_datarecord_by_addr/3, read_txsrecord_by_addr_deposits/3, read_txsrecord_by_addr_send/3, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0
+		read_txsrecord_function/1, read_txs_by_addr/3, read_txrecord_by_txid/1, read_txsrecord_by_addr/3, read_data_by_addr/3, read_datarecord_by_addr/3, read_txsrecord_by_addr_deposits/3, read_txsrecord_by_addr_send/3, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0, read_datarecord_function/1
 	]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).

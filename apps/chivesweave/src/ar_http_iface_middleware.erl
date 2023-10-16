@@ -2044,8 +2044,42 @@ handle_get_address_datarecord(Addr, PageId, PageRecords) ->
 				not_found ->
 					{404, #{}, []};
 				Res ->
-					% ?LOG_INFO([{handle_get_address_data, Res}]),
-					{200, #{}, ar_serialize:jsonify(Res)}
+					?LOG_INFO([{handle_get_address_data, Res}]),
+					IsMySelfTx = fun(TxId) ->
+						case ar_mempool:get_tx(TxId) of
+							not_found ->
+								?LOG_INFO([{handle_get_address_data_read_tx, TxId}]),
+								?LOG_INFO([{handle_get_address_data_read_tx, not_found}]),
+								false;
+							TX ->
+								% FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+								?LOG_INFO([{handle_get_address_data_TX___________, TX}]),
+								TargetAddress = ar_util:encode(TX#tx.target),	
+								?LOG_INFO([{handle_get_address_data_TargetAddress, TargetAddress}]),
+								?LOG_INFO([{handle_get_address_data_Addr, Addr}]),								
+								case TargetAddress of
+									Addr -> true;
+									"" -> true;
+									_ -> false
+								end
+						end
+					end,
+					MyPendingTxs = lists:filter(
+						IsMySelfTx,
+						ar_mempool:get_all_txids()
+					),
+					?LOG_INFO([{handle_get_address_data_MyPendingTxs, MyPendingTxs}]),
+					?LOG_INFO([{handle_get_address_data_ar_mempool_get_all_txids, ar_mempool:get_all_txids()}]),
+					MyPendingTxsEncode = lists:map(
+						fun(TxId) ->
+							ar_util:encode(TxId)
+						end,
+						MyPendingTxs
+					),
+					?LOG_INFO([{handle_get_address_data_MyPendingTxsEncode, MyPendingTxsEncode}]),
+					MyPendingTxsRecord = ar_storage:read_datarecord_function(MyPendingTxsEncode),
+					?LOG_INFO([{handle_get_address_data_MyPendingTxsRecord, MyPendingTxsRecord}]),
+					{200, #{}, ar_serialize:jsonify(lists:append(MyPendingTxsRecord, Res))}
 			end
 	end.
 

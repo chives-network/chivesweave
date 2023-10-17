@@ -2093,7 +2093,6 @@ update_reward_history(B) ->
 			ok
 	end.
 
-
 write_full_block2(BShadow, TXs) ->
 	case write_block(BShadow) of
 		ok ->

@@ -1948,9 +1948,9 @@ handle_get_block_txsrecord_by_height(Height) ->
 					{404, #{}, jiffy:encode(#{ error => block_not_found })};
 				#block{ txs = TXs2 } ->
 					TXIDs = lists:map(fun(TX) when is_binary(TX) -> ar_util:encode(TX); (#tx{ id = TX }) -> ar_util:encode(TX) end, TXs2),
-					?LOG_INFO([{handle_get_block_txsrecord_by_heightTXIDs, TXIDs}]),
-					TxsRecord = ar_storage:read_txsrecord_function(term_to_binary(TXIDs)),
-					?LOG_INFO([{handle_get_block_txsrecord_by_heightTxsRecord, TxsRecord}]),
+					% ?LOG_INFO([{handle_get_block_txsrecord_by_heightTXIDs____________, TXIDs}]),
+					TxsRecord = ar_storage:read_txsrecord_function(TXIDs),
+					% ?LOG_INFO([{handle_get_block_txsrecord_by_heightTxsRecord________, TxsRecord}]),
 					{200, #{}, ar_serialize:jsonify(TxsRecord)}
 			end
 	end.

@@ -541,7 +541,45 @@ A list containing the IP addresses of all of the nodes peers.
 ```
 
 
+## GET nodes peer list with details
 
+Retrieve the list with details of peers held by the contacted node.
+
+- **URL**
+  `/peersinfo`
+- **Method**
+  GET
+
+
+#### Example Response
+
+A list containing the IP addresses and details of all of the nodes peers.
+
+```javascript
+[
+  {
+    "coordinates": {
+      "latitude": xxx.xxx,
+      "longitude": -xxx.xxx
+    },
+    "ip": "xxx.xxx.xxx.xxx",
+    "isp": "xxx xxx",
+    "host": {
+      "domain": "xxx.net",
+      "ip_address": "xxx.xxx.xxx.xxx",
+      "prefix_len": 21
+    },
+    "status": false,
+    "country": "United States",
+    "region": "xxx",
+    "city": "xxx xxx",
+    "location": "United States, xxx, xxx xxx",
+    "area_code": "xxx",
+    "country_code": "US"
+  },
+  ...
+]
+```
 
 ## POST transaction to network
 

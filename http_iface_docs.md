@@ -383,7 +383,6 @@ Retrieve a JSON array representing the contents of the current block, the networ
 - **Method**
   GET
 
-
 #### Example Response
 
 A JSON array detailing the block.
@@ -417,7 +416,6 @@ The returned amount is in winston (the smallest division of XWE, 1 XWE = 1000000
   GET
 - **URL Parameters**
   [wallet_address] : A base64url encoded SHA256 hash of the raw RSA modulus.
-
 
 #### Example Response
 
@@ -461,7 +459,6 @@ Retrieve identifiers of transactions made by the given address.
   - [Pageid] : The page of the whole txs, pageid begin with 0, mean the first page in descending order, value from 1 ~ int(All Txs Relative This Address / Txs Number).
   - [TxNumber] : how many txs your want to fetch per page, value from 1 ~ 100. And will append the relative txs in mempool, so the results will more than [TxNumber].
 
-
 #### Example Response
 
 A JSON list of base64url encoded transaction identifiers.
@@ -469,6 +466,42 @@ A JSON list of base64url encoded transaction identifiers.
 ```javascript
 ["bUfaJN-KKS1LRh_DlJv4ff1gmdbHP4io-J9x7cLY5is","b23...xg"]
 ```
+
+
+## GET transactions made by the given address [New Function]
+
+Retrieve identifiers of transactions made by the given address.
+
+- **URL**
+  `/wallet/[wallet_address]/txsrecord/[Pageid]/[TxNumber]`
+- **Method**
+  GET
+- **URL Parameters**
+  - [wallet_address] : A Base64 encoded SHA256 hash of the public key.
+  - [Pageid] : The page of the whole txs, pageid begin with 0, mean the first page in descending order, value from 1 ~ int(All Txs Relative This Address / Txs Number).
+  - [TxNumber] : how many txs your want to fetch per page, value from 1 ~ 100. And will append the relative txs in mempool, so the results will more than [TxNumber].
+
+#### Example Response
+
+A JSON list of Tx structure.
+
+
+## GET File transactions made by the given address [New Function]
+
+Retrieve identifiers of File transactions made by the given address.
+
+- **URL**
+  `/wallet/[wallet_address]/datarecord/[Pageid]/[TxNumber]`
+- **Method**
+  GET
+- **URL Parameters**
+  - [wallet_address] : A Base64 encoded SHA256 hash of the public key.
+  - [Pageid] : The page of the whole txs, pageid begin with 0, mean the first page in descending order, value from 1 ~ int(All Txs Relative This Address / Txs Number).
+  - [TxNumber] : how many txs your want to fetch per page, value from 1 ~ 100. And will append the relative txs in mempool, so the results will more than [TxNumber].
+
+#### Example Response
+
+A JSON list of File Tx structure.
 
 
 ## GET depositing transactions made by the given address [New Function]
@@ -486,14 +519,10 @@ Retrieve identifiers of transactions depositing to the given address.
 - **Use Cases**
   Blockchain Explorers, Wallets, and More.
 
-
 #### Example Response
 
-A JSON list of base64url encoded transaction identifiers.
+A JSON list of Tx structure.
 
-```javascript
-["bUfaJN-KKS1LRh_DlJv4ff1gmdbHP4io-J9x7cLY5is","b23...xg"]
-```
 
 ## GET send transactions made by the given address [New Function]
 
@@ -512,11 +541,7 @@ Retrieve identifiers of transactions depositing to the given address.
 
 #### Example Response
 
-A JSON list of base64url encoded transaction identifiers.
-
-```javascript
-["bUfaJN-KKS1LRh_DlJv4ff1gmdbHP4io-J9x7cLY5is","b23...xg"]
-```
+A JSON list of Tx structure.
 
 
 ## GET a tx structure by give a txid [New Function]

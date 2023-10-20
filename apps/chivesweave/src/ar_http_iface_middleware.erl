@@ -1488,6 +1488,27 @@ handle(Method, [<<"height">>], Req, _Pid)
 handle(<<"GET">>, [<<Hash:43/binary, MaybeExt/binary>>], Req, Pid) ->
 	handle(<<"GET">>, [<<"tx">>, Hash, <<"data.", MaybeExt/binary>>], Req, Pid);
 
+%% If the data is a image, and will get a compressed version, if not, will get the original data.
+%% This function will can the "convert" external command. Need run "sudo apt install imagemagick-6.q16"
+handle(<<"GET">>, [<<Hash:43/binary>>, <<"thumbnail">>], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_html_data, Config#config.disable) of
+		true ->
+			{421, #{}, <<"Serving HTML data is disabled on this node.">>, Req};
+		_ ->
+			case ar_util:safe_decode(Hash) of
+				{error, invalid} ->
+					{400, #{}, <<"Invalid hash.">>, Req};
+				{ok, ID} ->
+					case ar_storage:read_tx(ID) of
+						unavailable ->
+							{404, #{}, sendfile("data/not_found.html"), Req};
+						#tx{} = TX ->
+							serve_tx_html_data_thumbnail(Req, TX)
+					end
+			end
+	end;
+
 %% Accept a nonce limiter (VDF) update from a configured peer, if any.
 %% POST request to /vdf.
 handle(<<"POST">>, [<<"vdf">>], Req, Pid) ->
@@ -1725,6 +1746,74 @@ serve_tx_html_data(Req, _TX, invalid) ->
 	{421, #{}, <<>>, Req}.
 
 serve_format_2_html_data(Req, ContentType, TX) ->
+	case ar_storage:read_tx_data(TX) of
+		{ok, Data} ->
+			{200, #{ <<"content-type">> => ContentType }, Data, Req};
+		{error, enoent} ->
+			ok = ar_semaphore:acquire(get_tx_data, infinity),
+			case ar_data_sync:get_tx_data(TX#tx.id) of
+				{ok, Data} ->
+					{200, #{ <<"content-type">> => ContentType }, Data, Req};
+				{error, tx_data_too_big} ->
+					{400, #{}, jiffy:encode(#{ error => tx_data_too_big }), Req};
+				{error, not_found} ->
+					{200, #{ <<"content-type">> => ContentType }, <<>>, Req};
+				{error, timeout} ->
+					{503, #{}, jiffy:encode(#{ error => timeout }), Req}
+			end
+	end.
+
+
+serve_tx_html_data_thumbnail(Req, TX) ->
+	serve_tx_html_data_thumbnail(Req, TX, ar_http_util:get_tx_content_type(TX)).
+
+serve_tx_html_data_thumbnail(Req, #tx{ format = 1 } = TX, {valid, ContentType}) ->
+	?LOG_INFO([{serve_format_2_html_data_thumbnail_____________1, ContentType}]),
+	image_thumbnail_compress(Req, ContentType, TX);
+serve_tx_html_data_thumbnail(Req, #tx{ format = 1 } = TX, none) ->
+	?LOG_INFO([{serve_format_2_html_data_thumbnail_____________2, format}]),
+	{200, #{ <<"content-type">> => <<"text/html">> }, TX#tx.data, Req};
+serve_tx_html_data_thumbnail(Req, #tx{ format = 2 } = TX, {valid, ContentType}) ->
+	?LOG_INFO([{serve_format_2_html_data_thumbnail_____________3, ContentType}]),
+	image_thumbnail_compress(Req, ContentType, TX);
+serve_tx_html_data_thumbnail(Req, #tx{ format = 2 } = TX, none) ->
+	?LOG_INFO([{serve_format_2_html_data_thumbnail_____________4, format}]),
+	serve_format_2_html_data_thumbnail(Req, <<"text/html">>, TX);
+serve_tx_html_data_thumbnail(Req, _TX, invalid) ->
+	{421, #{}, <<>>, Req}.
+
+image_thumbnail_compress(Req, ContentType, TX) ->
+	case ar_storage:read_tx_data(TX) of
+		{ok, Data} ->
+			?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____read_tx_data______, binary:match(ContentType, <<"image">>)}]),
+			case binary:match(ContentType, <<"image">>) of
+				{0, 5} ->
+					%% Is image, and will to compress this image
+					MayCompressedData = ar_storage:image_thumbnail_compress_to_storage(ContentType, TX, Data),
+					{200, #{ <<"content-type">> => ContentType }, MayCompressedData, Req};
+				nomatch ->
+					%% Not a image, just return the original data
+					?LOG_INFO([{serve_format_2_html_data_thumbnail___________binary_starts_with_failed, false}]),
+					{200, #{ <<"content-type">> => ContentType }, Data, Req}
+			end;
+		{error, enoent} ->
+			?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____TXID______, ar_data_sync:get_tx_data(TX#tx.id)}]),
+			ok = ar_semaphore:acquire(get_tx_data, infinity),
+			case ar_data_sync:get_tx_data(TX#tx.id) of
+				{ok, Data} ->
+					?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____Data______, Data}]),
+					MayCompressedData = ar_storage:image_thumbnail_compress_to_storage(ContentType, TX, Data),
+					{200, #{ <<"content-type">> => ContentType }, MayCompressedData, Req};
+				{error, tx_data_too_big} ->
+					{400, #{}, jiffy:encode(#{ error => tx_data_too_big }), Req};
+				{error, not_found} ->
+					{200, #{ <<"content-type">> => ContentType }, TX#tx.data, Req};
+				{error, timeout} ->
+					{503, #{}, jiffy:encode(#{ error => timeout }), Req}
+			end
+	end.
+
+serve_format_2_html_data_thumbnail(Req, ContentType, TX) ->
 	case ar_storage:read_tx_data(TX) of
 		{ok, Data} ->
 			{200, #{ <<"content-type">> => ContentType }, Data, Req};

@@ -14,7 +14,7 @@
 		read_migrated_v1_tx_file/1, ensure_directories/1, write_file_atomic/2,
 		write_term/2, write_term/3, read_term/1, read_term/2, delete_term/1, is_file/1,
 		migrate_tx_record/1, migrate_block_record/1, read_account/2,
-		read_txsrecord_function/1, read_txs_by_addr/3, read_txrecord_by_txid/1, read_txsrecord_by_addr/3, read_data_by_addr/3, read_datarecord_by_addr/3, read_txsrecord_by_addr_deposits/3, read_txsrecord_by_addr_send/3, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0, read_datarecord_function/1, get_mempool_tx_data_records/1, get_mempool_tx_send_records/1, get_mempool_tx_deposits_records/1, get_mempool_tx_txs_records/1
+		read_txsrecord_function/1, read_txs_by_addr/3, read_txrecord_by_txid/1, read_txsrecord_by_addr/3, read_data_by_addr/3, read_datarecord_by_addr/3, read_txsrecord_by_addr_deposits/3, read_txsrecord_by_addr_send/3, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0, read_datarecord_function/1, get_mempool_tx_data_records/1, get_mempool_tx_send_records/1, get_mempool_tx_deposits_records/1, get_mempool_tx_txs_records/1, image_thumbnail_compress_to_storage/3
 	]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
@@ -2082,6 +2082,68 @@ read_data_by_addr(Addr, PageId, PageRecords) ->
 		[]
 	end.
 
+image_thumbnail_compress_to_storage(ContentType, TX, Data) ->
+	case binary:match(ContentType, <<"image">>) of
+		{0, 5} ->
+			%% Is image, and will to compress this image
+			DataSize = byte_size(Data),
+			case DataSize > 500 * 1024 of
+				true ->
+					%% Begin to comporess
+					%% Step 1: copy the data as a file, the path is [ADDRESS]/[TX]
+					{ok, Config} = application:get_env(chivesweave, config),
+					DataDir = Config#config.data_dir,
+					Address = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+					ImageThumbnailDir = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address])),
+					% ?LOG_INFO([{image_thumbnail_compress_to_storage_____________Address, Address}]),
+					% ?LOG_INFO([{image_thumbnail_compress_to_storage_____________ImageThumbnailDir, ImageThumbnailDir}]),
+					% ?LOG_INFO([{image_thumbnail_compress_to_storage_____________TXID, ar_util:encode(TX#tx.id)}]),
+					filelib:ensure_dir(ImageThumbnailDir ++ "/"),
+					OriginalFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, ar_util:encode(TX#tx.id)])),
+					NewFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(ar_util:encode(TX#tx.id)) ++ "_thumbnail"])),
+					%?LOG_INFO([{image_thumbnail_compress_to_storage_____________OriginalFilePath, OriginalFilePath}]),
+					%?LOG_INFO([{image_thumbnail_compress_to_storage_____________NewFilePath, NewFilePath}]),
+					case file:read_file_info(NewFilePath) of
+						{ok, _FileInfo} ->
+							ok;
+						_ ->
+							%% First to copy data to file
+							{ok, File} = file:open(OriginalFilePath, [write]),
+							case file:write(File, Data) of
+								ok ->
+									?LOG_INFO([{image_thumbnail_compress_to_storage_____________write, OriginalFilePath}]),
+									%% Not Exist, need to compress									
+									CompressCommand = "convert " ++ OriginalFilePath ++ " -resize 600x " ++ NewFilePath,
+									%?LOG_INFO([{image_thumbnail_compress_to_storage_____________Error, Error}]),
+									%?LOG_INFO([{image_thumbnail_compress_to_storage_____________CompressCommand, CompressCommand}]),
+									case os:cmd(CompressCommand) of
+										"" ->
+											file:delete(OriginalFilePath);
+										ErrorOutput ->
+											?LOG_INFO([{image_thumbnail_compress_to_storage_Compress_Command_Failed, ErrorOutput}])
+									end;
+								{error, Reason} ->													
+									?LOG_INFO([{image_thumbnail_compress_to_storage_____________write_Reason, Reason}])
+							end
+					end,
+					%% Begin to output			
+					case file:read_file(NewFilePath) of
+						{ok, FileContent} ->
+							% ?LOG_INFO([{image_thumbnail_compress_to_storage_____________FileContent, FileContent}]),
+							FileContent;
+						{error, _Reason} ->
+							Data
+					end;
+				false ->
+					?LOG_INFO([{image_thumbnail_compress_to_storage_____________DataSize_is_too_small, DataSize}]),
+					Data
+			end;
+		_ ->
+			%% Not a image, just return the original data
+			?LOG_INFO([{image_thumbnail_compress_to_storage___________Not_a_image, false}]),
+			Data
+	end.
+
 update_reward_history(B) ->
 	case B#block.height >= ar_fork:height_2_6() of
 		true ->
@@ -2161,6 +2223,7 @@ ensure_directories(DataDir) ->
 	filelib:ensure_dir(filename:join(DataDir, ?BLOCK_DIR) ++ "/"),
 	filelib:ensure_dir(filename:join(DataDir, ?WALLET_LIST_DIR) ++ "/"),
 	filelib:ensure_dir(filename:join(DataDir, ?HASH_LIST_DIR) ++ "/"),
+	filelib:ensure_dir(filename:join(DataDir, ?IMAGE_THUMBNAIL_DIR) ++ "/"),
 	filelib:ensure_dir(filename:join(DataDir, ?STORAGE_MIGRATIONS_DIR) ++ "/"),
 	filelib:ensure_dir(filename:join([DataDir, ?TX_DIR, "migrated_v1"]) ++ "/").
 

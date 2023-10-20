@@ -241,6 +241,9 @@
 %% Backup block hash list storage directory, relative to the data dir.
 -define(HASH_LIST_DIR, "hash_lists").
 
+%% Cache image thumbnail.
+-define(IMAGE_THUMBNAIL_DIR, "image_thumbnail").
+
 %% Directory for storing miner wallets, relative to the data dir.
 -define(WALLET_DIR, "wallets").
 

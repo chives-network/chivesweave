@@ -907,7 +907,7 @@ handle_task({mining_thread_computed_h0, {H0, PartitionNumber, PartitionUpperBoun
 			Range1End = RecallRange1Start + ?RECALL_RANGE_SIZE,
 			case find_thread(PartitionNumber, ReplicaID, Range1End, RecallRange1Start, Threads) of
 				not_found ->
-					?LOG_INFO([{event, mining_debug_no_io_thread_found_for_range______find_thread_failed______}, {range_start, RecallRange1Start}, {range_end, Range1End}, {partitionUpperBound, PartitionUpperBound}]),
+					?LOG_INFO([{event, mining_debug_no_io_thread_found_for_range_find_thread_failed}, {range_start, RecallRange1Start}, {range_end, Range1End}, {partitionUpperBound, PartitionUpperBound}]),
 					%% We have a storage module smaller than the partition size which
 					%% partially covers this partition but does not include this range.
 					ok;

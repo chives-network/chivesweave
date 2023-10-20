@@ -315,12 +315,12 @@ Retrieve a JSON array representing the contents of the block specified via the b
 - **Method**
   GET
 - **URL Parameters**
-  [FromHeight] : The height at which the block is being requested for
-  [BlockNumber] : how many blocks your want to fetch per page, value from 1 ~ 100
+  [FromHeight] : The height at which the block is being requested for.
+  [BlockNumber] : how many blocks your want to fetch per page, value from 1 ~ 100.
 - **Examples**
   `/blocklist/300/100`
 - **Use Cases**
-  Blockchain Explorers, Wallets, and More
+  Blockchain Explorers, Wallets, and More.
 
 
 ## GET block via pageid and records [New Function]
@@ -332,12 +332,12 @@ Retrieve a JSON array representing the contents of the block specified via the b
 - **Method**
   GET
 - **URL Parameters**
-  [Pageid] : The page of the whole blocks, pageid begin with 1, mean the first page in descending order, value from 1 ~ int(CurrentHeight/BlockNumber)
-  [BlockNumber] : how many blocks your want to fetch per page, value from 1 ~ 100
+  [Pageid] : The page of the whole blocks, pageid begin with 1, mean the first page in descending order, value from 1 ~ int(CurrentHeight/BlockNumber).
+  [BlockNumber] : how many blocks your want to fetch per page, value from 1 ~ 100.
 - **Examples**
   `/blocklist/300/100`
 - **Use Cases**
-  Blockchain Explorers, Wallets, and More
+  Blockchain Explorers, Wallets, and More.
 
 
 ## GET block via height
@@ -349,7 +349,7 @@ Retrieve a JSON array representing the contents of the block specified via the b
 - **Method**
   GET
 - **URL Parameters**
-  [block_height] : The height at which the block is being requested for
+  [block_height] : The height at which the block is being requested for.
 
 
 #### Example Response
@@ -382,7 +382,6 @@ Retrieve a JSON array representing the contents of the current block, the networ
   `/current_block`
 - **Method**
   GET
-
 
 #### Example Response
 
@@ -417,7 +416,6 @@ The returned amount is in winston (the smallest division of XWE, 1 XWE = 1000000
   GET
 - **URL Parameters**
   [wallet_address] : A base64url encoded SHA256 hash of the raw RSA modulus.
-
 
 #### Example Response
 
@@ -458,9 +456,8 @@ Retrieve identifiers of transactions made by the given address.
   GET
 - **URL Parameters**
   - [wallet_address] : A Base64 encoded SHA256 hash of the public key.
-  - [Pageid] : The page of the whole txs, pageid begin with 0, mean the first page in descending order, value from 1 ~ int(All Txs Relative This Address / Txs Number)
-  - [TxNumber] : how many txs your want to fetch per page, value from 1 ~ 100
-
+  - [Pageid] : The page of the whole txs, pageid begin with 0, mean the first page in descending order, value from 1 ~ int(All Txs Relative This Address / Txs Number).
+  - [TxNumber] : how many txs your want to fetch per page, value from 1 ~ 100. And will append the relative txs in mempool, so the results will more than [TxNumber].
 
 #### Example Response
 
@@ -469,6 +466,42 @@ A JSON list of base64url encoded transaction identifiers.
 ```javascript
 ["bUfaJN-KKS1LRh_DlJv4ff1gmdbHP4io-J9x7cLY5is","b23...xg"]
 ```
+
+
+## GET transactions made by the given address [New Function]
+
+Retrieve identifiers of transactions made by the given address.
+
+- **URL**
+  `/wallet/[wallet_address]/txsrecord/[Pageid]/[TxNumber]`
+- **Method**
+  GET
+- **URL Parameters**
+  - [wallet_address] : A Base64 encoded SHA256 hash of the public key.
+  - [Pageid] : The page of the whole txs, pageid begin with 0, mean the first page in descending order, value from 1 ~ int(All Txs Relative This Address / Txs Number).
+  - [TxNumber] : how many txs your want to fetch per page, value from 1 ~ 100. And will append the relative txs in mempool, so the results will more than [TxNumber].
+
+#### Example Response
+
+A JSON list of Tx structure.
+
+
+## GET File transactions made by the given address [New Function]
+
+Retrieve identifiers of File transactions made by the given address.
+
+- **URL**
+  `/wallet/[wallet_address]/datarecord/[Pageid]/[TxNumber]`
+- **Method**
+  GET
+- **URL Parameters**
+  - [wallet_address] : A Base64 encoded SHA256 hash of the public key.
+  - [Pageid] : The page of the whole txs, pageid begin with 0, mean the first page in descending order, value from 1 ~ int(All Txs Relative This Address / Txs Number).
+  - [TxNumber] : how many txs your want to fetch per page, value from 1 ~ 100. And will append the relative txs in mempool, so the results will more than [TxNumber].
+
+#### Example Response
+
+A JSON list of File Tx structure.
 
 
 ## GET depositing transactions made by the given address [New Function]
@@ -481,19 +514,15 @@ Retrieve identifiers of transactions depositing to the given address.
   GET
 - **URL Parameters**
   - [wallet_address] : A Base64 encoded SHA256 hash of the public key.
-  - [Pageid] : The page of the whole txs, pageid begin with 0, mean the first page in descending order, value from 1 ~ int(All Txs Relative This Address / Txs Number)
-  - [TxNumber] : how many txs your want to fetch per page, value from 1 ~ 100
+  - [Pageid] : The page of the whole txs, pageid begin with 0, mean the first page in descending order, value from 1 ~ int(All Txs Relative This Address / Txs Number).
+  - [TxNumber] : how many txs your want to fetch per page, value from 1 ~ 100. And will append the relative txs in mempool, so the results will more than [TxNumber].
 - **Use Cases**
-  Blockchain Explorers, Wallets, and More
-
+  Blockchain Explorers, Wallets, and More.
 
 #### Example Response
 
-A JSON list of base64url encoded transaction identifiers.
+A JSON list of Tx structure.
 
-```javascript
-["bUfaJN-KKS1LRh_DlJv4ff1gmdbHP4io-J9x7cLY5is","b23...xg"]
-```
 
 ## GET send transactions made by the given address [New Function]
 
@@ -505,17 +534,68 @@ Retrieve identifiers of transactions depositing to the given address.
   GET
 - **URL Parameters**
   - [wallet_address] : A Base64 encoded SHA256 hash of the public key.
-  - [Pageid] : The page of the whole txs, pageid begin with 0, mean the first page in descending order, value from 1 ~ int(All Txs Relative This Address / Txs Number)
-  - [TxNumber] : how many txs your want to fetch per page, value from 1 ~ 100
+  - [Pageid] : The page of the whole txs, pageid begin with 0, mean the first page in descending order, value from 1 ~ int(All Txs Relative This Address / Txs Number).
+  - [TxNumber] : how many txs your want to fetch per page, value from 1 ~ 100. And will append the relative txs in mempool, so the results will more than [TxNumber].
 - **Use Cases**
-  Blockchain Explorers, Wallets, and More
+  Blockchain Explorers, Wallets, and More.
 
 #### Example Response
 
-A JSON list of base64url encoded transaction identifiers.
+A JSON list of Tx structure.
+
+
+## GET a tx structure by give a txid [New Function]
+
+Retrieve identifiers of transactions structure to the given address.
+
+- **URL**
+  `/wallet/[transaction_id]/txrecord`
+- **Method**
+  GET
+- **URL Parameters**
+  - [transaction_id] : Base64 encoded ID associated with the transaction
+- **Use Cases**
+  Blockchain Explorers, Wallets, and More.
+
+#### Example Response
+
+A JSON object.
 
 ```javascript
-["bUfaJN-KKS1LRh_DlJv4ff1gmdbHP4io-J9x7cLY5is","b23...xg"]
+{
+  "tags": [
+    {
+      "name": "Content-Type",
+      "value": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "name": "File-Hash",
+      "value": "af212aa1fef46859f2c1c9d6bb0a848140434d8f45e1b9267d92e351c160d448"
+    }
+  ],
+  "recipient": "",
+  "quantity": {
+    "xwe": 0.0,
+    "winston": 0
+  },
+  "owner": {
+    "address": "r72kcrbulgboBk6EiuNro-JcLedyANekX-y1OMUQ3dM"
+  },
+  "id": "ogWreYEenO_pVL7Pe3olhw2Iv9a97i0DU5wxeXRtoP4",
+  "fee": {
+    "xwe": 0.000212017846,
+    "winston": 212017846
+  },
+  "data": {
+    "type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "size": 32176
+  },
+  "block": {
+    "timestamp": 1697648297,
+    "indep_hash": "fBZ8xXyZzZs_eDTjQ4Rix6ZBoVpzhjiLZFczZpkQNfurVo2Jbr9eZDHdEURmNmNg",
+    "height": 5774
+  }
+}
 ```
 
 
@@ -541,7 +621,45 @@ A list containing the IP addresses of all of the nodes peers.
 ```
 
 
+## GET nodes peer list with details
 
+Retrieve the list with details of peers held by the contacted node.
+
+- **URL**
+  `/peersinfo`
+- **Method**
+  GET
+
+
+#### Example Response
+
+A list containing the IP addresses and details of all of the nodes peers.
+
+```javascript
+[
+  {
+    "coordinates": {
+      "latitude": xxx.xxx,
+      "longitude": -xxx.xxx
+    },
+    "ip": "xxx.xxx.xxx.xxx",
+    "isp": "xxx xxx",
+    "host": {
+      "domain": "xxx.net",
+      "ip_address": "xxx.xxx.xxx.xxx",
+      "prefix_len": 21
+    },
+    "status": false,
+    "country": "United States",
+    "region": "xxx",
+    "city": "xxx xxx",
+    "location": "United States, xxx, xxx xxx",
+    "area_code": "xxx",
+    "country_code": "US"
+  },
+  ...
+]
+```
 
 ## POST transaction to network
 

@@ -175,8 +175,8 @@ http://127.0.0.1:1985/wallet/[YOUR_WALLET_ADDRESS]/balance
 You can also use public nodes to check wallet balances:
 
 ```sh
-https://api.chivesweave.net/wallet/[YOUR_WALLET_ADDRESS]/reserved_rewards_total
-https://api.chivesweave.net/wallet/[YOUR_WALLET_ADDRESS]/balance
+https://api.chivesweave.net:1986/wallet/[YOUR_WALLET_ADDRESS]/reserved_rewards_total
+https://api.chivesweave.net:1986/wallet/[YOUR_WALLET_ADDRESS]/balance
 ```
 
 

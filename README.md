@@ -38,10 +38,8 @@ mkdir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir
 
 Step 4: Running your node:
 
-The nodes are already embedded in the code and do not need to be specified separately.
-
 ```sh
-./bin/start mine data_dir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS]
+./bin/start mine data_dir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] peer node1.chivesweave.net
 
 ```
 

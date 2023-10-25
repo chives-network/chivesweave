@@ -38,10 +38,8 @@ mkdir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir
 
 Step 4: Running your node:
 
-The nodes are already embedded in the code and do not need to be specified separately.
-
 ```sh
-./bin/start mine data_dir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS]
+./bin/start mine data_dir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] peer node1.chivesweave.net
 
 ```
 
@@ -175,8 +173,8 @@ http://127.0.0.1:1985/wallet/[YOUR_WALLET_ADDRESS]/balance
 You can also use public nodes to check wallet balances:
 
 ```sh
-https://api.chivesweave.net/wallet/[YOUR_WALLET_ADDRESS]/reserved_rewards_total
-https://api.chivesweave.net/wallet/[YOUR_WALLET_ADDRESS]/balance
+https://api.chivesweave.net:1986/wallet/[YOUR_WALLET_ADDRESS]/reserved_rewards_total
+https://api.chivesweave.net:1986/wallet/[YOUR_WALLET_ADDRESS]/balance
 ```
 
 

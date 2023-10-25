@@ -404,6 +404,7 @@ in beamPackages.rebar3Relx {
     b64fast
     erlang-rocksdb
     jiffy
+    erlavro
     accept
     gun
     ranch

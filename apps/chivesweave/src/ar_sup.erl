@@ -66,6 +66,7 @@ init([]) ->
 	ets:new(node_state, [set, public, named_table]),
 	ets:new(chunk_storage_file_index, [set, public, named_table, {read_concurrency, true}]),
 	ets:new(mining_state, [set, public, named_table, {read_concurrency, true}]),
+	ets:new(cache_table, [set, public, named_table, {read_concurrency, true}]),
 	{ok, Config} = application:get_env(chivesweave, config),
 	MayBeARQL =
 		case lists:member(arql, Config#config.disable) of

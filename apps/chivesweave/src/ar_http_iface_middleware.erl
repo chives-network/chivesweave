@@ -250,6 +250,17 @@ handle(<<"GET">>, [<<"tx">>, Hash, <<"status">>], Req, _Pid) ->
 			handle_get_tx_status(Hash, Req)
 	end;
 
+%% Return a txs list in a bundle if tx is a bundle, and will unbundle txs and storage in disk.
+%% GET request to endpoint /tx/{hash}/status.
+handle(<<"GET">>, [<<"tx">>, Hash, <<"unbundle">>], Req, _Pid) ->
+	ar_semaphore:acquire(arql_semaphore(Req), 5000),
+	case ar_node:is_joined() of
+		false ->
+			not_joined(Req);
+		true ->
+			handle_get_tx_unbundle(Hash, Req)
+	end;
+
 %% Return a JSON-encoded transaction.
 %% GET request to endpoint /tx/{hash}.
 handle(<<"GET">>, [<<"tx">>, Hash], Req, _Pid) ->
@@ -334,7 +345,23 @@ handle(<<"GET">>, [<<"tx">>, Hash, << "data.", _/binary >>], Req, _Pid) ->
 				{ok, ID} ->
 					case ar_storage:read_tx(ID) of
 						unavailable ->
-							{404, #{}, sendfile("data/not_found.html"), Req};
+							DataDir = Config#config.data_dir,							
+							case ar_kv:get(xwe_storage_txid_in_bundle, ar_util:encode(ID))  of
+								not_found ->
+									{404, #{}, sendfile("data/not_found.html"), Req};
+								{ok, BundleTxBinary} ->
+									BundleTx = binary_to_term(BundleTxBinary),	
+									% ?LOG_INFO([{handle_get_tx_unbundle_____________BundleTx, BundleTx}]),
+									Address = maps:get(<<"address">>, maps:get(<<"owner">>, BundleTx, undefined), undefined),
+									FileName = binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, Address, ar_util:encode(ID) ])),
+									?LOG_INFO([{image_thumbnail_compress_to_storage_____________FileName, FileName}]),
+									case file:read_file(FileName) of
+										{ok, Content} ->
+											{200, #{}, Content, Req};
+										_ ->
+											{404, #{}, sendfile("data/not_found.html"), Req}
+									end
+							end;
 						#tx{} = TX ->
 							serve_tx_html_data(Req, TX)
 					end
@@ -1434,8 +1461,7 @@ handle(<<"GET">>, [<<"tx">>, Hash, Field], Req, _Pid) ->
 						<<"tags">> ->
 							{200, #{}, ar_serialize:jsonify(lists:map(
 									fun({Name, Value}) ->
-										{[{name, ar_util:encode(Name)},
-												{value, ar_util:encode(Value)}]}
+										{[{name, ar_util:encode(Name)},{value, ar_util:encode(Value)}]}
 									end,
 									TX#tx.tags)), Req};
 						<<"data">> ->
@@ -1502,7 +1528,41 @@ handle(<<"GET">>, [<<Hash:43/binary>>, <<"thumbnail">>], Req, _Pid) ->
 				{ok, ID} ->
 					case ar_storage:read_tx(ID) of
 						unavailable ->
-							{404, #{}, sendfile("data/not_found.html"), Req};
+							case ar_kv:get(xwe_storage_txid_in_bundle, ar_util:encode(ID))  of
+								not_found ->
+									{404, #{}, sendfile("data/not_found.html"), Req};
+								{ok, BundleTxBinary} ->
+									BundleTx = binary_to_term(BundleTxBinary),	
+									% ?LOG_INFO([{handle_get_tx_unbundle_____________BundleTx, BundleTx}]),
+									Address = maps:get(<<"address">>, maps:get(<<"owner">>, BundleTx, undefined), undefined),
+									% ?LOG_INFO([{handle_get_tx_unbundle_____________Address, Address}]),
+									DataDir = Config#config.data_dir,
+									NewFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(ar_util:encode(ID)) ++ "_thumbnail"])),
+									% ?LOG_INFO([{handle_get_tx_unbundle_____________NewFilePath, NewFilePath}]),
+									case file:read_file_info(NewFilePath) of
+										{ok, FileInfo} ->
+											case file:read_file(NewFilePath) of
+												{ok, FileContent} ->
+													{200, #{}, FileContent, Req};
+												{error, _Reason} ->
+													{404, #{}, sendfile("data/not_found.html"), Req}
+											end;
+										{error, _} ->
+											OriginalFilePath = binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, Address, ar_util:encode(ID) ])),
+											% ?LOG_INFO([{handle_get_tx_unbundle_____________NewFilePath, NewFilePath}]),
+											case file:read_file_info(OriginalFilePath) of
+												{ok, FileInfo} ->
+													case file:read_file(OriginalFilePath) of
+														{ok, FileContent} ->
+															{200, #{}, FileContent, Req};
+														{error, _Reason} ->
+															{404, #{}, sendfile("data/not_found.html"), Req}
+													end;
+												{error, _} ->
+													{404, #{}, sendfile("data/not_found.html"), Req}
+											end
+									end										
+							end;
 						#tx{} = TX ->
 							serve_tx_html_data_thumbnail(Req, TX)
 					end
@@ -1656,7 +1716,14 @@ handle_get_tx_status(EncodedTXID, Req) ->
 			end
 	end.
 
-handle_get_tx(Hash, Req, Encoding) ->
+find_value(Key, List) ->
+	case lists:keyfind(Key, 1, List) of
+		{Key, Val} -> Val;
+		false -> <<"text/plain">>
+	end.
+
+
+handle_get_tx_unbundle(Hash, Req) ->
 	case ar_util:safe_decode(Hash) of
 		{error, invalid} ->
 			{400, #{}, <<"Invalid hash.">>, Req};
@@ -1664,6 +1731,61 @@ handle_get_tx(Hash, Req, Encoding) ->
 			case ar_storage:read_tx(ID) of
 				unavailable ->
 					maybe_tx_is_pending_response(ID, Req);
+				#tx{} = TX ->
+					Tags = lists:map(
+							fun({Name, Value}) ->
+								{Name, Value}
+							end,
+							TX#tx.tags),
+					% ?LOG_INFO([{handle_get_tx_unbundle_____________TX, TX}]),
+					UnBundleResult = case find_value(<<"Bundle-Version">>, Tags) of
+						<<"2.0.0">> ->
+							% Is Bundle
+							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____Tags, Tags}]),
+							case ar_storage:read_tx_data(TX) of
+								{ok, TxData} ->
+									<<GetDataItemCountBinary:32/binary, DataItemsBinary/binary>> = TxData,
+									GetDataItemCount = binary:decode_unsigned(GetDataItemCountBinary,little),
+									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__read_tx_data___TX, TxData}]),
+									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCountBinary, GetDataItemCountBinary}]),
+									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____DataItemsBinary, DataItemsBinary}]),
+									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCountBinary, binary_to_integer(GetDataItemCount)}]),
+									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCount, GetDataItemCount}]);
+								{error, enoent} ->
+									ok = ar_semaphore:acquire(get_tx_data, infinity),
+									case ar_data_sync:get_tx_data(TX#tx.id) of
+										{ok, TxData} ->
+											% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(TX#tx.id)}]),
+											ar_storage:parse_bundle_data(TxData, TX);
+										_ ->
+											% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed, ar_util:encode(TX#tx.id)}]),
+											ar_storage:read_txrecord_by_txid(ar_util:encode(TX#tx.id))
+									end
+							end;
+						_ ->
+							% Not a Bundle
+							?LOG_INFO([{handle_get_tx_unbundle________NOT_A_Bundle_____Tags, Tags}]),
+							ar_storage:read_txrecord_by_txid(ar_util:encode(TX#tx.id))
+					end,
+					% ?LOG_INFO([{handle_get_tx_unbundle________Bundle_____BundleResult, UnBundleResult}]),
+					{200, #{}, ar_serialize:jsonify(UnBundleResult), Req}
+			end
+	end.
+
+handle_get_tx(Hash, Req, Encoding) ->
+	case ar_util:safe_decode(Hash) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid hash.">>, Req};
+		{ok, ID} ->
+			case ar_storage:read_tx(ID) of
+				unavailable ->
+					case ar_kv:get(xwe_storage_txid_in_bundle, ar_util:encode(ID))  of
+						not_found ->
+							maybe_tx_is_pending_response(ID, Req);
+						{ok, BundleTxBinary} ->
+							BundleTx = binary_to_term(BundleTxBinary),	
+							{200, #{}, ar_serialize:jsonify(BundleTx), Req}			
+					end;
 				#tx{} = TX ->
 					Body =
 						case Encoding of
@@ -1789,7 +1911,8 @@ image_thumbnail_compress(Req, ContentType, TX) ->
 			case binary:match(ContentType, <<"image">>) of
 				{0, 5} ->
 					%% Is image, and will to compress this image
-					MayCompressedData = ar_storage:image_thumbnail_compress_to_storage(ContentType, TX, Data),
+					FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+					MayCompressedData = ar_storage:image_thumbnail_compress_to_storage(ContentType, Data, FromAddress, ar_util:encode(TX#tx.id)),
 					{200, #{ <<"content-type">> => ContentType }, MayCompressedData, Req};
 				nomatch ->
 					%% Not a image, just return the original data
@@ -1802,7 +1925,8 @@ image_thumbnail_compress(Req, ContentType, TX) ->
 			case ar_data_sync:get_tx_data(TX#tx.id) of
 				{ok, Data} ->
 					?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____Data______, Data}]),
-					MayCompressedData = ar_storage:image_thumbnail_compress_to_storage(ContentType, TX, Data),
+					FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+					MayCompressedData = ar_storage:image_thumbnail_compress_to_storage(ContentType, Data, FromAddress, ar_util:encode(TX#tx.id)),
 					{200, #{ <<"content-type">> => ContentType }, MayCompressedData, Req};
 				{error, tx_data_too_big} ->
 					{400, #{}, jiffy:encode(#{ error => tx_data_too_big }), Req};

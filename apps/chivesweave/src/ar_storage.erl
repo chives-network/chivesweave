@@ -14,7 +14,7 @@
 		read_migrated_v1_tx_file/1, ensure_directories/1, write_file_atomic/2,
 		write_term/2, write_term/3, read_term/1, read_term/2, delete_term/1, is_file/1,
 		migrate_tx_record/1, migrate_block_record/1, read_account/2,
-		read_txsrecord_function/1, read_txs_by_addr/3, read_txrecord_by_txid/1, read_txsrecord_by_addr/3, read_data_by_addr/3, read_datarecord_by_addr/3, read_txsrecord_by_addr_deposits/3, read_txsrecord_by_addr_send/3, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0, read_datarecord_function/1, get_mempool_tx_data_records/1, get_mempool_tx_send_records/1, get_mempool_tx_deposits_records/1, get_mempool_tx_txs_records/1, image_thumbnail_compress_to_storage/3
+		read_txsrecord_function/1, read_txs_by_addr/3, read_txrecord_by_txid/1, read_txsrecord_by_addr/3, read_data_by_addr/3, read_datarecord_by_addr/3, read_txsrecord_by_addr_deposits/3, read_txsrecord_by_addr_send/3, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0, read_datarecord_function/1, get_mempool_tx_data_records/1, get_mempool_tx_send_records/1, get_mempool_tx_deposits_records/1, get_mempool_tx_txs_records/1, image_thumbnail_compress_to_storage/4, parse_bundle_data/2
 	]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
@@ -1024,6 +1024,7 @@ init([]) ->
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_storage_address_tx_db"), address_tx_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_storage_address_data_db"), address_data_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_storage_txid_block_db"), xwe_storage_txid_block_db),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_storage_txid_in_bundle"), xwe_storage_txid_in_bundle),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_storage_block_db"), block_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "reward_history_db"), reward_history_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "account_tree_db"), account_tree_db),
@@ -1525,10 +1526,17 @@ read_txs_by_addr(Addr, PageId, PageRecords) ->
 read_txrecord_by_txid(TxId) ->
 	case ar_util:safe_decode(TxId) of
 		{ok, ID} ->
-			?LOG_INFO([{txId, TxId},{iD___________________, ID}]),
 			case ar_storage:read_tx(ID) of
 				unavailable ->
+					?LOG_INFO([{txId_____read_tx______unavailable_____________________, TxId}]),
 					case ar_mempool:get_tx(ID) of
+						not_found ->
+							case ar_kv:get(xwe_storage_txid_in_bundle, ar_util:encode(ID))  of
+								not_found ->
+									[];
+								{ok, BundleTxBinary} ->
+									binary_to_term(BundleTxBinary)
+							end;
 						TX ->
 							FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
 							TargetAddress = ar_util:encode(TX#tx.target),									
@@ -2082,7 +2090,200 @@ read_data_by_addr(Addr, PageId, PageRecords) ->
 		[]
 	end.
 
-image_thumbnail_compress_to_storage(ContentType, TX, Data) ->
+parse_bundle_dataitem_index(From, Offset) ->
+    NewValue = From + Offset,
+    NewValue.
+
+parse_bundle_data(TxData, TX) ->
+	%% Begin to save unbundle data
+	{ok, Config} = application:get_env(chivesweave, config),
+	DataDir = Config#config.data_dir,
+	filelib:ensure_dir(filename:join(DataDir, ?UNBUNDLE_DATA_DIR) ++ "/"),
+
+	BlockStructure 	= 	case ar_kv:get(xwe_storage_txid_block_db, ar_util:encode(TX#tx.id)) of
+							{ok, BlockInfoByTxIdBinary} ->
+								BlockInfoByTxId = binary_to_term(BlockInfoByTxIdBinary),
+								BlockStructure2 = #{<<"height">> => lists:nth(1, BlockInfoByTxId), <<"indep_hash">> => list_to_binary(binary_to_list(lists:nth(2, BlockInfoByTxId))), <<"timestamp">> => lists:nth(3, BlockInfoByTxId) },
+								BlockStructure2;
+							not_found ->
+								[]
+						end,
+
+	%% Begin to parse bundle data	
+	GetDataItemCount = binary:decode_unsigned(binary:part(TxData, {0, 32}), little),
+	HEADER_START = 32,
+	case ets:lookup(cache_table, ar_util:encode(TX#tx.id)) of
+		[] ->
+			ets:insert(cache_table, {ar_util:encode(TX#tx.id), 0});
+		[{Key, _}] ->
+			ets:delete(cache_table, Key),
+            ets:insert(cache_table, {Key, 0})
+	end,
+	GetBundleStart = HEADER_START + 64 * GetDataItemCount,
+	GetNumbersList = lists:seq(0, GetDataItemCount - 1),
+	GetDataItems = lists:map(
+		fun(Index) ->
+			I = HEADER_START + Index * 64,
+			_OFFSET = binary:decode_unsigned(binary:part(TxData, {I, 32}), little),
+			_ID = binary:part(TxData, {I + 32, 32}),
+			DataItemId = ar_util:encode(_ID),
+			case byte_size(_ID) == 0 of
+				true ->
+					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____ID_NOT_VALID, DataItemId}]);
+				false ->
+					% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____IS__VALID, DataItemId}]),
+					ok
+			end,
+			OFFSET_START_ITEM = case ets:lookup(cache_table, ar_util:encode(TX#tx.id)) of
+									[{_, Value_OFFSET}] ->
+										Value_OFFSET
+								end,
+			DataItemStart = GetBundleStart + OFFSET_START_ITEM,
+			DataItemBytes = binary:part(TxData, {DataItemStart, _OFFSET}),
+			% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____DataItemStart, DataItemStart}]),
+			% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____OFFSET, _OFFSET}]),
+			case ets:lookup(cache_table, ar_util:encode(TX#tx.id)) of
+				[{_, ValueItem1}] ->
+					ets:delete(cache_table, ar_util:encode(TX#tx.id)),
+            		ets:insert(cache_table, {ar_util:encode(TX#tx.id), ValueItem1 + _OFFSET})
+			end,
+			% Tab2list = ets:tab2list(cache_table),
+			% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____Tab2list, Tab2list}]),
+			SignatureTypeVal = binary:decode_unsigned(binary:part(DataItemBytes, {0, 2}), little),
+			%% [w.ARWEAVE]:{sigLength:512,pubLength:512,sigName:"arweave"},
+			%% [w.ED25519]:{sigLength:64,pubLength:32,sigName:"ed25519"},
+			%% [w.ETHEREUM]:{sigLength:65,pubLength:65,sigName:"ethereum"}
+			TxStructure = case SignatureTypeVal of
+				1 ->
+					%% Arweave or Chivesweave
+					SigLength = 512,
+					%% SignatureBinary = binary:part(DataItemBytes, {2, SigLength}),
+					%% Signature = ar_util:encode(SignatureBinary),
+					% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____Signature, Signature}]),
+					PubLength = 512,
+					OwnerBinary = binary:part(DataItemBytes, {2 + SigLength, PubLength}),
+					%% Owner = ar_util:encode(OwnerBinary),
+					% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____Owner, Owner}]),
+					TargetBinaryMark = binary:part(DataItemBytes, {2 + SigLength + PubLength, 1}),
+					TargetBinaryLength = case TargetBinaryMark of
+						<<1>> ->
+							TargetBinary = binary:part(DataItemBytes, {2 + SigLength + PubLength + 1, 32}),
+							Target = ar_util:encode(TargetBinary),
+							% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TargetBinary, TargetBinary}]),
+							% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____Target, Target}]),
+							32 + 1;
+						<<0>> ->
+							Target = <<>>,
+							% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TargetBinaryMark, TargetBinaryMark}]),
+							1
+					end,
+					AnchorBinaryMark = binary:part(DataItemBytes, {2 + SigLength + PubLength + TargetBinaryLength, 1}),
+					AnchorBinaryLength = case AnchorBinaryMark of
+						<<1>> ->
+							Anchor = binary:part(DataItemBytes, {2 + SigLength + PubLength + TargetBinaryLength + 1, 32}),
+							% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____Anchor, Anchor}]),
+							32 + 1;
+						<<0>> ->
+							Anchor = <<>>,
+							% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____AnchorBinaryMark, AnchorBinaryMark}]),
+							1
+					end,
+					% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____AnchorBinaryLength, AnchorBinaryLength}]),
+					TagsNumbers = binary:decode_unsigned(binary:part(DataItemBytes, {2 + SigLength + PubLength + TargetBinaryLength + AnchorBinaryLength, 8}), little),
+					% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TagsNumbers, TagsNumbers}]),
+					TagsBytesNumbers = binary:decode_unsigned(binary:part(DataItemBytes, {2 + SigLength + PubLength + TargetBinaryLength + AnchorBinaryLength + 8, 8}), little),
+					% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TagsBytesNumbers, TagsBytesNumbers}]),
+
+					TagsBytesContent = binary:part(DataItemBytes, {2 + SigLength + PubLength + TargetBinaryLength + AnchorBinaryLength + 8 + 8, TagsBytesNumbers}),
+					% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TagsBytesContent, TagsBytesContent}]),
+
+					DataItemDataStart = 2 + SigLength + PubLength + TargetBinaryLength + AnchorBinaryLength + 8 + 8 + TagsBytesNumbers,
+					DataItemContent = binary:part(DataItemBytes, {DataItemDataStart, byte_size(DataItemBytes) - DataItemDataStart}),
+					% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____DataItemContent, DataItemContent}]),
+
+					TagType = avro_record:type(
+						<<"rec">>,
+						[avro_record:define_field(name, string), avro_record:define_field(value, string)],
+						[{namespace, 'Tag'}]
+					),
+					TagsType = avro_array:type(TagType),
+					Decoder = avro:make_simple_decoder(TagsType, []),
+					TagsList = Decoder(TagsBytesContent),
+					Tags 	= lists:map(
+									fun(Tag) ->
+										{_, TagName} = lists:nth(1, Tag),
+										{_, TagValue} = lists:nth(2, Tag),
+										{[{name, TagName},{value, TagValue}]}
+									end,
+									TagsList),
+					TagsMap = lists:map(
+									fun(Tag) ->
+										{_, TagName} = lists:nth(1, Tag),
+										{_, TagValue} = lists:nth(2, Tag),
+										{TagName, TagValue}
+									end,
+									TagsList),
+					% ?LOG_INFO([{handle_get_tx_unbundle________avro_record____TagsList, TagsList}]),
+					?LOG_INFO([{handle_get_tx_unbundle________avro_record____TagsMap, TagsMap}]),
+					% ?LOG_INFO([{handle_get_tx_unbundle________avro_record____Tags, Tags}]),
+					
+					FromAddress = ar_util:encode(ar_wallet:to_address(OwnerBinary, {rsa, 65537})),
+					DataType = find_value(<<"Content-Type">>, TagsMap),
+					TxStructureItem = #{
+							<<"id">> => DataItemId,
+							<<"owner">> => #{<<"address">> => FromAddress},
+							<<"recipient">> => Target,
+							<<"quantity">> => #{<<"winston">> => 0, <<"xwe">>=> float(0) / float(?WINSTON_PER_AR)},
+							<<"fee">> => #{<<"winston">> => 0, <<"xwe">>=> float(0) / float(?WINSTON_PER_AR)},
+							<<"data">> => #{<<"size">> => byte_size(DataItemContent), <<"type">> => DataType},
+							<<"block">> => BlockStructure,
+							<<"bundleid">> => ar_util:encode(TX#tx.id),
+							<<"anchor">> => Anchor,
+							<<"tags">> => Tags
+						},
+					
+					%% Compress Image
+					% ?LOG_INFO([{handle_get_tx_unbundle________DataType_DataType____DataType, DataType}]),
+					image_thumbnail_compress_to_storage(DataType, DataItemContent, FromAddress, DataItemId),
+
+					%% Write Unbundle data to file
+					filelib:ensure_dir(binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, FromAddress])) ++ "/"),
+					OriginalUnBundleDataFilePath = binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, FromAddress, DataItemId])),
+					case filelib:is_file(OriginalUnBundleDataFilePath) of
+						true ->
+							ok;
+						false ->
+							{ok, FileData} = file:open(OriginalUnBundleDataFilePath, [write, binary]),
+							ok = file:write(FileData, DataItemContent),
+							ok = file:close(FileData)
+					end,
+
+					%% Write Unbundle tx to rocksdb
+					% ?LOG_INFO([{handle_get_tx_unbundle________avro_record____DataItemId, DataItemId}]),
+					ar_kv:put(xwe_storage_txid_in_bundle, DataItemId, term_to_binary(TxStructureItem)),
+
+					TxStructureItem;
+				2 ->
+					%% ED25519
+					ok;
+				3 ->
+					%% ETHEREUM
+					ok;
+				4 ->
+					%% SOLANA
+					ok;
+				_ ->
+					%% None
+					ok
+			end,
+			TxStructure
+		end,
+		GetNumbersList
+	),
+	% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItems, GetDataItems}]),
+	GetDataItems.
+
+image_thumbnail_compress_to_storage(ContentType, Data, Address, TxId) ->
 	case binary:match(ContentType, <<"image">>) of
 		{0, 5} ->
 			%% Is image, and will to compress this image
@@ -2093,16 +2294,11 @@ image_thumbnail_compress_to_storage(ContentType, TX, Data) ->
 					%% Step 1: copy the data as a file, the path is [ADDRESS]/[TX]
 					{ok, Config} = application:get_env(chivesweave, config),
 					DataDir = Config#config.data_dir,
-					Address = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+					% Address = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
 					ImageThumbnailDir = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address])),
-					% ?LOG_INFO([{image_thumbnail_compress_to_storage_____________Address, Address}]),
-					% ?LOG_INFO([{image_thumbnail_compress_to_storage_____________ImageThumbnailDir, ImageThumbnailDir}]),
-					% ?LOG_INFO([{image_thumbnail_compress_to_storage_____________TXID, ar_util:encode(TX#tx.id)}]),
 					filelib:ensure_dir(ImageThumbnailDir ++ "/"),
-					OriginalFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, ar_util:encode(TX#tx.id)])),
-					NewFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(ar_util:encode(TX#tx.id)) ++ "_thumbnail"])),
-					%?LOG_INFO([{image_thumbnail_compress_to_storage_____________OriginalFilePath, OriginalFilePath}]),
-					%?LOG_INFO([{image_thumbnail_compress_to_storage_____________NewFilePath, NewFilePath}]),
+					OriginalFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, TxId])),
+					NewFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(TxId) ++ "_thumbnail"])),
 					case file:read_file_info(NewFilePath) of
 						{ok, _FileInfo} ->
 							ok;
@@ -2111,25 +2307,29 @@ image_thumbnail_compress_to_storage(ContentType, TX, Data) ->
 							{ok, File} = file:open(OriginalFilePath, [write]),
 							case file:write(File, Data) of
 								ok ->
-									?LOG_INFO([{image_thumbnail_compress_to_storage_____________write, OriginalFilePath}]),
+									% ?LOG_INFO([{image_thumbnail_compress_to_storage_____________write, OriginalFilePath}]),
 									%% Not Exist, need to compress									
 									CompressCommand = "convert " ++ OriginalFilePath ++ " -resize 600x " ++ NewFilePath,
-									%?LOG_INFO([{image_thumbnail_compress_to_storage_____________Error, Error}]),
-									%?LOG_INFO([{image_thumbnail_compress_to_storage_____________CompressCommand, CompressCommand}]),
 									case os:cmd(CompressCommand) of
 										"" ->
 											file:delete(OriginalFilePath);
 										ErrorOutput ->
-											?LOG_INFO([{image_thumbnail_compress_to_storage_Compress_Command_Failed, ErrorOutput}])
+											NewFilePathFailed = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(TxId) ++ ""])),
+											case file:read_file_info(NewFilePathFailed) of
+												{ok, FileInfo} when FileInfo#file_info.type == regular ->
+													ok = file:delete(NewFilePathFailed);
+												{error, _} ->
+													ok
+											end,
+											?LOG_INFO([{image_thumbnail_compress_to_storage_Compress_Command_Failed________, ErrorOutput}])
 									end;
 								{error, Reason} ->													
-									?LOG_INFO([{image_thumbnail_compress_to_storage_____________write_Reason, Reason}])
+									?LOG_INFO([{image_thumbnail_compress_to_storage_____________write_original_file_failed, Reason}])
 							end
 					end,
 					%% Begin to output			
 					case file:read_file(NewFilePath) of
 						{ok, FileContent} ->
-							% ?LOG_INFO([{image_thumbnail_compress_to_storage_____________FileContent, FileContent}]),
 							FileContent;
 						{error, _Reason} ->
 							Data
@@ -2224,6 +2424,7 @@ ensure_directories(DataDir) ->
 	filelib:ensure_dir(filename:join(DataDir, ?WALLET_LIST_DIR) ++ "/"),
 	filelib:ensure_dir(filename:join(DataDir, ?HASH_LIST_DIR) ++ "/"),
 	filelib:ensure_dir(filename:join(DataDir, ?IMAGE_THUMBNAIL_DIR) ++ "/"),
+	filelib:ensure_dir(filename:join(DataDir, ?UNBUNDLE_DATA_DIR) ++ "/"),
 	filelib:ensure_dir(filename:join(DataDir, ?STORAGE_MIGRATIONS_DIR) ++ "/"),
 	filelib:ensure_dir(filename:join([DataDir, ?TX_DIR, "migrated_v1"]) ++ "/").
 

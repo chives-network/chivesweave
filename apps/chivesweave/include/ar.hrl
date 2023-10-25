@@ -244,6 +244,9 @@
 %% Cache image thumbnail.
 -define(IMAGE_THUMBNAIL_DIR, "image_thumbnail").
 
+%% Cache unbundle files.
+-define(UNBUNDLE_DATA_DIR, "unbundle_data").
+
 %% Directory for storing miner wallets, relative to the data dir.
 -define(WALLET_DIR, "wallets").
 

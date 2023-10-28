@@ -14,7 +14,7 @@
 		read_migrated_v1_tx_file/1, ensure_directories/1, write_file_atomic/2,
 		write_term/2, write_term/3, read_term/1, read_term/2, delete_term/1, is_file/1,
 		migrate_tx_record/1, migrate_block_record/1, read_account/2,
-		read_txsrecord_function/1, read_txs_by_addr/3, read_txrecord_by_txid/1, read_txsrecord_by_addr/3, read_data_by_addr/3, read_datarecord_by_addr/3, read_txsrecord_by_addr_deposits/3, read_txsrecord_by_addr_send/3, take_first_n_chars/2, read_block_from_height_by_number/2, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0, read_datarecord_function/1, get_mempool_tx_data_records/1, get_mempool_tx_send_records/1, get_mempool_tx_deposits_records/1, get_mempool_tx_txs_records/1, image_thumbnail_compress_to_storage/4, parse_bundle_data/2
+		read_txsrecord_function/1, read_txs_by_addr/3, read_txrecord_by_txid/1, read_txsrecord_by_addr/3, read_data_by_addr/3, read_datarecord_by_addr/3, read_txsrecord_by_addr_deposits/3, read_txsrecord_by_addr_send/3, take_first_n_chars/2, read_block_from_height_by_number/3, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0, read_datarecord_function/1, get_mempool_tx_data_records/1, get_mempool_tx_send_records/1, get_mempool_tx_deposits_records/1, get_mempool_tx_txs_records/1, image_thumbnail_compress_to_storage/4, parse_bundle_data/2
 	]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
@@ -276,11 +276,12 @@ is_blacklisted(#tx{ id = TXID }) ->
 
 update_confirmation_index(B) ->
 	{ok, Config} = application:get_env(chivesweave, config),
+	put_tx_confirmation_data(B),
 	case lists:member(arql_tags_index, Config#config.enable) of
 		true ->
 			ar_arql_db:insert_full_block(B, store_tags);
 		false ->
-			put_tx_confirmation_data(B)
+			ok
 	end.
 
 put_tx_confirmation_data(B) ->
@@ -1329,7 +1330,7 @@ generate_range(A, B) when A >= B ->
 generate_range(A, B) ->
     [A | generate_range(A + 1, B)].
 
-read_block_from_height_by_number(FromHeight, BlockNumber) ->
+read_block_from_height_by_number(FromHeight, BlockNumber, PageId) ->
 	BlockHeightArray = generate_range(FromHeight, FromHeight + BlockNumber),
 	BlockHeightArrayReverse = lists:reverse(BlockHeightArray),
 	BlockListElement = lists:map(
@@ -1346,6 +1347,7 @@ read_block_from_height_by_number(FromHeight, BlockNumber) ->
 								{ok, BlockIdBinary} -> 
 									BlockIdBinaryResult = binary_to_term(BlockIdBinary),
 									BlockMap = #{
+											<<"id">> => lists:nth(1, BlockIdBinaryResult),
 											<<"height">> => lists:nth(1, BlockIdBinaryResult),
 											<<"indep_hash">> => list_to_binary(binary_to_list(lists:nth(2, BlockIdBinaryResult))),
 											<<"reward_addr">> => list_to_binary(binary_to_list(lists:nth(3, BlockIdBinaryResult))),
@@ -1361,9 +1363,19 @@ read_block_from_height_by_number(FromHeight, BlockNumber) ->
 					end;
 				false ->
 					[]
-			end		
+			end
 		end, BlockHeightArrayReverse),
-	lists:filter(fun(Element) -> is_map(Element) end, BlockListElement).
+	BlockListElementMap = lists:filter(fun(Element) -> is_map(Element) end, BlockListElement),
+	CurrentBlockHeight = ar_node:get_height(),
+	BlockListElementResult = #{
+									<<"data">> => BlockListElementMap,
+									<<"total">> => CurrentBlockHeight,
+									<<"from">> => FromHeight,
+									<<"pageid">> => PageId div 1,
+									<<"pagesize">> => BlockNumber,
+									<<"allpages">> => ceil(CurrentBlockHeight / BlockNumber) div 1
+								},
+	BlockListElementResult.
 		
 
 read_statistics_network() ->
@@ -1432,7 +1444,7 @@ read_statistics_data() ->
 read_statistics_block() ->
 	case ar_kv:get(statistics_summary, list_to_binary("datelist")) of
 		not_found ->
-			{404, #{}, []};
+			{200, #{}, []};
 		{ok, StatisticsDateListResult} ->
 			DateListArray = binary_to_term(StatisticsDateListResult),
 			Statistics_block = lists:map(
@@ -1464,19 +1476,45 @@ read_statistics_block() ->
 	end.
 
 read_statistics_address() ->
-	TodayDate = take_first_n_chars(calendar:system_time_to_rfc3339(erlang:system_time(second)), 10),
-	case ar_kv:get(statistics_address, ar_util:encode(TodayDate)) of
+	% TodayDate = take_first_n_chars(calendar:system_time_to_rfc3339(erlang:system_time(second)), 10),
+	case ar_kv:get(statistics_summary, list_to_binary("datelist")) of
 		not_found ->
-			{404, #{}, []};
-		{ok, StatisticsAddressResult} ->
-			{200, #{}, ar_serialize:jsonify(binary_to_term(StatisticsAddressResult))}							
+			{200, #{}, []};
+		{ok, StatisticsDateListResult} ->
+			DateListArray = binary_to_term(StatisticsDateListResult),
+			statistics_address = lists:map(
+				fun(X) -> 
+					case ar_kv:get(statistics_address, X) of
+						not_found ->
+							[];
+						{ok, DateListBinary} ->
+							DateListResult = binary_to_term(DateListBinary),
+							DateListMap = #{
+								<<"Date">> => ar_util:decode(X),
+								<<"Blocks">> => lists:nth(1, DateListResult),
+								<<"Avg_Txs_By_Block">> => lists:nth(2, DateListResult),
+								<<"Cumulative_Block_Rewards">> => lists:nth(3, DateListResult),
+								<<"Block_Rewards">> => lists:nth(4, DateListResult),
+								<<"Rewards_vs_Endowment">> => lists:nth(5, DateListResult),
+								<<"Avg_Block_Rewards">> => lists:nth(6, DateListResult),
+								<<"Max_Block_Rewards">> => lists:nth(7, DateListResult),
+								<<"Min_Block_Rewards">> => lists:nth(8, DateListResult),
+								<<"Avg_Block_Time">> => lists:nth(9, DateListResult),
+								<<"Max_Block_Time">> => lists:nth(10, DateListResult),
+								<<"Min_Block_Time">> => lists:nth(11, DateListResult),
+								<<"BlockUsedTime">> => lists:nth(12, DateListResult)
+							},
+							DateListMap							
+					end
+				end, DateListArray),
+			{200, #{}, ar_serialize:jsonify(statistics_address)}
 	end.
 
 read_statistics_transaction() ->
 	TodayDate = take_first_n_chars(calendar:system_time_to_rfc3339(erlang:system_time(second)), 10),
 	case ar_kv:get(statistics_transaction, ar_util:encode(TodayDate)) of
 		not_found ->
-			{404, #{}, []};
+			{200, #{}, []};
 		{ok, StatisticsTransactionResult} ->
 			{200, #{}, ar_serialize:jsonify(binary_to_term(StatisticsTransactionResult))}							
 	end.

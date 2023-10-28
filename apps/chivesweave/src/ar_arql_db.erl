@@ -3,7 +3,10 @@
 
 -export([start_link/0, select_tx_by_id/1, select_txs_by/1, select_block_by_tx_id/1,
 		select_tags_by_tx_id/1, eval_legacy_arql/1, insert_full_block/1, insert_full_block/2,
-		insert_block/1, insert_tx/2, insert_tx/3]).
+		insert_block/1, insert_tx/4, insert_tx/5, 
+		select_address_range/2, select_address_total/0,
+		select_transaction_range/2, select_transaction_total/0
+		]).
 
 -export([init/1, handle_call/3, handle_cast/2, terminate/2]).
 
@@ -34,6 +37,16 @@ CREATE INDEX idx_migration_date ON migration (date);
 ").
 
 -define(CREATE_TABLES_SQL, "
+CREATE TABLE address (
+	address TEXT PRIMARY KEY,
+	balance INTEGER,
+	txs INTEGER,
+	sent INTEGER,
+	received INTEGER,
+	lastblock INTEGER,
+	timestamp INTEGER
+);
+
 CREATE TABLE block (
 	indep_hash TEXT PRIMARY KEY,
 	previous_block TEXT,
@@ -50,7 +63,11 @@ CREATE TABLE tx (
 	target TEXT,
 	quantity INTEGER,
 	signature TEXT,
-	reward INTEGER
+	reward INTEGER,
+	timestamp INTEGER,
+	block_height INTEGER,
+	data_size INTEGER,
+	bundleid TEXT
 );
 
 CREATE TABLE tag (
@@ -66,9 +83,17 @@ CREATE INDEX idx_block_timestamp ON block (timestamp);
 
 CREATE INDEX idx_tx_block_indep_hash ON tx (block_indep_hash);
 CREATE INDEX idx_tx_from_address ON tx (from_address);
+CREATE INDEX idx_tx_target ON tx (target);
+CREATE INDEX idx_tx_timestamp ON tx (timestamp);
+CREATE INDEX idx_tx_block_height ON tx (block_height);
+CREATE INDEX idx_tx_bundleid ON tx (bundleid);
 
 CREATE INDEX idx_tag_tx_id ON tag (tx_id);
+CREATE INDEX idx_tag_name ON tag (name);
 CREATE INDEX idx_tag_name_value ON tag (name, value);
+
+CREATE INDEX idx_address_lastblock ON address (lastblock);
+CREATE INDEX idx_address_timestamp ON address (timestamp);
 ").
 
 -define(DROP_INDEXES_SQL, "
@@ -77,13 +102,20 @@ DROP INDEX idx_block_timestamp;
 
 DROP INDEX idx_tx_block_indep_hash;
 DROP INDEX idx_tx_from_address;
+DROP INDEX idx_tx_timestamp;
+DROP INDEX idx_tx_block_height;
+DROP INDEX idx_tx_bundleid;
 
 DROP INDEX idx_tag_tx_id;
+DROP INDEX idx_tag_name;
 DROP INDEX idx_tag_name_value;
+
+DROP INDEX idx_address_lastblock;
+DROP INDEX idx_address_timestamp;
 ").
 
 -define(INSERT_BLOCK_SQL, "INSERT OR REPLACE INTO block VALUES (?, ?, ?, ?)").
--define(INSERT_TX_SQL, "INSERT OR REPLACE INTO tx VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").
+-define(INSERT_TX_SQL, "INSERT OR REPLACE INTO tx VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").
 -define(INSERT_TAG_SQL, "INSERT OR REPLACE INTO tag VALUES (?, ?, ?)").
 -define(SELECT_TX_BY_ID_SQL, "SELECT * FROM tx WHERE id = ?").
 
@@ -94,6 +126,13 @@ DROP INDEX idx_tag_name_value;
 ").
 
 -define(SELECT_TAGS_BY_TX_ID_SQL, "SELECT * FROM tag WHERE tx_id = ?").
+
+-define(INSERT_ADDRESS_SQL, "INSERT OR REPLACE INTO address VALUES (?, ?, ?, ?, ?, ?, ?)").
+-define(SELECT_ADDRESS_RANGE_SQL, "SELECT * FROM address order by balance desc LIMIT ? OFFSET ?").
+-define(SELECT_ADDRESS_TOTAL, "SELECT COUNT(*) AS NUM FROM address").
+
+-define(SELECT_TRANSACTION_RANGE_SQL, "SELECT * FROM tx order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL, "SELECT COUNT(*) AS NUM FROM tx").
 
 %%%===================================================================
 %%% Public API.
@@ -113,6 +152,18 @@ select_block_by_tx_id(TXID) ->
 
 select_tags_by_tx_id(TXID) ->
 	gen_server:call(?MODULE, {select_tags_by_tx_id, TXID}, ?SELECT_TIMEOUT).
+
+select_address_range(LIMIT, OFFSET) ->
+	gen_server:call(?MODULE, {select_address_range, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
+
+select_address_total() ->
+	gen_server:call(?MODULE, {select_address_total}, ?SELECT_TIMEOUT).
+
+select_transaction_range(LIMIT, OFFSET) ->
+	gen_server:call(?MODULE, {select_transaction_range, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
+
+select_transaction_total() ->
+	gen_server:call(?MODULE, {select_transaction_total}, ?SELECT_TIMEOUT).
 
 eval_legacy_arql(Query) ->
 	gen_server:call(?MODULE, {eval_legacy_arql, Query}, ?SELECT_TIMEOUT).
@@ -141,11 +192,11 @@ insert_block(B) ->
 	gen_server:cast(?MODULE, {insert_block, BlockFields}),
 	ok.
 
-insert_tx(BH, TX) ->
-	insert_tx(BH, TX, store_tags).
+insert_tx(BH, TX, Timestamp, Height) ->
+	insert_tx(BH, TX, store_tags, Timestamp, Height).
 
-insert_tx(BH, TX, StoreTags) ->
-	TXFields = tx_to_fields(BH, TX),
+insert_tx(BH, TX, StoreTags, Timestamp, Height) ->
+	TXFields = tx_to_fields(BH, TX, Timestamp, Height),
 	TagFieldsList = case StoreTags of
 		store_tags ->
 			tx_to_tag_fields_list(TX);
@@ -178,6 +229,11 @@ init([]) ->
 	{ok, SelectTxByIdStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TX_BY_ID_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectBlockByTxIdStmt} = ar_sqlite3:prepare(Conn, ?SELECT_BLOCK_BY_TX_ID_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectTagsByTxIdStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TAGS_BY_TX_ID_SQL, ?DRIVER_TIMEOUT),
+	{ok, InsertAddressStmt} = ar_sqlite3:prepare(Conn, ?INSERT_ADDRESS_SQL, ?DRIVER_TIMEOUT),
+	{ok, SelectAddressRangeStmt} = ar_sqlite3:prepare(Conn, ?SELECT_ADDRESS_RANGE_SQL, ?DRIVER_TIMEOUT),
+	{ok, SelectAddressTotalStmt} = ar_sqlite3:prepare(Conn, ?SELECT_ADDRESS_TOTAL, ?DRIVER_TIMEOUT),
+	{ok, SelectTransactionRangeStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_SQL, ?DRIVER_TIMEOUT),
+	{ok, SelectTransactionTotalStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL, ?DRIVER_TIMEOUT),
 	{ok, #{
 		data_dir => DataDir,
 		conn => Conn,
@@ -186,7 +242,12 @@ init([]) ->
 		insert_tag_stmt => InsertTagStmt,
 		select_tx_by_id_stmt => SelectTxByIdStmt,
 		select_block_by_tx_id_stmt => SelectBlockByTxIdStmt,
-		select_tags_by_tx_id_stmt => SelectTagsByTxIdStmt
+		select_tags_by_tx_id_stmt => SelectTagsByTxIdStmt,
+		insert_address_stmt => InsertAddressStmt,
+		select_address_range_stmt => SelectAddressRangeStmt,
+		select_address_total_stmt => SelectAddressTotalStmt,
+		select_transaction_range_stmt => SelectTransactionRangeStmt,
+		select_transaction_total_stmt => SelectTransactionTotalStmt
 	}}.
 
 handle_call({insert_full_block, BlockFields, TxFieldsList, TagFieldsList}, _From, State) ->
@@ -194,7 +255,8 @@ handle_call({insert_full_block, BlockFields, TxFieldsList, TagFieldsList}, _From
 		conn := Conn,
 		insert_block_stmt := InsertBlockStmt,
 		insert_tx_stmt := InsertTxStmt,
-		insert_tag_stmt := InsertTagStmt
+		insert_tag_stmt := InsertTagStmt,
+		insert_address_stmt := InsertAddressStmt
 	} = State,
 	{Time, ok} = timer:tc(fun() ->
 		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
@@ -205,7 +267,47 @@ handle_call({insert_full_block, BlockFields, TxFieldsList, TagFieldsList}, _From
 			fun(TxFields) ->
 				ok = ar_sqlite3:bind(InsertTxStmt, TxFields, ?INSERT_STEP_TIMEOUT),
 				done = ar_sqlite3:step(InsertTxStmt, ?INSERT_STEP_TIMEOUT),
-				ok = ar_sqlite3:reset(InsertTxStmt, ?INSERT_STEP_TIMEOUT)
+				ok = ar_sqlite3:reset(InsertTxStmt, ?INSERT_STEP_TIMEOUT),
+				
+				% FromAddress Balance Record
+				FromAddress = lists:nth(5, TxFields),
+				case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(FromAddress) of
+					{ok, FromAddressOK} ->
+						case ar_node:get_balance(FromAddressOK) of
+							node_unavailable ->
+								ok;
+							FromAddressBalance ->
+								FromAddressFields = [FromAddress, integer_to_binary(FromAddressBalance div 100000000), 0, 0, 0, lists:nth(3, BlockFields), lists:nth(4, BlockFields)],
+								% ?LOG_INFO([{fromAddressFields___________________________________________________________________, FromAddressFields}]),
+								ok = ar_sqlite3:bind(InsertAddressStmt, FromAddressFields, ?INSERT_STEP_TIMEOUT),
+								done = ar_sqlite3:step(InsertAddressStmt, ?INSERT_STEP_TIMEOUT),
+								ok = ar_sqlite3:reset(InsertAddressStmt, ?INSERT_STEP_TIMEOUT)
+						end
+				end,
+
+				% ToAddress Balance Record
+				TargetAddress = lists:nth(6, TxFields),
+				TargetAddressLength = byte_size(TargetAddress),
+				% ?LOG_INFO([{targetAddressLength___________________________________________________________________, TargetAddressLength}]),
+				case TargetAddressLength == 43 of
+					true ->
+						case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(TargetAddress) of
+							{ok, TargetAddressOK} ->
+								case ar_node:get_balance(TargetAddressOK) of
+									node_unavailable ->
+										ok;
+									TargetAddressBalance ->
+										TargetAddressFields = [TargetAddress, integer_to_binary(TargetAddressBalance div 100000000), 0, 0, 0, lists:nth(3, BlockFields), lists:nth(4, BlockFields)],
+										% ?LOG_INFO([{targetAddressFields___________________________________________________________________, TargetAddressFields}]),
+										ok = ar_sqlite3:bind(InsertAddressStmt, TargetAddressFields, ?INSERT_STEP_TIMEOUT),
+										done = ar_sqlite3:step(InsertAddressStmt, ?INSERT_STEP_TIMEOUT),
+										ok = ar_sqlite3:reset(InsertAddressStmt, ?INSERT_STEP_TIMEOUT)
+								end
+						end;
+					false ->
+						ok
+				end
+				
 			end,
 			TxFieldsList
 		),
@@ -275,6 +377,50 @@ handle_call({select_tags_by_tx_id, TXID}, _, State) ->
 		end
 	end),
 	record_query_time(select_tags_by_tx_id, Time),
+	{reply, Reply, State};
+
+handle_call({select_address_range, LIMIT, OFFSET}, _, State) ->
+	#{ select_address_range_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [LIMIT, OFFSET], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:map(fun address_map/1, Rows)
+		end
+	end),
+	record_query_time(select_address_range, Time),
+	{reply, Reply, State};
+
+handle_call({select_address_total}, _, State) ->
+	#{ select_address_total_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:nth(1, lists:nth(1, Rows))
+		end
+	end),
+	record_query_time(select_address_total, Time),
+	{reply, Reply, State};
+
+handle_call({select_transaction_range, LIMIT, OFFSET}, _, State) ->
+	#{ select_transaction_range_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [LIMIT, OFFSET], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:map(fun tx_map/1, Rows)
+		end
+	end),
+	record_query_time(select_transaction_range, Time),
+	{reply, Reply, State};
+
+handle_call({select_transaction_total}, _, State) ->
+	#{ select_transaction_total_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:nth(1, lists:nth(1, Rows))
+		end
+	end),
+	record_query_time(select_transaction_total, Time),
 	{reply, Reply, State};
 
 handle_call({eval_legacy_arql, Query}, _, #{ conn := Conn } = State) ->
@@ -347,7 +493,12 @@ terminate(Reason, State) ->
 		insert_tag_stmt := InsertTagStmt,
 		select_tx_by_id_stmt := SelectTxByIdStmt,
 		select_block_by_tx_id_stmt := SelectBlockByTxIdStmt,
-		select_tags_by_tx_id_stmt := SelectTagsByTxIdStmt
+		select_tags_by_tx_id_stmt := SelectTagsByTxIdStmt,
+		insert_address_stmt := InsertAddressStmt,
+		select_address_range_stmt := SelectAddressRangeStmt,
+		select_address_total_stmt := SelectAddressTotalStmt,
+		select_transaction_range_stmt := SelectTransactionRangeStmt,
+		select_transaction_total_stmt := SelectTransactionTotalStmt
 	} = State,
 	?LOG_INFO([{ar_arql_db, terminate}, {reason, Reason}]),
 	ar_sqlite3:finalize(InsertBlockStmt, ?DRIVER_TIMEOUT),
@@ -356,6 +507,11 @@ terminate(Reason, State) ->
 	ar_sqlite3:finalize(SelectTxByIdStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectBlockByTxIdStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectTagsByTxIdStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(InsertAddressStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectAddressRangeStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectAddressTotalStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectTransactionRangeStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectTransactionTotalStmt, ?DRIVER_TIMEOUT),
 	ok = ar_sqlite3:close(Conn, ?DRIVER_TIMEOUT).
 
 %%%===================================================================
@@ -492,6 +648,24 @@ select_txs_by_where_clause_tags(Tags) ->
 			}
 	end, {"1", []}, Tags).
 
+address_map([
+	Address,
+	Balance,
+	Txs,
+	Sent,
+	Received,
+	Lastblock,
+	Timestamp
+]) -> #{
+	id => Address,
+	balance => Balance,
+	txs => Txs,
+	sent => Sent,
+	received => Received,
+	lastblock => Lastblock,
+	timestamp => Timestamp
+}.
+
 tx_map([
 	Id,
 	BlockIndepHash,
@@ -501,7 +675,11 @@ tx_map([
 	Target,
 	Quantity,
 	Signature,
-	Reward
+	Reward,
+	Timestamp,
+	Height,
+	DataSize,
+	BundleId
 ]) -> #{
 	id => Id,
 	block_indep_hash => BlockIndepHash,
@@ -511,7 +689,11 @@ tx_map([
 	target => Target,
 	quantity => Quantity,
 	signature => Signature,
-	reward => Reward
+	reward => Reward,
+	timestamp => Timestamp,
+	block_height => Height,
+	data_size => DataSize,
+	bundleid => BundleId
 }.
 
 block_map([
@@ -592,7 +774,11 @@ full_block_to_fields(FullBlock) ->
 		ar_util:encode(TX#tx.target),
 		TX#tx.quantity,
 		ar_util:encode(TX#tx.signature),
-		TX#tx.reward
+		TX#tx.reward,
+		integer_to_binary(lists:nth(4, BlockFields)),
+		integer_to_binary(lists:nth(3, BlockFields)),
+		TX#tx.data_size,
+		""
 	] end, FullBlock#block.txs),
 	{BlockFields, TxFieldsList}.
 
@@ -614,7 +800,7 @@ block_to_fields(B) ->
 		B#block.timestamp
 	].
 
-tx_to_fields(BH, TX) ->
+tx_to_fields(BH, TX, Timestamp, Height) ->
 	[
 		ar_util:encode(TX#tx.id),
 		ar_util:encode(BH),
@@ -624,7 +810,11 @@ tx_to_fields(BH, TX) ->
 		ar_util:encode(TX#tx.target),
 		TX#tx.quantity,
 		ar_util:encode(TX#tx.signature),
-		TX#tx.reward
+		TX#tx.reward,
+		Timestamp,
+		Height,
+		TX#tx.data_size,
+		""
 	].
 
 tx_to_tag_fields_list(TX) ->

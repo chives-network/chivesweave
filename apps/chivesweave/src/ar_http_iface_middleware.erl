@@ -1248,6 +1248,31 @@ handle(<<"GET">>, [<<"statistics_transaction">>], Req, _Pid) ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
 
+%% Return address records by from and size.
+%% GET request to endpoint /address/{PageId}/{PageSize}.
+handle(<<"GET">>, [<<"address">>, PageId, PageSize], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_arql, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_address_records(PageId, PageSize),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+%% Return transaction records by from and size.
+%% GET request to endpoint /address/{PageId}/{PageSize}.
+handle(<<"GET">>, [<<"transaction">>, PageId, PageSize], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_arql, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_transaction_records(PageId, PageSize),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+
 %% Return transaction identifiers (hashes) for the wallet specified via wallet_address.
 %% GET request to endpoint /wallet/{wallet_address}/txs.
 handle(<<"GET">>, [<<"wallet">>, Addr, <<"txs">>, PageId, PageRecords], Req, _Pid) ->
@@ -1730,7 +1755,13 @@ handle_get_tx_unbundle(Hash, Req) ->
 		{ok, ID} ->
 			case ar_storage:read_tx(ID) of
 				unavailable ->
-					maybe_tx_is_pending_response(ID, Req);
+					case ar_storage:read_txrecord_by_txid(ar_util:encode(ID)) of
+						not_found ->
+							maybe_tx_is_pending_response(ID, Req);
+						Res ->
+							TxResult = #{ <<"txs">> => [], <<"tx">> => Res },
+							{200, #{}, ar_serialize:jsonify(TxResult), Req}
+					end;					
 				#tx{} = TX ->
 					Tags = lists:map(
 							fun({Name, Value}) ->
@@ -1750,7 +1781,8 @@ handle_get_tx_unbundle(Hash, Req) ->
 									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCountBinary, GetDataItemCountBinary}]),
 									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____DataItemsBinary, DataItemsBinary}]),
 									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCountBinary, binary_to_integer(GetDataItemCount)}]),
-									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCount, GetDataItemCount}]);
+									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCount, GetDataItemCount}]),
+									[];
 								{error, enoent} ->
 									ok = ar_semaphore:acquire(get_tx_data, infinity),
 									case ar_data_sync:get_tx_data(TX#tx.id) of
@@ -1759,16 +1791,23 @@ handle_get_tx_unbundle(Hash, Req) ->
 											ar_storage:parse_bundle_data(TxData, TX);
 										_ ->
 											% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed, ar_util:encode(TX#tx.id)}]),
-											ar_storage:read_txrecord_by_txid(ar_util:encode(TX#tx.id))
+											[]
 									end
 							end;
 						_ ->
 							% Not a Bundle
 							?LOG_INFO([{handle_get_tx_unbundle________NOT_A_Bundle_____Tags, Tags}]),
-							ar_storage:read_txrecord_by_txid(ar_util:encode(TX#tx.id))
+							[]
 					end,
-					% ?LOG_INFO([{handle_get_tx_unbundle________Bundle_____BundleResult, UnBundleResult}]),
-					{200, #{}, ar_serialize:jsonify(UnBundleResult), Req}
+					TxInfor = case ar_storage:read_txrecord_by_txid(ar_util:encode(TX#tx.id)) of
+						not_found ->
+							[];
+						Res ->
+							Res
+					end,
+					TxResult = #{ <<"txs">> => UnBundleResult, <<"tx">> => TxInfor },
+					% ?LOG_INFO([{handle_get_block_txsrecord_by_heightTxsRecord________, TxResult}]),
+					{200, #{}, ar_serialize:jsonify(TxResult), Req}
 			end
 	end.
 
@@ -2037,7 +2076,7 @@ handle_get_blocklist_data(FromHeight, BlockNumber) ->
 	try binary_to_integer(BlockNumber) of
 		BlockNumberInt ->				
 			BlockNumberNew = if
-				BlockNumberInt < 0 -> 1;
+				BlockNumberInt < 0 -> 5;
 				BlockNumberInt > 100 -> 100;
 				true -> BlockNumberInt
 			end,
@@ -2049,7 +2088,7 @@ handle_get_blocklist_data(FromHeight, BlockNumber) ->
 						FromHeightInt > CurrentHeight -> CurrentHeight;
 						true -> FromHeightInt
 					end,
-					case ar_storage:read_block_from_height_by_number(FromHeightNew, BlockNumberNew) of
+					case ar_storage:read_block_from_height_by_number(FromHeightNew, BlockNumberNew, ceil(FromHeightNew / BlockNumberNew)) of
 						not_found ->
 							{404, #{}, []};
 						Res ->
@@ -2067,14 +2106,14 @@ handle_get_blockpage_data(PageId, PageRecords) ->
 	try binary_to_integer(PageRecords) of
 		PageRecordsInt ->				
 			PageRecordsNew = if
-				PageRecordsInt < 0 -> 1;
+				PageRecordsInt < 0 -> 5;
 				PageRecordsInt > 100 -> 100;
 				true -> PageRecordsInt
 			end,
 			try binary_to_integer(PageId) of
 				PageIdInt ->
 					CurrentHeight = ar_node:get_height(),
-					AllPages = math:ceil(CurrentHeight / PageRecordsNew),
+					AllPages = ceil(CurrentHeight / PageRecordsNew),
 					PageIdNew = if
 						PageIdInt < 0 -> 0;
 						PageIdInt > AllPages -> AllPages;
@@ -2086,7 +2125,7 @@ handle_get_blockpage_data(PageId, PageRecords) ->
 						FromHeight > CurrentHeight -> CurrentHeight;
 						true -> FromHeight
 					end,
-					case ar_storage:read_block_from_height_by_number(FromHeightNew, PageRecordsNew) of
+					case ar_storage:read_block_from_height_by_number(FromHeightNew, PageRecordsNew, PageIdNew) of
 						not_found ->
 							{404, #{}, []};
 						Res ->
@@ -2103,7 +2142,7 @@ handle_get_blockpage_data(PageId, PageRecords) ->
 handle_get_block_last_data(BlockNumber) ->
 	BlockNumberInt = binary_to_integer(BlockNumber),
 	BlockNumberNew = if
-		BlockNumberInt < 0 -> 1;
+		BlockNumberInt < 0 -> 5;
 		BlockNumberInt > 100 -> 100;
 		true -> BlockNumberInt
 	end,
@@ -2113,7 +2152,7 @@ handle_get_block_last_data(BlockNumber) ->
 		FromHeight < 0 -> 0;
 		true -> FromHeight
 	end,
-	case ar_storage:read_block_from_height_by_number(FromHeightNew, BlockNumberNew) of
+	case ar_storage:read_block_from_height_by_number(FromHeightNew, BlockNumberNew, ceil(FromHeightNew / BlockNumberNew) ) of
 		not_found ->
 			{404, #{}, []};
 		Res ->
@@ -2163,8 +2202,40 @@ handle_get_block_txsrecord_by_height(Height) ->
 					TXIDs = lists:map(fun(TX) when is_binary(TX) -> ar_util:encode(TX); (#tx{ id = TX }) -> ar_util:encode(TX) end, TXs2),
 					% ?LOG_INFO([{handle_get_block_txsrecord_by_heightTXIDs____________, TXIDs}]),
 					TxsRecord = ar_storage:read_txsrecord_function(TXIDs),
+					BlockInfor = case ar_kv:get(explorer_block, list_to_binary(integer_to_list(HeightInt))) of 
+						not_found -> []; 
+						{ok, BlockIdBinaryPrevious} -> 
+							BlockIdBinaryResultPrevious = binary_to_term(BlockIdBinaryPrevious),
+							TimestampPrevious = lists:nth(5, BlockIdBinaryResultPrevious),
+							case ar_kv:get(explorer_block, list_to_binary(integer_to_list(HeightInt))) of 
+								not_found -> []; 
+								{ok, BlockIdBinary} -> 
+									CurrentHeight = ar_node:get_height(),
+									BlockIdBinaryResult = binary_to_term(BlockIdBinary),
+									BlockMap = #{
+											<<"id">> => lists:nth(1, BlockIdBinaryResult),
+											<<"height">> => lists:nth(1, BlockIdBinaryResult),
+											<<"indep_hash">> => list_to_binary(binary_to_list(lists:nth(2, BlockIdBinaryResult))),
+											<<"reward_addr">> => list_to_binary(binary_to_list(lists:nth(3, BlockIdBinaryResult))),
+											<<"reward">> => lists:nth(4, BlockIdBinaryResult),
+											<<"timestamp">> => lists:nth(5, BlockIdBinaryResult),
+											<<"txs_length">> => lists:nth(6, BlockIdBinaryResult),
+											<<"weave_size">> => lists:nth(7, BlockIdBinaryResult),
+											<<"block_size">> => lists:nth(8, BlockIdBinaryResult),
+											<<"last_retarget">> => B#block.last_retarget,
+											<<"reward_pool">> => B#block.reward_pool,
+											<<"mining_time">> => lists:nth(5, BlockIdBinaryResult) - TimestampPrevious,
+											<<"currentheight">> => CurrentHeight
+										},
+									BlockMap
+							end
+					end,
+					BlockResult = #{
+									<<"txs">> => TxsRecord,
+									<<"block">> => BlockInfor
+								},
 					% ?LOG_INFO([{handle_get_block_txsrecord_by_heightTxsRecord________, TxsRecord}]),
-					{200, #{}, ar_serialize:jsonify(TxsRecord)}
+					{200, #{}, ar_serialize:jsonify(BlockResult)}
 			end
 	end.
 
@@ -2182,6 +2253,90 @@ handle_get_wallet_txs(Addr, PageId, PageRecords) ->
 			end
 	end.
 
+handle_get_address_records(PageId, PageSize) ->
+	try binary_to_integer(PageSize) of
+		PageSizeInt ->				
+			PageSizeNew = if
+				PageSizeInt < 0 -> 5;
+				PageSizeInt > 100 -> 100;
+				true -> PageSizeInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						true -> PageIdInt
+					end,
+					AddressTotal  = case ar_arql_db:select_address_total() of
+						TotalRes ->
+							TotalRes;
+						_ -> 
+							0							
+					end,
+					case ar_arql_db:select_address_range(PageSizeNew, PageIdNew * PageSizeNew) of
+						not_found ->
+							{404, #{}, []};
+						Res ->
+							% ?LOG_INFO([{handle_get_blocklist_data, Res}]),
+							AddressResult = #{
+									<<"data">> => Res,
+									<<"total">> => AddressTotal,
+									<<"from">> => PageIdNew * PageSizeNew,
+									<<"pageid">> => PageIdNew,
+									<<"pagesize">> => PageSize,
+									<<"allpages">> => ceil(AddressTotal / PageSizeNew) div 1
+								},
+							{200, #{}, ar_serialize:jsonify(AddressResult)}
+					end
+			catch _:_ ->
+				{404, #{}, []}
+			end
+	catch _:_ ->
+		{404, #{}, []}
+	end.
+
+
+handle_get_transaction_records(PageId, PageSize) ->
+	try binary_to_integer(PageSize) of
+		PageSizeInt ->				
+			PageSizeNew = if
+				PageSizeInt < 0 -> 5;
+				PageSizeInt > 100 -> 100;
+				true -> PageSizeInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						true -> PageIdInt
+					end,
+					TransactionsTotal  = case ar_arql_db:select_transaction_total() of
+						TotalRes ->
+							TotalRes;
+						_ -> 
+							0
+					end,
+					case ar_arql_db:select_transaction_range(PageSizeNew, PageIdNew * PageSizeNew) of
+						not_found ->
+							{404, #{}, []};
+						Res ->
+							% ?LOG_INFO([{handle_get_blocklist_data, Res}]),
+							TransactionResult = #{
+									<<"data">> => Res,
+									<<"total">> => TransactionsTotal,
+									<<"from">> => PageIdNew * PageSizeNew,
+									<<"pageid">> => PageIdNew,
+									<<"pagesize">> => PageSize,
+									<<"allpages">> => ceil(TransactionsTotal / PageSizeNew) div 1
+								},
+							{200, #{}, ar_serialize:jsonify(TransactionResult)}
+					end
+			catch _:_ ->
+				{404, #{}, []}
+			end
+	catch _:_ ->
+		{404, #{}, []}
+	end.
 
 handle_get_wallet_txrecord(TxId) ->
 	case ar_storage:read_txrecord_by_txid(TxId) of

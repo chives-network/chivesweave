@@ -264,10 +264,10 @@ calculate_difficulty_before_1_8(OldDiff, TS, Last, Height) ->
 		end,
 		min_difficulty(Height)
 	),
-	?LOG_INFO([{min_difficulty_________________________, min_difficulty(Height)}]),
-	?LOG_INFO([{actualTime_____________________________, ActualTime}]),
-	?LOG_INFO([{oldDiff________________________________, OldDiff}]),
-	?LOG_INFO([{newDiff________________________________, Diff}]),
+	% ?LOG_INFO([{min_difficulty_________________________, min_difficulty(Height)}]),
+	% ?LOG_INFO([{actualTime_____________________________, ActualTime}]),
+	% ?LOG_INFO([{oldDiff________________________________, OldDiff}]),
+	% ?LOG_INFO([{newDiff________________________________, Diff}]),
 	Diff.
 
 between(N, Min, _) when N < Min -> Min;

@@ -2356,8 +2356,7 @@ handle_get_wallet_txsrecord(Addr, PageId, PageRecords) ->
 				not_found ->
 					{404, #{}, []};
 				Res ->
-					MyPendingTxsRecord = ar_storage:get_mempool_tx_txs_records(Addr),
-					{200, #{}, ar_serialize:jsonify(lists:append(MyPendingTxsRecord, Res))}
+					{200, #{}, ar_serialize:jsonify(Res)}
 			end
 	end.
 
@@ -2370,8 +2369,7 @@ handle_get_wallet_txs_deposits(Addr, PageId, PageRecords) ->
 				not_found ->
 					{404, #{}, []};
 				Res ->
-					MyPendingTxsRecord = ar_storage:get_mempool_tx_deposits_records(Addr),
-					{200, #{}, ar_serialize:jsonify(lists:append(MyPendingTxsRecord, Res))}
+					{200, #{}, ar_serialize:jsonify(Res)}
 			end
 	end.
 	
@@ -2384,8 +2382,7 @@ handle_get_wallet_txs_send(Addr, PageId, PageRecords) ->
 				not_found ->
 					{404, #{}, []};
 				Res ->
-					MyPendingTxsRecord = ar_storage:get_mempool_tx_send_records(Addr),
-					{200, #{}, ar_serialize:jsonify(lists:append(MyPendingTxsRecord, Res))}
+					{200, #{}, ar_serialize:jsonify(Res)}
 			end
 	end.
 
@@ -2412,8 +2409,7 @@ handle_get_address_datarecord(Addr, PageId, PageRecords) ->
 				not_found ->
 					{404, #{}, []};
 				Res ->
-					MyPendingTxsRecord = ar_storage:get_mempool_tx_data_records(Addr),
-					{200, #{}, ar_serialize:jsonify(lists:append(MyPendingTxsRecord, Res))}
+					{200, #{}, ar_serialize:jsonify(Res)}
 			end
 	end.
 

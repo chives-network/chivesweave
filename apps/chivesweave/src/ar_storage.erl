@@ -1707,7 +1707,23 @@ read_txsrecord_by_addr(Addr, PageId, PageRecords) ->
 								true -> FromIndex
 							end,
 							TargetResult = lists:sublist(AllArray, FromIndexNew, PageRecordsNew),
-							read_txsrecord_function(TargetResult)
+							TxRecordFunction = read_txsrecord_function(TargetResult),
+							TxRecordFunctionPlusMemPool = case PageIdNew == 0 of
+																true ->
+																	MyPendingTxsRecord = ar_storage:get_mempool_tx_txs_records(Addr),
+																	lists:append(MyPendingTxsRecord, TxRecordFunction);
+																false ->
+																	TxRecordFunction
+															end,
+							TxsResult = #{
+								<<"data">> => TxRecordFunctionPlusMemPool,
+								<<"total">> => Length,
+								<<"from">> => FromIndexNew,
+								<<"pageid">> => PageIdNew,
+								<<"pagesize">> => PageRecordsNew,
+								<<"allpages">> => ceil(Length / PageRecordsNew) div 1
+							},
+							TxsResult
 					end
 			catch _:_ ->
 				[]
@@ -1743,7 +1759,23 @@ read_txsrecord_by_addr_deposits(Addr, PageId, PageRecords) ->
 								true -> FromIndex
 							end,
 							TargetResult = lists:sublist(AllArray, FromIndexNew, PageRecordsNew),
-							read_txsrecord_function(TargetResult)
+							TxRecordFunction = read_txsrecord_function(TargetResult),
+							TxRecordFunctionPlusMemPool = case PageIdNew == 0 of
+																true ->
+																	MyPendingTxsRecord = ar_storage:get_mempool_tx_deposits_records(Addr),
+																	lists:append(MyPendingTxsRecord, TxRecordFunction);
+																false ->
+																	TxRecordFunction
+															end,
+							TxsResult = #{
+								<<"data">> => TxRecordFunctionPlusMemPool,
+								<<"total">> => Length,
+								<<"from">> => FromIndexNew,
+								<<"pageid">> => PageIdNew,
+								<<"pagesize">> => PageRecordsNew,
+								<<"allpages">> => ceil(Length / PageRecordsNew) div 1
+							},
+							TxsResult
 					end
 			catch _:_ ->
 				[]
@@ -1779,7 +1811,23 @@ read_txsrecord_by_addr_send(Addr, PageId, PageRecords) ->
 								true -> FromIndex
 							end,
 							TargetResult = lists:sublist(AllArray, FromIndexNew, PageRecordsNew),
-							read_txsrecord_function(TargetResult)
+							TxRecordFunction = read_txsrecord_function(TargetResult),
+							TxRecordFunctionPlusMemPool = case PageIdNew == 0 of
+																true ->
+																	MyPendingTxsRecord = ar_storage:get_mempool_tx_send_records(Addr),
+																	lists:append(MyPendingTxsRecord, TxRecordFunction);
+																false ->
+																	TxRecordFunction
+															end,
+							TxsResult = #{
+								<<"data">> => TxRecordFunctionPlusMemPool,
+								<<"total">> => Length,
+								<<"from">> => FromIndexNew,
+								<<"pageid">> => PageIdNew,
+								<<"pagesize">> => PageRecordsNew,
+								<<"allpages">> => ceil(Length / PageRecordsNew) div 1
+							},
+							TxsResult
 					end
 			catch _:_ ->
 				[]
@@ -2084,7 +2132,23 @@ read_datarecord_by_addr(Addr, PageId, PageRecords) ->
 								true -> FromIndex
 							end,
 							TargetResult = lists:sublist(AllArray, FromIndexNew, PageRecordsNew),
-							read_datarecord_function(TargetResult)
+							TxRecordFunction = read_datarecord_function(TargetResult),
+							TxRecordFunctionPlusMemPool = case PageIdNew == 0 of
+																true ->
+																	MyPendingTxsRecord = ar_storage:get_mempool_tx_data_records(Addr),
+																	lists:append(MyPendingTxsRecord, TxRecordFunction);
+																false ->
+																	TxRecordFunction
+															end,
+							TxsResult = #{
+								<<"data">> => TxRecordFunctionPlusMemPool,
+								<<"total">> => Length,
+								<<"from">> => FromIndexNew,
+								<<"pageid">> => PageIdNew,
+								<<"pagesize">> => PageRecordsNew,
+								<<"allpages">> => ceil(Length / PageRecordsNew) div 1
+							},
+							TxsResult
 					end
 			catch _:_ ->
 				[]

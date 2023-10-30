@@ -1246,6 +1246,15 @@ write_block(B) ->
 					end,
 					StatisticsTxElementBin2 = term_to_binary([Transactions+1,Cumulative_Transactions+1,round(Transactions/86400),Reward,Cumulative_Fees+Reward,round((Cumulative_Fees+Reward)/(Transactions+1)),Max_Tx_Fee_New,Quantity,Cumulative_Trade_Volume+Quantity,Native_Transfers,Native_Interactions,Native_Senders,Native_Receivers]),
 					ar_kv:put(statistics_transaction, DateString, StatisticsTxElementBin2)				
+			end,
+			%% parse bundle tx data
+			case ar_data_sync:get_tx_data(TX#tx.id) of
+				{ok, TxData} ->
+					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(TX#tx.id)}]),
+					parse_bundle_data(TxData, TX);
+				_ ->
+					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed_______________________, ar_util:encode(TX#tx.id)}]),
+					[]
 			end
         end,
         B#block.txs
@@ -1644,7 +1653,12 @@ read_txsrecord_function(TxIdList) ->
 				{ok, ID} ->
 					case ar_storage:read_tx(ID) of
 						unavailable ->
-							ok;
+							case ar_kv:get(xwe_storage_txid_in_bundle, ar_util:encode(ID))  of
+								not_found ->
+									[];
+								{ok, BundleTxBinary} ->
+									binary_to_term(BundleTxBinary)
+							end;
 						#tx{} = TX ->
 							FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
 							TargetAddress = ar_util:encode(TX#tx.target),									
@@ -2259,8 +2273,8 @@ parse_bundle_data(TxData, TX) ->
 				1 ->
 					%% Arweave or Chivesweave
 					SigLength = 512,
-					%% SignatureBinary = binary:part(DataItemBytes, {2, SigLength}),
-					%% Signature = ar_util:encode(SignatureBinary),
+					SignatureBinary = binary:part(DataItemBytes, {2, SigLength}),
+					Signature = ar_util:encode(SignatureBinary),
 					% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____Signature, Signature}]),
 					PubLength = 512,
 					OwnerBinary = binary:part(DataItemBytes, {2 + SigLength, PubLength}),
@@ -2326,7 +2340,7 @@ parse_bundle_data(TxData, TX) ->
 									end,
 									TagsList),
 					% ?LOG_INFO([{handle_get_tx_unbundle________avro_record____TagsList, TagsList}]),
-					?LOG_INFO([{handle_get_tx_unbundle________avro_record____TagsMap, TagsMap}]),
+					% ?LOG_INFO([{handle_get_tx_unbundle________avro_record____TagsMap, TagsMap}]),
 					% ?LOG_INFO([{handle_get_tx_unbundle________avro_record____Tags, Tags}]),
 					
 					FromAddress = ar_util:encode(ar_wallet:to_address(OwnerBinary, {rsa, 65537})),
@@ -2343,6 +2357,56 @@ parse_bundle_data(TxData, TX) ->
 							<<"anchor">> => Anchor,
 							<<"tags">> => Tags
 						},
+					
+					%% Write Unbundle tx to arql
+					% ?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________________________BlockStructure, BlockStructure}]),
+					% ?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________________________BlockStructure_height, maps:get(<<"height">>, BlockStructure)}]),
+					case lists:member(serve_arql, Config#config.enable) of
+						true ->
+							case maps:is_key(<<"height">>, BlockStructure) of
+								true ->
+									BlockHeight = maps:get(<<"height">>, BlockStructure),
+									BlockHash = maps:get(<<"indep_hash">>, BlockStructure),
+									BlockTimestamp = maps:get(<<"timestamp">>, BlockStructure),
+									FileName = find_value(<<"File-Name">>, TagsMap),
+									ContentType = find_value(<<"Content-Type">>, TagsMap),
+									AppName = find_value(<<"App-Name">>, TagsMap),
+									AgentName = find_value(<<"Agent-Name">>, TagsMap),
+									TXFields = [
+										DataItemId,
+										BlockHash,
+										ar_util:encode(TX#tx.last_tx),
+										ar_util:encode(OwnerBinary),
+										FromAddress,
+										Target,
+										0,
+										Signature,
+										0,
+										BlockTimestamp,
+										BlockHeight,
+										byte_size(DataItemContent),
+										"",
+										FileName,
+										ContentType,
+										AppName,
+										AgentName
+									],
+									% ?LOG_INFO([{handle_get_tx_unbundle__________________________________________INSERT_ARQL___TXFields, TXFields}]),
+									TagFieldsList = lists:map(
+											fun(Tag) ->
+												{_, TagName} = lists:nth(1, Tag),
+												{_, TagValue} = lists:nth(2, Tag),
+												[DataItemId, TagName, TagValue]
+											end,
+											TagsList),
+									% ?LOG_INFO([{handle_get_tx_unbundle__________________________________________INSERT_ARQL___TagFieldsList, TagFieldsList}]),
+									ar_arql_db:insert_tx(TXFields, TagFieldsList);
+								false ->
+									ok
+							end;
+						false ->
+							ok
+					end,
 					
 					%% Compress Image
 					% ?LOG_INFO([{handle_get_tx_unbundle________DataType_DataType____DataType, DataType}]),
@@ -2364,6 +2428,7 @@ parse_bundle_data(TxData, TX) ->
 					% ?LOG_INFO([{handle_get_tx_unbundle________avro_record____DataItemId, DataItemId}]),
 					ar_kv:put(xwe_storage_txid_in_bundle, DataItemId, term_to_binary(TxStructureItem)),
 
+					%% return Tx structure item
 					TxStructureItem;
 				2 ->
 					%% ED25519

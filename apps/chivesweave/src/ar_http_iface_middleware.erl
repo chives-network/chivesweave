@@ -1747,7 +1747,6 @@ find_value(Key, List) ->
 		false -> <<"text/plain">>
 	end.
 
-
 handle_get_tx_unbundle(Hash, Req) ->
 	case ar_util:safe_decode(Hash) of
 		{error, invalid} ->
@@ -2321,8 +2320,15 @@ handle_get_transaction_records(PageId, PageSize) ->
 							{404, #{}, []};
 						Res ->
 							% ?LOG_INFO([{handle_get_blocklist_data, Res}]),
+							TxsResult = lists:map(
+								fun(TxResult) ->
+									maps:get(id, TxResult)
+								end,
+								Res
+							),
+							TxRecordFunction = ar_storage:read_txsrecord_function(TxsResult),
 							TransactionResult = #{
-									<<"data">> => Res,
+									<<"data">> => TxRecordFunction,
 									<<"total">> => TransactionsTotal,
 									<<"from">> => PageIdNew * PageSizeNew,
 									<<"pageid">> => PageIdNew,

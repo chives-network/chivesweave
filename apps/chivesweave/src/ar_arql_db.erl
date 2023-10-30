@@ -3,7 +3,7 @@
 
 -export([start_link/0, select_tx_by_id/1, select_txs_by/1, select_block_by_tx_id/1,
 		select_tags_by_tx_id/1, eval_legacy_arql/1, insert_full_block/1, insert_full_block/2,
-		insert_block/1, insert_tx/4, insert_tx/5, 
+		insert_block/1, insert_tx/4, insert_tx/5, insert_tx/2,
 		select_address_range/2, select_address_total/0,
 		select_transaction_range/2, select_transaction_total/0
 		]).
@@ -67,7 +67,11 @@ CREATE TABLE tx (
 	timestamp INTEGER,
 	block_height INTEGER,
 	data_size INTEGER,
-	bundleid TEXT
+	bundleid TEXT,
+	file_name TEXT,
+	content_type TEXT,
+	app_name TEXT,
+	agent_name TEXT
 );
 
 CREATE TABLE tag (
@@ -87,6 +91,10 @@ CREATE INDEX idx_tx_target ON tx (target);
 CREATE INDEX idx_tx_timestamp ON tx (timestamp);
 CREATE INDEX idx_tx_block_height ON tx (block_height);
 CREATE INDEX idx_tx_bundleid ON tx (bundleid);
+CREATE INDEX idx_tx_file_name ON tx (file_name);
+CREATE INDEX idx_tx_content_type ON tx (content_type);
+CREATE INDEX idx_tx_app_name ON tx (app_name);
+CREATE INDEX idx_tx_agent_name ON tx (agent_name);
 
 CREATE INDEX idx_tag_tx_id ON tag (tx_id);
 CREATE INDEX idx_tag_name ON tag (name);
@@ -105,6 +113,10 @@ DROP INDEX idx_tx_from_address;
 DROP INDEX idx_tx_timestamp;
 DROP INDEX idx_tx_block_height;
 DROP INDEX idx_tx_bundleid;
+DROP INDEX idx_tx_file_name;
+DROP INDEX idx_tx_content_type;
+DROP INDEX idx_tx_app_name;
+DROP INDEX idx_tx_agent_name;
 
 DROP INDEX idx_tag_tx_id;
 DROP INDEX idx_tag_name;
@@ -115,7 +127,7 @@ DROP INDEX idx_address_timestamp;
 ").
 
 -define(INSERT_BLOCK_SQL, "INSERT OR REPLACE INTO block VALUES (?, ?, ?, ?)").
--define(INSERT_TX_SQL, "INSERT OR REPLACE INTO tx VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").
+-define(INSERT_TX_SQL, "INSERT OR REPLACE INTO tx VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").
 -define(INSERT_TAG_SQL, "INSERT OR REPLACE INTO tag VALUES (?, ?, ?)").
 -define(SELECT_TX_BY_ID_SQL, "SELECT * FROM tx WHERE id = ?").
 
@@ -203,6 +215,10 @@ insert_tx(BH, TX, StoreTags, Timestamp, Height) ->
 		_ ->
 			[]
 	end,
+	gen_server:cast(?MODULE, {insert_tx, TXFields, TagFieldsList}),
+	ok.
+
+insert_tx(TXFields, TagFieldsList) ->
 	gen_server:cast(?MODULE, {insert_tx, TXFields, TagFieldsList}),
 	ok.
 
@@ -679,7 +695,11 @@ tx_map([
 	Timestamp,
 	Height,
 	DataSize,
-	BundleId
+	BundleId,
+	FileName,
+	ContentType,
+	AppName,
+	AgentName
 ]) -> #{
 	id => Id,
 	block_indep_hash => BlockIndepHash,
@@ -693,7 +713,11 @@ tx_map([
 	timestamp => Timestamp,
 	block_height => Height,
 	data_size => DataSize,
-	bundleid => BundleId
+	bundleid => BundleId,
+	file_name => FileName,
+	content_type => ContentType,
+	app_name => AppName,
+	agent_name => AgentName
 }.
 
 block_map([
@@ -762,24 +786,48 @@ eval_legacy_arql_where_clause({'or',E1,E2}) ->
 eval_legacy_arql_where_clause(_) ->
 	throw(bad_query).
 
+find_value(Key, List) ->
+	case lists:keyfind(Key, 1, List) of
+		{Key, Val} -> Val;
+		false -> <<"">>
+	end.
+
 full_block_to_fields(FullBlock) ->
 	BlockFields = block_to_fields(FullBlock),
 	BlockIndepHash = lists:nth(1, BlockFields),
-	TxFieldsList = lists:map(fun(TX) -> [
-		ar_util:encode(TX#tx.id),
-		BlockIndepHash,
-		ar_util:encode(TX#tx.last_tx),
-		ar_util:encode(TX#tx.owner),
-		ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
-		ar_util:encode(TX#tx.target),
-		TX#tx.quantity,
-		ar_util:encode(TX#tx.signature),
-		TX#tx.reward,
-		integer_to_binary(lists:nth(4, BlockFields)),
-		integer_to_binary(lists:nth(3, BlockFields)),
-		TX#tx.data_size,
-		""
-	] end, FullBlock#block.txs),
+	TxFieldsList = lists:map(
+		fun(TX) -> 
+			TagsMap = lists:map(
+									fun({Name, Value}) ->
+										{Name, Value}
+									end,
+									TX#tx.tags),
+			FileName = find_value(<<"File-Name">>, TagsMap),
+			ContentType = find_value(<<"Content-Type">>, TagsMap),
+			AppName = find_value(<<"App-Name">>, TagsMap),
+			AgentName = find_value(<<"Agent-Name">>, TagsMap),
+			[
+				ar_util:encode(TX#tx.id),
+				BlockIndepHash,
+				ar_util:encode(TX#tx.last_tx),
+				ar_util:encode(TX#tx.owner),
+				ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+				ar_util:encode(TX#tx.target),
+				TX#tx.quantity,
+				ar_util:encode(TX#tx.signature),
+				TX#tx.reward,
+				integer_to_binary(lists:nth(4, BlockFields)),
+				integer_to_binary(lists:nth(3, BlockFields)),
+				TX#tx.data_size,
+				"",
+				FileName,
+				ContentType,
+				AppName,
+				AgentName
+			] 
+		end,
+		FullBlock#block.txs
+	),
 	{BlockFields, TxFieldsList}.
 
 block_to_tag_fields_list(B) ->
@@ -801,6 +849,15 @@ block_to_fields(B) ->
 	].
 
 tx_to_fields(BH, TX, Timestamp, Height) ->
+	TagsMap = lists:map(
+									fun({Name, Value}) ->
+										{Name, Value}
+									end,
+									TX#tx.tags),
+	FileName = find_value(<<"File-Name">>, TagsMap),
+	ContentType = find_value(<<"Content-Type">>, TagsMap),
+	AppName = find_value(<<"App-Name">>, TagsMap),
+	AgentName = find_value(<<"Agent-Name">>, TagsMap),
 	[
 		ar_util:encode(TX#tx.id),
 		ar_util:encode(BH),
@@ -814,7 +871,11 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 		Timestamp,
 		Height,
 		TX#tx.data_size,
-		""
+		"",
+		FileName,
+		ContentType,
+		AppName,
+		AgentName
 	].
 
 tx_to_tag_fields_list(TX) ->

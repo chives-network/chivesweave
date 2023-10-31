@@ -233,6 +233,21 @@ handle(<<"GET">>, [<<"tx">>, <<"pending">>], Req, _Pid) ->
 			Req}
 	end;
 
+%% Return all mempool transaction records.
+%% GET request to endpoint /tx/pending/record.
+handle(<<"GET">>, [<<"tx">>, <<"pending">>, <<"record">>], Req, _Pid) ->
+	case ar_node:is_joined() of
+		false ->
+			not_joined(Req);
+		true ->
+			{200, #{},
+					ar_serialize:jsonify(
+						%% Should encode
+						ar_storage:get_mempool_tx_txs_records()
+					),
+			Req}
+	end;
+
 %% Return outgoing transaction priority queue.
 %% GET request to endpoint /queue.
 %% @deprecated
@@ -2215,7 +2230,12 @@ handle_get_block_txsrecord_by_height(Height, PageId, PageRecords) ->
 										FromIndex > MaxRecords -> MaxRecords;
 										true -> FromIndex
 									end,
-									TXIDsInPage = lists:sublist(TXIDs, FromHeightNew, FromHeightNew + PageRecordsNew - 1 ),
+									TXIDsInPage = 	case length(TXIDs) of
+														0 ->
+															[];
+														_ ->
+															lists:sublist(TXIDs, FromHeightNew, FromHeightNew + PageRecordsNew - 1 )
+													end,
 									TxsRecord = ar_storage:read_txsrecord_function(TXIDsInPage),
 									BlockInfor = case ar_kv:get(explorer_block, list_to_binary(integer_to_list(HeightInt))) of 
 										not_found -> []; 

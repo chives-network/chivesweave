@@ -252,13 +252,13 @@ handle(<<"GET">>, [<<"tx">>, Hash, <<"status">>], Req, _Pid) ->
 
 %% Return a txs list in a bundle if tx is a bundle, and will unbundle txs and storage in disk.
 %% GET request to endpoint /tx/{hash}/status.
-handle(<<"GET">>, [<<"tx">>, Hash, <<"unbundle">>], Req, _Pid) ->
+handle(<<"GET">>, [<<"tx">>, Hash, <<"unbundle">>, PageId, PageRecords], Req, _Pid) ->
 	ar_semaphore:acquire(arql_semaphore(Req), 5000),
 	case ar_node:is_joined() of
 		false ->
 			not_joined(Req);
 		true ->
-			handle_get_tx_unbundle(Hash, Req)
+			handle_get_tx_unbundle(Hash, Req, PageId, PageRecords)
 	end;
 
 %% Return a JSON-encoded transaction.
@@ -1189,8 +1189,8 @@ handle(<<"GET">>, [<<"block">>, <<"txs">>, Height], Req, _Pid) ->
 	{Status, Headers, Body, Req};
 
 %% Return a list of Last Block, used for block explorer.
-handle(<<"GET">>, [<<"block">>, <<"txsrecord">>, Height], Req, _Pid) ->
-	{Status, Headers, Body} = handle_get_block_txsrecord_by_height(Height),
+handle(<<"GET">>, [<<"block">>, <<"txsrecord">>, Height, PageId, PageRecords], Req, _Pid) ->
+	{Status, Headers, Body} = handle_get_block_txsrecord_by_height(Height, PageId, PageRecords),
 	{Status, Headers, Body, Req};
 
 %% Return a list of Block infor, used for block explorer.
@@ -1747,7 +1747,7 @@ find_value(Key, List) ->
 		false -> <<"text/plain">>
 	end.
 
-handle_get_tx_unbundle(Hash, Req) ->
+handle_get_tx_unbundle(Hash, Req, PageId, PageRecords) ->
 	case ar_util:safe_decode(Hash) of
 		{error, invalid} ->
 			{400, #{}, <<"Invalid hash.">>, Req};
@@ -1787,7 +1787,7 @@ handle_get_tx_unbundle(Hash, Req) ->
 									case ar_data_sync:get_tx_data(TX#tx.id) of
 										{ok, TxData} ->
 											% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(TX#tx.id)}]),
-											ar_storage:parse_bundle_data(TxData, TX);
+											ar_storage:parse_bundle_data(TxData, TX, PageId, PageRecords);
 										_ ->
 											% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed, ar_util:encode(TX#tx.id)}]),
 											[]
@@ -1798,15 +1798,8 @@ handle_get_tx_unbundle(Hash, Req) ->
 							?LOG_INFO([{handle_get_tx_unbundle________NOT_A_Bundle_____Tags, Tags}]),
 							[]
 					end,
-					TxInfor = case ar_storage:read_txrecord_by_txid(ar_util:encode(TX#tx.id)) of
-						not_found ->
-							[];
-						Res ->
-							Res
-					end,
-					TxResult = #{ <<"txs">> => UnBundleResult, <<"tx">> => TxInfor },
 					% ?LOG_INFO([{handle_get_block_txsrecord_by_heightTxsRecord________, TxResult}]),
-					{200, #{}, ar_serialize:jsonify(TxResult), Req}
+					{200, #{}, ar_serialize:jsonify(UnBundleResult), Req}
 			end
 	end.
 
@@ -2181,7 +2174,7 @@ handle_get_block_txs_by_height(Height) ->
 			end
 	end.
 
-handle_get_block_txsrecord_by_height(Height) ->
+handle_get_block_txsrecord_by_height(Height, PageId, PageRecords) ->
 	HeightInt = binary_to_integer(Height),
 	case ar_block_index:get_element_by_height(HeightInt) of
 		not_found ->
@@ -2200,41 +2193,75 @@ handle_get_block_txsrecord_by_height(Height) ->
 				#block{ txs = TXs2 } ->
 					TXIDs = lists:map(fun(TX) when is_binary(TX) -> ar_util:encode(TX); (#tx{ id = TX }) -> ar_util:encode(TX) end, TXs2),
 					% ?LOG_INFO([{handle_get_block_txsrecord_by_heightTXIDs____________, TXIDs}]),
-					TxsRecord = ar_storage:read_txsrecord_function(TXIDs),
-					BlockInfor = case ar_kv:get(explorer_block, list_to_binary(integer_to_list(HeightInt))) of 
-						not_found -> []; 
-						{ok, BlockIdBinaryPrevious} -> 
-							BlockIdBinaryResultPrevious = binary_to_term(BlockIdBinaryPrevious),
-							TimestampPrevious = lists:nth(5, BlockIdBinaryResultPrevious),
-							case ar_kv:get(explorer_block, list_to_binary(integer_to_list(HeightInt))) of 
-								not_found -> []; 
-								{ok, BlockIdBinary} -> 
-									CurrentHeight = ar_node:get_height(),
-									BlockIdBinaryResult = binary_to_term(BlockIdBinary),
-									BlockMap = #{
-											<<"id">> => lists:nth(1, BlockIdBinaryResult),
-											<<"height">> => lists:nth(1, BlockIdBinaryResult),
-											<<"indep_hash">> => list_to_binary(binary_to_list(lists:nth(2, BlockIdBinaryResult))),
-											<<"reward_addr">> => list_to_binary(binary_to_list(lists:nth(3, BlockIdBinaryResult))),
-											<<"reward">> => lists:nth(4, BlockIdBinaryResult),
-											<<"timestamp">> => lists:nth(5, BlockIdBinaryResult),
-											<<"txs_length">> => lists:nth(6, BlockIdBinaryResult),
-											<<"weave_size">> => lists:nth(7, BlockIdBinaryResult),
-											<<"block_size">> => lists:nth(8, BlockIdBinaryResult),
-											<<"last_retarget">> => B#block.last_retarget,
-											<<"reward_pool">> => B#block.reward_pool,
-											<<"mining_time">> => lists:nth(5, BlockIdBinaryResult) - TimestampPrevious,
-											<<"currentheight">> => CurrentHeight
-										},
-									BlockMap
+					try binary_to_integer(PageRecords) of
+						PageRecordsInt ->				
+							PageRecordsNew = if
+								PageRecordsInt < 0 -> 5;
+								PageRecordsInt > 100 -> 100;
+								true -> PageRecordsInt
+							end,
+							try binary_to_integer(PageId) of
+								PageIdInt ->
+									MaxRecords = length(TXIDs),
+									AllPages = ceil(MaxRecords / PageRecordsNew),
+									PageIdNew = if
+										PageIdInt < 0 -> 0;
+										PageIdInt > AllPages -> AllPages;
+										true -> PageIdInt
+									end,
+									FromIndex = PageIdNew * PageRecordsNew + 1,
+									FromHeightNew = if
+										FromIndex < 1 -> 1;
+										FromIndex > MaxRecords -> MaxRecords;
+										true -> FromIndex
+									end,
+									TXIDsInPage = lists:sublist(TXIDs, FromHeightNew, FromHeightNew + PageRecordsNew - 1 ),
+									TxsRecord = ar_storage:read_txsrecord_function(TXIDsInPage),
+									BlockInfor = case ar_kv:get(explorer_block, list_to_binary(integer_to_list(HeightInt))) of 
+										not_found -> []; 
+										{ok, BlockIdBinaryPrevious} -> 
+											BlockIdBinaryResultPrevious = binary_to_term(BlockIdBinaryPrevious),
+											TimestampPrevious = lists:nth(5, BlockIdBinaryResultPrevious),
+											case ar_kv:get(explorer_block, list_to_binary(integer_to_list(HeightInt))) of 
+												not_found -> []; 
+												{ok, BlockIdBinary} -> 
+													CurrentHeight = ar_node:get_height(),
+													BlockIdBinaryResult = binary_to_term(BlockIdBinary),
+													BlockMap = #{
+															<<"id">> => lists:nth(1, BlockIdBinaryResult),
+															<<"height">> => lists:nth(1, BlockIdBinaryResult),
+															<<"indep_hash">> => list_to_binary(binary_to_list(lists:nth(2, BlockIdBinaryResult))),
+															<<"reward_addr">> => list_to_binary(binary_to_list(lists:nth(3, BlockIdBinaryResult))),
+															<<"reward">> => lists:nth(4, BlockIdBinaryResult),
+															<<"timestamp">> => lists:nth(5, BlockIdBinaryResult),
+															<<"txs_length">> => lists:nth(6, BlockIdBinaryResult),
+															<<"weave_size">> => lists:nth(7, BlockIdBinaryResult),
+															<<"block_size">> => lists:nth(8, BlockIdBinaryResult),
+															<<"last_retarget">> => B#block.last_retarget,
+															<<"reward_pool">> => B#block.reward_pool,
+															<<"mining_time">> => lists:nth(5, BlockIdBinaryResult) - TimestampPrevious,
+															<<"currentheight">> => CurrentHeight
+														},
+													BlockMap
+											end
+									end,
+									BlockResult = #{
+													<<"txs">> => TxsRecord,
+													<<"block">> => BlockInfor,
+													<<"total">> => MaxRecords,
+													<<"from">> => FromHeightNew,
+													<<"pageid">> => PageIdNew,
+													<<"pagesize">> => PageRecordsNew,
+													<<"allpages">> => AllPages
+												},
+									% ?LOG_INFO([{handle_get_block_txsrecord_by_heightTxsRecord________, TxsRecord}]),
+									{200, #{}, ar_serialize:jsonify(BlockResult)}
+							catch _:_ ->
+								{404, #{}, []}
 							end
-					end,
-					BlockResult = #{
-									<<"txs">> => TxsRecord,
-									<<"block">> => BlockInfor
-								},
-					% ?LOG_INFO([{handle_get_block_txsrecord_by_heightTxsRecord________, TxsRecord}]),
-					{200, #{}, ar_serialize:jsonify(BlockResult)}
+					catch _:_ ->
+						{404, #{}, []}
+					end
 			end
 	end.
 

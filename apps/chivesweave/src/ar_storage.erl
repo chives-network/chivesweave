@@ -14,7 +14,7 @@
 		read_migrated_v1_tx_file/1, ensure_directories/1, write_file_atomic/2,
 		write_term/2, write_term/3, read_term/1, read_term/2, delete_term/1, is_file/1,
 		migrate_tx_record/1, migrate_block_record/1, read_account/2,
-		read_txsrecord_function/1, read_txs_by_addr/3, read_txrecord_by_txid/1, read_txsrecord_by_addr/3, read_data_by_addr/3, read_datarecord_by_addr/3, read_txsrecord_by_addr_deposits/3, read_txsrecord_by_addr_send/3, take_first_n_chars/2, read_block_from_height_by_number/3, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0, read_datarecord_function/1, get_mempool_tx_data_records/1, get_mempool_tx_send_records/1, get_mempool_tx_deposits_records/1, get_mempool_tx_txs_records/1, image_thumbnail_compress_to_storage/4, parse_bundle_data/2
+		read_txsrecord_function/1, read_txs_by_addr/3, read_txrecord_by_txid/1, read_txsrecord_by_addr/3, read_data_by_addr/3, read_datarecord_by_addr/3, read_txsrecord_by_addr_deposits/3, read_txsrecord_by_addr_send/3, take_first_n_chars/2, read_block_from_height_by_number/3, read_statistics_network/0, read_statistics_data/0, read_statistics_block/0, read_statistics_address/0, read_statistics_transaction/0, read_datarecord_function/1, get_mempool_tx_data_records/1, get_mempool_tx_send_records/1, get_mempool_tx_deposits_records/1, get_mempool_tx_txs_records/1, image_thumbnail_compress_to_storage/4, parse_bundle_data/4
 	]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
@@ -1251,7 +1251,7 @@ write_block(B) ->
 			case ar_data_sync:get_tx_data(TX#tx.id) of
 				{ok, TxData} ->
 					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(TX#tx.id)}]),
-					parse_bundle_data(TxData, TX);
+					parse_bundle_data(TxData, TX, 0, 100);
 				_ ->
 					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed_______________________, ar_util:encode(TX#tx.id)}]),
 					[]
@@ -2210,7 +2210,7 @@ parse_bundle_dataitem_index(From, Offset) ->
     NewValue = From + Offset,
     NewValue.
 
-parse_bundle_data(TxData, TX) ->
+parse_bundle_data(TxData, TX, PageId, PageRecords) ->
 	%% Begin to save unbundle data
 	{ok, Config} = application:get_env(chivesweave, config),
 	DataDir = Config#config.data_dir,
@@ -2448,7 +2448,81 @@ parse_bundle_data(TxData, TX) ->
 		GetNumbersList
 	),
 	% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItems, GetDataItems}]),
-	GetDataItems.
+	try binary_to_integer(PageRecords) of
+		PageRecordsInt ->				
+			PageRecordsNew = if
+				PageRecordsInt < 0 -> 5;
+				PageRecordsInt > 100 -> 100;
+				true -> PageRecordsInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					MaxRecords = length(GetDataItems),
+					AllPages = ceil(MaxRecords / PageRecordsNew),
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						PageIdInt > AllPages -> AllPages;
+						true -> PageIdInt
+					end,
+					FromIndex = PageIdNew * PageRecordsNew + 1,
+					FromHeightNew = if
+						FromIndex < 1 -> 1;
+						FromIndex > MaxRecords -> MaxRecords;
+						true -> FromIndex
+					end,
+					TXIDsInPage = lists:sublist(GetDataItems, FromHeightNew, FromHeightNew + PageRecordsNew - 1 ),
+					TxInfor = case read_txrecord_by_txid(ar_util:encode(TX#tx.id)) of
+						not_found ->
+							[];
+						Res ->
+							Res
+					end,
+					TxResult = #{ 
+								<<"txs">> => TXIDsInPage, 
+								<<"tx">> => TxInfor,
+								<<"total">> => MaxRecords,
+								<<"from">> => FromHeightNew,
+								<<"pageid">> => PageIdNew,
+								<<"pagesize">> => PageRecordsNew,
+								<<"allpages">> => AllPages
+								},
+					TxResult
+			catch _:_ ->
+				TxInfor = case read_txrecord_by_txid(ar_util:encode(TX#tx.id)) of
+					not_found ->
+						[];
+					Res ->
+						Res
+				end,
+				TxResult = #{ 
+							<<"txs">> => [], 
+							<<"tx">> => TxInfor,
+							<<"total">> => 0,
+							<<"from">> => 0,
+							<<"pageid">> => 0,
+							<<"pagesize">> => 0,
+							<<"allpages">> => 0
+							},
+				TxResult
+			end
+	catch _:_ ->
+		TxInfor = case read_txrecord_by_txid(ar_util:encode(TX#tx.id)) of
+			not_found ->
+				[];
+			Res ->
+				Res
+		end,
+		TxResult = #{ 
+					<<"txs">> => [], 
+					<<"tx">> => TxInfor,
+					<<"total">> => 0,
+					<<"from">> => 0,
+					<<"pageid">> => 0,
+					<<"pagesize">> => 0,
+					<<"allpages">> => 0
+					},
+		TxResult
+	end.
 
 image_thumbnail_compress_to_storage(ContentType, Data, Address, TxId) ->
 	case binary:match(ContentType, <<"image">>) of

@@ -667,10 +667,9 @@ handle(<<"GET">>, [<<"peersinfo">>], Req, _Pid) ->
 				ar_peers:is_public_peer(P)
 			],
 	IpInfoList = lists:map(
-		fun(IPPort) ->
-			?LOG_INFO([{ip______________________________________, IPPort}]),
-			[IPStr, _] = string:split(IPPort, ":"),
-			case ar_kv:get(statistics_ipaddress, IPStr) of
+		fun(IPInfo) ->
+			[IPStr, _] = string:split(IPInfo, ":"),
+			IpDetail = case ar_kv:get(statistics_ipaddress, IPStr) of
 				not_found ->
 					Response = httpc:request(post, {"https://nordvpn.com/wp-admin/admin-ajax.php?action=get_user_info_data&ip=" ++ IPStr, [], "application/json", "" }, [], []),
 					case Response of
@@ -683,7 +682,8 @@ handle(<<"GET">>, [<<"peersinfo">>], Req, _Pid) ->
 				{ok, IpInfoBinary} ->
 					IpInfo = binary_to_term(IpInfoBinary),	
 					IpInfo			
-			end
+			end,
+			#{ <<"ip">> => IPInfo, <<"result">> => IpDetail }
         end,
 		IpList
 	),
@@ -1672,7 +1672,7 @@ handle(<<"GET">>, [<<Hash:43/binary>>, <<"thumbnail">>], Req, _Pid) ->
 										{ok, FileInfo} ->
 											case file:read_file(NewFilePath) of
 												{ok, FileContent} ->
-													{200, #{}, FileContent, Req};
+													{200, #{ <<"Cache-Control">> => <<"max-age=604800">> }, FileContent, Req};
 												{error, _Reason} ->
 													{404, #{}, sendfile("data/not_found.html"), Req}
 											end;
@@ -1683,7 +1683,7 @@ handle(<<"GET">>, [<<Hash:43/binary>>, <<"thumbnail">>], Req, _Pid) ->
 												{ok, FileInfo} ->
 													case file:read_file(OriginalFilePath) of
 														{ok, FileContent} ->
-															{200, #{}, FileContent, Req};
+															{200, #{ <<"Cache-Control">> => <<"max-age=604800">> }, FileContent, Req};
 														{error, _Reason} ->
 															{404, #{}, sendfile("data/not_found.html"), Req}
 													end;
@@ -1992,7 +1992,7 @@ serve_tx_html_data(Req, TX) ->
 	serve_tx_html_data(Req, TX, ar_http_util:get_tx_content_type(TX)).
 
 serve_tx_html_data(Req, #tx{ format = 1 } = TX, {valid, ContentType}) ->
-	{200, #{ <<"content-type">> => ContentType }, TX#tx.data, Req};
+	{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, TX#tx.data, Req};
 serve_tx_html_data(Req, #tx{ format = 1 } = TX, none) ->
 	{200, #{ <<"content-type">> => <<"text/html">> }, TX#tx.data, Req};
 serve_tx_html_data(Req, #tx{ format = 2 } = TX, {valid, ContentType}) ->
@@ -2005,12 +2005,12 @@ serve_tx_html_data(Req, _TX, invalid) ->
 serve_format_2_html_data(Req, ContentType, TX) ->
 	case ar_storage:read_tx_data(TX) of
 		{ok, Data} ->
-			{200, #{ <<"content-type">> => ContentType }, Data, Req};
+			{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, Data, Req};
 		{error, enoent} ->
 			ok = ar_semaphore:acquire(get_tx_data, infinity),
 			case ar_data_sync:get_tx_data(TX#tx.id) of
 				{ok, Data} ->
-					{200, #{ <<"content-type">> => ContentType }, Data, Req};
+					{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, Data, Req};
 				{error, tx_data_too_big} ->
 					{400, #{}, jiffy:encode(#{ error => tx_data_too_big }), Req};
 				{error, not_found} ->
@@ -2029,7 +2029,7 @@ serve_tx_html_data_thumbnail(Req, #tx{ format = 1 } = TX, {valid, ContentType}) 
 	image_thumbnail_compress(Req, ContentType, TX);
 serve_tx_html_data_thumbnail(Req, #tx{ format = 1 } = TX, none) ->
 	?LOG_INFO([{serve_format_2_html_data_thumbnail_____________2, format}]),
-	{200, #{ <<"content-type">> => <<"text/html">> }, TX#tx.data, Req};
+	{200, #{ <<"content-type">> => <<"text/html">>, <<"Cache-Control">> => <<"max-age=604800">> }, TX#tx.data, Req};
 serve_tx_html_data_thumbnail(Req, #tx{ format = 2 } = TX, {valid, ContentType}) ->
 	?LOG_INFO([{serve_format_2_html_data_thumbnail_____________3, ContentType}]),
 	image_thumbnail_compress(Req, ContentType, TX);
@@ -2048,11 +2048,11 @@ image_thumbnail_compress(Req, ContentType, TX) ->
 					%% Is image, and will to compress this image
 					FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
 					MayCompressedData = ar_storage:image_thumbnail_compress_to_storage(ContentType, Data, FromAddress, ar_util:encode(TX#tx.id)),
-					{200, #{ <<"content-type">> => ContentType }, MayCompressedData, Req};
+					{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, MayCompressedData, Req};
 				nomatch ->
 					%% Not a image, just return the original data
 					?LOG_INFO([{serve_format_2_html_data_thumbnail___________binary_starts_with_failed, false}]),
-					{200, #{ <<"content-type">> => ContentType }, Data, Req}
+					{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, Data, Req}
 			end;
 		{error, enoent} ->
 			?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____TXID______, ar_data_sync:get_tx_data(TX#tx.id)}]),
@@ -2062,11 +2062,11 @@ image_thumbnail_compress(Req, ContentType, TX) ->
 					?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____Data______, Data}]),
 					FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
 					MayCompressedData = ar_storage:image_thumbnail_compress_to_storage(ContentType, Data, FromAddress, ar_util:encode(TX#tx.id)),
-					{200, #{ <<"content-type">> => ContentType }, MayCompressedData, Req};
+					{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, MayCompressedData, Req};
 				{error, tx_data_too_big} ->
 					{400, #{}, jiffy:encode(#{ error => tx_data_too_big }), Req};
 				{error, not_found} ->
-					{200, #{ <<"content-type">> => ContentType }, TX#tx.data, Req};
+					{400, #{ <<"content-type">> => ContentType }, TX#tx.data, Req};
 				{error, timeout} ->
 					{503, #{}, jiffy:encode(#{ error => timeout }), Req}
 			end
@@ -2075,16 +2075,16 @@ image_thumbnail_compress(Req, ContentType, TX) ->
 serve_format_2_html_data_thumbnail(Req, ContentType, TX) ->
 	case ar_storage:read_tx_data(TX) of
 		{ok, Data} ->
-			{200, #{ <<"content-type">> => ContentType }, Data, Req};
+			{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, Data, Req};
 		{error, enoent} ->
 			ok = ar_semaphore:acquire(get_tx_data, infinity),
 			case ar_data_sync:get_tx_data(TX#tx.id) of
 				{ok, Data} ->
-					{200, #{ <<"content-type">> => ContentType }, Data, Req};
+					{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, Data, Req};
 				{error, tx_data_too_big} ->
 					{400, #{}, jiffy:encode(#{ error => tx_data_too_big }), Req};
 				{error, not_found} ->
-					{200, #{ <<"content-type">> => ContentType }, <<>>, Req};
+					{400, #{ <<"content-type">> => ContentType }, <<>>, Req};
 				{error, timeout} ->
 					{503, #{}, jiffy:encode(#{ error => timeout }), Req}
 			end

@@ -407,13 +407,13 @@ serve_manifest_path_3(SubFilename, Req) ->
 	end.
 
 serve_plain_tx(#tx{ format = 1 } = TX, ContentType, Req) ->
-	Headers = #{ <<"content-type">> => ContentType },
+	Headers = #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> },
 	{stop, {200, Headers, TX#tx.data, Req}};
 serve_plain_tx(#tx{ format = 2, data = Data } = TX, ContentType, Req) when byte_size(Data) > 0 ->
-	Headers = #{ <<"content-type">> => ContentType },
+	Headers = #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> },
 	{stop, {200, Headers, TX#tx.data, Req}};
 serve_plain_tx(#tx{ format = 2 } = TX, ContentType, Req) ->
-	Headers = #{ <<"content-type">> => ContentType },
+	Headers = #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> },
 	case ar_storage:read_tx_data(TX) of
 		{ok, Data} ->
 			{stop, {200, Headers, Data, Req}};

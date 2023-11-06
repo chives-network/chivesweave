@@ -367,12 +367,13 @@ handle(<<"GET">>, [<<"tx">>, Hash, << "data.", _/binary >>], Req, _Pid) ->
 								{ok, BundleTxBinary} ->
 									BundleTx = binary_to_term(BundleTxBinary),	
 									% ?LOG_INFO([{handle_get_tx_unbundle_____________BundleTx, BundleTx}]),
+									ContentType = maps:get(<<"type">>, maps:get(<<"data">>, BundleTx, undefined), undefined),
 									Address = maps:get(<<"address">>, maps:get(<<"owner">>, BundleTx, undefined), undefined),
 									FileName = binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, Address, ar_util:encode(ID) ])),
-									?LOG_INFO([{image_thumbnail_compress_to_storage_____________FileName, FileName}]),
+									% ?LOG_INFO([{image_thumbnail_compress_to_storage_____________FileName, FileName}]),
 									case file:read_file(FileName) of
 										{ok, Content} ->
-											{200, #{}, Content, Req};
+											{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, Content, Req};
 										_ ->
 											{404, #{}, sendfile("data/not_found.html"), Req}
 									end
@@ -1663,6 +1664,7 @@ handle(<<"GET">>, [<<Hash:43/binary>>, <<"thumbnail">>], Req, _Pid) ->
 								{ok, BundleTxBinary} ->
 									BundleTx = binary_to_term(BundleTxBinary),	
 									% ?LOG_INFO([{handle_get_tx_unbundle_____________BundleTx, BundleTx}]),
+									ContentType = maps:get(<<"type">>, maps:get(<<"data">>, BundleTx, undefined), undefined),
 									Address = maps:get(<<"address">>, maps:get(<<"owner">>, BundleTx, undefined), undefined),
 									% ?LOG_INFO([{handle_get_tx_unbundle_____________Address, Address}]),
 									DataDir = Config#config.data_dir,
@@ -1672,7 +1674,7 @@ handle(<<"GET">>, [<<Hash:43/binary>>, <<"thumbnail">>], Req, _Pid) ->
 										{ok, FileInfo} ->
 											case file:read_file(NewFilePath) of
 												{ok, FileContent} ->
-													{200, #{ <<"Cache-Control">> => <<"max-age=604800">> }, FileContent, Req};
+													{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, FileContent, Req};
 												{error, _Reason} ->
 													{404, #{}, sendfile("data/not_found.html"), Req}
 											end;
@@ -1683,7 +1685,7 @@ handle(<<"GET">>, [<<Hash:43/binary>>, <<"thumbnail">>], Req, _Pid) ->
 												{ok, FileInfo} ->
 													case file:read_file(OriginalFilePath) of
 														{ok, FileContent} ->
-															{200, #{ <<"Cache-Control">> => <<"max-age=604800">> }, FileContent, Req};
+															{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, FileContent, Req};
 														{error, _Reason} ->
 															{404, #{}, sendfile("data/not_found.html"), Req}
 													end;
@@ -1982,7 +1984,7 @@ serve_tx_data(Req, #tx{ format = 2, id = ID } = TX) ->
 				{error, tx_data_too_big} ->
 					{400, #{}, jiffy:encode(#{ error => tx_data_too_big }), Req};
 				{error, not_found} ->
-					{200, #{}, <<>>, Req};
+					{404, #{}, <<>>, Req};
 				{error, timeout} ->
 					{503, #{}, jiffy:encode(#{ error => timeout }), Req}
 			end
@@ -2014,7 +2016,7 @@ serve_format_2_html_data(Req, ContentType, TX) ->
 				{error, tx_data_too_big} ->
 					{400, #{}, jiffy:encode(#{ error => tx_data_too_big }), Req};
 				{error, not_found} ->
-					{200, #{ <<"content-type">> => ContentType }, <<>>, Req};
+					{404, #{ <<"content-type">> => ContentType }, <<>>, Req};
 				{error, timeout} ->
 					{503, #{}, jiffy:encode(#{ error => timeout }), Req}
 			end
@@ -2066,7 +2068,7 @@ image_thumbnail_compress(Req, ContentType, TX) ->
 				{error, tx_data_too_big} ->
 					{400, #{}, jiffy:encode(#{ error => tx_data_too_big }), Req};
 				{error, not_found} ->
-					{400, #{ <<"content-type">> => ContentType }, TX#tx.data, Req};
+					{404, #{ <<"content-type">> => ContentType }, TX#tx.data, Req};
 				{error, timeout} ->
 					{503, #{}, jiffy:encode(#{ error => timeout }), Req}
 			end
@@ -2084,7 +2086,7 @@ serve_format_2_html_data_thumbnail(Req, ContentType, TX) ->
 				{error, tx_data_too_big} ->
 					{400, #{}, jiffy:encode(#{ error => tx_data_too_big }), Req};
 				{error, not_found} ->
-					{400, #{ <<"content-type">> => ContentType }, <<>>, Req};
+					{404, #{ <<"content-type">> => ContentType }, <<>>, Req};
 				{error, timeout} ->
 					{503, #{}, jiffy:encode(#{ error => timeout }), Req}
 			end

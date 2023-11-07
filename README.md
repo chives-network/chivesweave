@@ -130,14 +130,14 @@ Step 5: Running your node:
 If you have small disk free space, you can use this command to start mine job:
 
 ```sh
-./_build/mainnet/rel/chivesweave/bin/start mine data_dir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] max_disk_pool_buffer_mb 10000 peer node1.chivesweave.net
+./_build/mainnet/rel/chivesweave/bin/start mine data_dir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] peer node1.chivesweave.net
 
 ```
 
 If you want to execute mine in the background:
 
 ```sh
-nohup _build/mainnet/rel/chivesweave/bin/start mine data_dir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] max_disk_pool_buffer_mb 10000 peer node1.chivesweave.net > output.log 2>&1 &
+nohup _build/mainnet/rel/chivesweave/bin/start mine data_dir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] peer node1.chivesweave.net > output.log 2>&1 &
 
 ```
 

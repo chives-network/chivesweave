@@ -6,7 +6,8 @@
 		insert_block/1, insert_tx/4, insert_tx/5, insert_tx/2,
 		select_address_range/2, select_address_total/0,
 		select_transaction_range/2, select_transaction_total/0, 
-		select_transaction_range_filter/3, select_transaction_total_filter/1
+		select_transaction_range_filter/3, select_transaction_total_filter/1, 
+		select_transaction_range_filter_address/4, select_transaction_total_filter_address/2
 		]).
 
 -export([init/1, handle_call/3, handle_cast/2, terminate/2]).
@@ -149,6 +150,9 @@ DROP INDEX idx_address_timestamp;
 -define(SELECT_TRANSACTION_TOTAL, "SELECT COUNT(*) AS NUM FROM tx").
 -define(SELECT_TRANSACTION_TOTAL_FILTER, "SELECT COUNT(*) AS NUM FROM tx where content_type = ?").
 
+-define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_SQL, "SELECT * FROM tx where content_type = ? and from_address = ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where content_type = ? and from_address = ?").
+
 %%%===================================================================
 %%% Public API.
 %%%===================================================================
@@ -177,14 +181,20 @@ select_address_total() ->
 select_transaction_range(LIMIT, OFFSET) ->
 	gen_server:call(?MODULE, {select_transaction_range, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
 
-select_transaction_range_filter(CONTENT_TYPE, LIMIT, OFFSET) ->
-	gen_server:call(?MODULE, {select_transaction_range_filter, CONTENT_TYPE, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
-
 select_transaction_total() ->
 	gen_server:call(?MODULE, {select_transaction_total}, ?SELECT_TIMEOUT).
 
+select_transaction_range_filter(CONTENT_TYPE, LIMIT, OFFSET) ->
+	gen_server:call(?MODULE, {select_transaction_range_filter, CONTENT_TYPE, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
+
 select_transaction_total_filter(CONTENT_TYPE) ->
 	gen_server:call(?MODULE, {select_transaction_total_filter, CONTENT_TYPE}, ?SELECT_TIMEOUT).
+
+select_transaction_range_filter_address(CONTENT_TYPE, FROM_ADDRESS, LIMIT, OFFSET) ->
+	gen_server:call(?MODULE, {select_transaction_range_filter_address, CONTENT_TYPE, FROM_ADDRESS, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
+
+select_transaction_total_filter_address(CONTENT_TYPE, FROM_ADDRESS) ->
+	gen_server:call(?MODULE, {select_transaction_total_filter_address, CONTENT_TYPE, FROM_ADDRESS}, ?SELECT_TIMEOUT).
 
 eval_legacy_arql(Query) ->
 	gen_server:call(?MODULE, {eval_legacy_arql, Query}, ?SELECT_TIMEOUT).
@@ -258,9 +268,11 @@ init([]) ->
 	{ok, SelectAddressRangeStmt} = ar_sqlite3:prepare(Conn, ?SELECT_ADDRESS_RANGE_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectAddressTotalStmt} = ar_sqlite3:prepare(Conn, ?SELECT_ADDRESS_TOTAL, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionRangeStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_SQL, ?DRIVER_TIMEOUT),
-	{ok, SelectTransactionRangeFilterStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_FILTER_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionTotalStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL, ?DRIVER_TIMEOUT),
+	{ok, SelectTransactionRangeFilterStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_FILTER_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionTotalFilterStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_FILTER, ?DRIVER_TIMEOUT),
+	{ok, SelectTransactionRangeFilterAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_SQL, ?DRIVER_TIMEOUT),
+	{ok, SelectTransactionTotalFilterAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS, ?DRIVER_TIMEOUT),
 	{ok, #{
 		data_dir => DataDir,
 		conn => Conn,
@@ -274,9 +286,11 @@ init([]) ->
 		select_address_range_stmt => SelectAddressRangeStmt,
 		select_address_total_stmt => SelectAddressTotalStmt,
 		select_transaction_range_stmt => SelectTransactionRangeStmt,
-		select_transaction_range_filter_stmt => SelectTransactionRangeFilterStmt,
 		select_transaction_total_stmt => SelectTransactionTotalStmt,
-		select_transaction_total_filter_stmt => SelectTransactionTotalFilterStmt
+		select_transaction_range_filter_stmt => SelectTransactionRangeFilterStmt,
+		select_transaction_total_filter_stmt => SelectTransactionTotalFilterStmt,
+		select_transaction_range_filter_address_stmt => SelectTransactionRangeFilterAddressStmt,
+		select_transaction_total_filter_address_stmt => SelectTransactionTotalFilterAddressStmt
 	}}.
 
 handle_call({insert_full_block, BlockFields, TxFieldsList, TagFieldsList}, _From, State) ->
@@ -441,17 +455,6 @@ handle_call({select_transaction_range, LIMIT, OFFSET}, _, State) ->
 	record_query_time(select_transaction_range, Time),
 	{reply, Reply, State};
 
-handle_call({select_transaction_range_filter, CONTENT_TYPE, LIMIT, OFFSET}, _, State) ->
-	#{ select_transaction_range_filter_stmt := Stmt } = State,
-	{Time, Reply} = timer:tc(fun() ->
-		case stmt_fetchall(Stmt, [CONTENT_TYPE, LIMIT, OFFSET], ?DRIVER_TIMEOUT) of
-			Rows when is_list(Rows) ->
-				lists:map(fun tx_map/1, Rows)
-		end
-	end),
-	record_query_time(select_transaction_range_filter, Time),
-	{reply, Reply, State};
-
 handle_call({select_transaction_total}, _, State) ->
 	#{ select_transaction_total_stmt := Stmt } = State,
 	{Time, Reply} = timer:tc(fun() ->
@@ -463,6 +466,17 @@ handle_call({select_transaction_total}, _, State) ->
 	record_query_time(select_transaction_total, Time),
 	{reply, Reply, State};
 
+handle_call({select_transaction_range_filter, CONTENT_TYPE, LIMIT, OFFSET}, _, State) ->
+	#{ select_transaction_range_filter_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [CONTENT_TYPE, LIMIT, OFFSET], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:map(fun tx_map/1, Rows)
+		end
+	end),
+	record_query_time(select_transaction_range_filter, Time),
+	{reply, Reply, State};
+
 handle_call({select_transaction_total_filter, CONTENT_TYPE}, _, State) ->
 	#{ select_transaction_total_filter_stmt := Stmt } = State,
 	{Time, Reply} = timer:tc(fun() ->
@@ -472,6 +486,28 @@ handle_call({select_transaction_total_filter, CONTENT_TYPE}, _, State) ->
 		end
 	end),
 	record_query_time(select_transaction_total_filter, Time),
+	{reply, Reply, State};
+
+handle_call({select_transaction_range_filter_address, CONTENT_TYPE, FROM_ADDRESS, LIMIT, OFFSET}, _, State) ->
+	#{ select_transaction_range_filter_address_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [CONTENT_TYPE, FROM_ADDRESS, LIMIT, OFFSET], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:map(fun tx_map/1, Rows)
+		end
+	end),
+	record_query_time(select_transaction_range_filter_address, Time),
+	{reply, Reply, State};
+
+handle_call({select_transaction_total_filter_address, CONTENT_TYPE, FROM_ADDRESS}, _, State) ->
+	#{ select_transaction_total_filter_address_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [CONTENT_TYPE, FROM_ADDRESS], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:nth(1, lists:nth(1, Rows))
+		end
+	end),
+	record_query_time(select_transaction_total_filter_address, Time),
 	{reply, Reply, State};
 
 handle_call({eval_legacy_arql, Query}, _, #{ conn := Conn } = State) ->
@@ -549,9 +585,11 @@ terminate(Reason, State) ->
 		select_address_range_stmt := SelectAddressRangeStmt,
 		select_address_total_stmt := SelectAddressTotalStmt,
 		select_transaction_range_stmt := SelectTransactionRangeStmt,
-		select_transaction_range_filter_stmt := SelectTransactionRangeFilterStmt,
 		select_transaction_total_stmt := SelectTransactionTotalStmt,
-		select_transaction_total_filter_stmt := SelectTransactionTotalFilterStmt
+		select_transaction_range_filter_stmt := SelectTransactionRangeFilterStmt,
+		select_transaction_total_filter_stmt := SelectTransactionTotalFilterStmt,
+		select_transaction_range_filter_address_stmt := SelectTransactionRangeFilterAddressStmt,
+		select_transaction_total_filter_address_stmt := SelectTransactionTotalFilterAddressStmt
 	} = State,
 	?LOG_INFO([{ar_arql_db, terminate}, {reason, Reason}]),
 	ar_sqlite3:finalize(InsertBlockStmt, ?DRIVER_TIMEOUT),
@@ -564,9 +602,11 @@ terminate(Reason, State) ->
 	ar_sqlite3:finalize(SelectAddressRangeStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectAddressTotalStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectTransactionRangeStmt, ?DRIVER_TIMEOUT),
-	ar_sqlite3:finalize(SelectTransactionRangeFilterStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectTransactionTotalStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectTransactionRangeFilterStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectTransactionTotalFilterStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectTransactionRangeFilterAddressStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectTransactionTotalFilterAddressStmt, ?DRIVER_TIMEOUT),
 	ok = ar_sqlite3:close(Conn, ?DRIVER_TIMEOUT).
 
 %%%===================================================================

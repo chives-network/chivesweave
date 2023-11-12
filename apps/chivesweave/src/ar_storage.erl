@@ -2272,271 +2272,293 @@ parse_bundle_data(TxData, TX, PageId, PageRecords) ->
 
 	%% Begin to parse bundle data	
 	GetDataItemCount = binary:decode_unsigned(binary:part(TxData, {0, 32}), little),
-	HEADER_START = 32,
-	case ets:lookup(cache_table, ar_util:encode(TX#tx.id)) of
-		[] ->
-			ets:insert(cache_table, {ar_util:encode(TX#tx.id), 0});
-		[{Key, _}] ->
-			ets:delete(cache_table, Key),
-            ets:insert(cache_table, {Key, 0})
-	end,
-	?LOG_INFO([{handle_get_tx_unbundle______________________________GetDataItemCount, GetDataItemCount}]),
-	GetBundleStart = HEADER_START + 64 * GetDataItemCount,
-	GetNumbersList = lists:seq(0, GetDataItemCount - 1),
-	
-	?LOG_INFO([{handle_get_tx_unbundle______________________________GetNumbersList, GetNumbersList}]),
-
-	GetDataItems = lists:map(
-		fun(Index) ->
-			I = HEADER_START + Index * 64,
-			_OFFSET = binary:decode_unsigned(binary:part(TxData, {I, 32}), little),
-			_ID = binary:part(TxData, {I + 32, 32}),
-			DataItemId = ar_util:encode(_ID),
-			case byte_size(_ID) == 0 of
-				true ->
-					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____ID_NOT_VALID, DataItemId}]);
-				false ->
-					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____IS__VALID, DataItemId}]),
-					ok
-			end,
-			OFFSET_START_ITEM = case ets:lookup(cache_table, ar_util:encode(TX#tx.id)) of
-									[{_, Value_OFFSET}] ->
-										Value_OFFSET
-								end,
-			DataItemStart = GetBundleStart + OFFSET_START_ITEM,
-			DataItemBytes = binary:part(TxData, {DataItemStart, _OFFSET}),
-			?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____DataItemStart, DataItemStart}]),
-			?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____OFFSET, _OFFSET}]),
+	case GetDataItemCount > 20000 of
+		true -> 
+			[];
+		_ -> 
+			HEADER_START = 32,
 			case ets:lookup(cache_table, ar_util:encode(TX#tx.id)) of
-				[{_, ValueItem1}] ->
-					ets:delete(cache_table, ar_util:encode(TX#tx.id)),
-            		ets:insert(cache_table, {ar_util:encode(TX#tx.id), ValueItem1 + _OFFSET})
+				[] ->
+					ets:insert(cache_table, {ar_util:encode(TX#tx.id), 0});
+				[{Key, _}] ->
+					ets:delete(cache_table, Key),
+					ets:insert(cache_table, {Key, 0})
 			end,
-			Tab2list = ets:tab2list(cache_table),
-			?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____Tab2list, Tab2list}]),
-			SignatureTypeVal = binary:decode_unsigned(binary:part(DataItemBytes, {0, 2}), little),
-			%% [w.ARWEAVE]:{sigLength:512,pubLength:512,sigName:"arweave"},
-			%% [w.ED25519]:{sigLength:64,pubLength:32,sigName:"ed25519"},
-			%% [w.ETHEREUM]:{sigLength:65,pubLength:65,sigName:"ethereum"}
-			TxStructure = case SignatureTypeVal of
-				1 ->
-					%% Arweave or Chivesweave
-					SigLength = 512,
-					SignatureBinary = binary:part(DataItemBytes, {2, SigLength}),
-					Signature = ar_util:encode(SignatureBinary),
-					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____Signature, Signature}]),
-					PubLength = 512,
-					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____DataItemBytes, {2 + SigLength, PubLength}}]),
-					OwnerBinary = binary:part(DataItemBytes, {2 + SigLength, PubLength}),
-					%% Owner = ar_util:encode(OwnerBinary),
-					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____Owner, OwnerBinary}]),
-					TargetBinaryMark = binary:part(DataItemBytes, {2 + SigLength + PubLength, 1}),
-					TargetBinaryLength = case TargetBinaryMark of
-						<<1>> ->
-							TargetBinary = binary:part(DataItemBytes, {2 + SigLength + PubLength + 1, 32}),
-							Target = ar_util:encode(TargetBinary),
-							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TargetBinary, TargetBinary}]),
-							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____Target, Target}]),
-							32 + 1;
-						<<0>> ->
-							Target = <<>>,
-							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TargetBinaryMark, TargetBinaryMark}]),
-							1
-					end,
-					AnchorBinaryMark = binary:part(DataItemBytes, {2 + SigLength + PubLength + TargetBinaryLength, 1}),
-					AnchorBinaryLength = case AnchorBinaryMark of
-						<<1>> ->
-							Anchor = binary:part(DataItemBytes, {2 + SigLength + PubLength + TargetBinaryLength + 1, 32}),
-							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____Anchor, Anchor}]),
-							32 + 1;
-						<<0>> ->
-							Anchor = <<>>,
-							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____AnchorBinaryMark, AnchorBinaryMark}]),
-							1
-					end,
-					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____AnchorBinaryLength, AnchorBinaryLength}]),
-					TagsNumbers = binary:decode_unsigned(binary:part(DataItemBytes, {2 + SigLength + PubLength + TargetBinaryLength + AnchorBinaryLength, 8}), little),
-					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TagsNumbers, TagsNumbers}]),
-					TagsBytesNumbers = binary:decode_unsigned(binary:part(DataItemBytes, {2 + SigLength + PubLength + TargetBinaryLength + AnchorBinaryLength + 8, 8}), little),
-					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TagsBytesNumbers, TagsBytesNumbers}]),
+			?LOG_INFO([{handle_get_tx_unbundle______________________________GetDataItemCount, GetDataItemCount}]),
+			GetBundleStart = HEADER_START + 64 * GetDataItemCount,
+			GetNumbersList = lists:seq(0, GetDataItemCount - 1),
+			
+			?LOG_INFO([{handle_get_tx_unbundle______________________________GetNumbersList, GetNumbersList}]),
 
-					TagsBytesContent = binary:part(DataItemBytes, {2 + SigLength + PubLength + TargetBinaryLength + AnchorBinaryLength + 8 + 8, TagsBytesNumbers}),
-					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TagsBytesContent, TagsBytesContent}]),
-
-					DataItemDataStart = 2 + SigLength + PubLength + TargetBinaryLength + AnchorBinaryLength + 8 + 8 + TagsBytesNumbers,
-					DataItemContent = binary:part(DataItemBytes, {DataItemDataStart, byte_size(DataItemBytes) - DataItemDataStart}),
-					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____DataItemContent, DataItemContent}]),
-
-					TagType = avro_record:type(
-						<<"rec">>,
-						[avro_record:define_field(name, string), avro_record:define_field(value, string)],
-						[{namespace, 'Tag'}]
-					),
-					TagsType = avro_array:type(TagType),
-					Decoder = avro:make_simple_decoder(TagsType, []),
-					TagsList = Decoder(TagsBytesContent),
-					Tags 	= lists:map(
-									fun(Tag) ->
-										{_, TagName} = lists:nth(1, Tag),
-										{_, TagValue} = lists:nth(2, Tag),
-										{[{name, TagName},{value, TagValue}]}
-									end,
-									TagsList),
-					TagsMap = lists:map(
-									fun(Tag) ->
-										{_, TagName} = lists:nth(1, Tag),
-										{_, TagValue} = lists:nth(2, Tag),
-										{TagName, TagValue}
-									end,
-									TagsList),
-					?LOG_INFO([{handle_get_tx_unbundle________avro_record____TagsList, TagsList}]),
-					?LOG_INFO([{handle_get_tx_unbundle________avro_record____TagsMap, TagsMap}]),
-					?LOG_INFO([{handle_get_tx_unbundle________avro_record____Tags, Tags}]),
-					
-					FromAddress = ar_util:encode(ar_wallet:to_address(OwnerBinary, {rsa, 65537})),
-					DataType = find_value(<<"Content-Type">>, TagsMap),
-					TxStructureItem = #{
-							<<"id">> => DataItemId,
-							<<"owner">> => #{<<"address">> => FromAddress},
-							<<"recipient">> => Target,
-							<<"quantity">> => #{<<"winston">> => 0, <<"xwe">>=> float(0) / float(?WINSTON_PER_AR)},
-							<<"fee">> => #{<<"winston">> => 0, <<"xwe">>=> float(0) / float(?WINSTON_PER_AR)},
-							<<"data">> => #{<<"size">> => byte_size(DataItemContent), <<"type">> => DataType},
-							<<"block">> => BlockStructure,
-							<<"bundleid">> => ar_util:encode(TX#tx.id),
-							<<"anchor">> => Anchor,
-							<<"tags">> => Tags
-						},
-					
-					%% Write Unbundle tx to arql
-					?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________________________BlockStructure, BlockStructure}]),
-					?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________________________BlockStructure_height, maps:get(<<"height">>, BlockStructure)}]),
-					case lists:member(serve_arql, Config#config.enable) of
+			GetDataItems = lists:map(
+				fun(Index) ->
+					I = HEADER_START + Index * 64,
+					_OFFSET = binary:decode_unsigned(binary:part(TxData, {I, 32}), little),
+					_ID = binary:part(TxData, {I + 32, 32}),
+					DataItemId = ar_util:encode(_ID),
+					case byte_size(_ID) == 0 of
 						true ->
-							case maps:is_key(<<"height">>, BlockStructure) of
-								true ->
-									BlockHeight = maps:get(<<"height">>, BlockStructure),
-									BlockHash = maps:get(<<"indep_hash">>, BlockStructure),
-									BlockTimestamp = maps:get(<<"timestamp">>, BlockStructure),
-									FileName = find_value(<<"File-Name">>, TagsMap),
-									ContentType = find_value(<<"Content-Type">>, TagsMap),
-									AppName = find_value(<<"App-Name">>, TagsMap),
-									AgentName = find_value(<<"Agent-Name">>, TagsMap),
-									TXFields = [
-										DataItemId,
-										BlockHash,
-										ar_util:encode(TX#tx.last_tx),
-										ar_util:encode(OwnerBinary),
-										FromAddress,
-										Target,
-										0,
-										Signature,
-										0,
-										BlockTimestamp,
-										BlockHeight,
-										byte_size(DataItemContent),
-										"",
-										FileName,
-										ContentType,
-										AppName,
-										AgentName
-									],
-									?LOG_INFO([{handle_get_tx_unbundle__________________________________________INSERT_ARQL___TXFields, TXFields}]),
-									TagFieldsList = lists:map(
+							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____ID_NOT_VALID, DataItemId}]);
+						false ->
+							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____IS__VALID, DataItemId}]),
+							ok
+					end,
+					OFFSET_START_ITEM = case ets:lookup(cache_table, ar_util:encode(TX#tx.id)) of
+											[{_, Value_OFFSET}] ->
+												Value_OFFSET
+										end,
+					DataItemStart = GetBundleStart + OFFSET_START_ITEM,
+					DataItemBytes = binary:part(TxData, {DataItemStart, _OFFSET}),
+					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____DataItemStart, DataItemStart}]),
+					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____OFFSET, _OFFSET}]),
+					case ets:lookup(cache_table, ar_util:encode(TX#tx.id)) of
+						[{_, ValueItem1}] ->
+							ets:delete(cache_table, ar_util:encode(TX#tx.id)),
+							ets:insert(cache_table, {ar_util:encode(TX#tx.id), ValueItem1 + _OFFSET})
+					end,
+					Tab2list = ets:tab2list(cache_table),
+					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____Tab2list, Tab2list}]),
+					SignatureTypeVal = binary:decode_unsigned(binary:part(DataItemBytes, {0, 2}), little),
+					%% [w.ARWEAVE]:{sigLength:512,pubLength:512,sigName:"arweave"},
+					%% [w.ED25519]:{sigLength:64,pubLength:32,sigName:"ed25519"},
+					%% [w.ETHEREUM]:{sigLength:65,pubLength:65,sigName:"ethereum"}
+					TxStructure = case SignatureTypeVal of
+						1 ->
+							%% Arweave or Chivesweave
+							SigLength = 512,
+							SignatureBinary = binary:part(DataItemBytes, {2, SigLength}),
+							Signature = ar_util:encode(SignatureBinary),
+							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____Signature, Signature}]),
+							PubLength = 512,
+							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____DataItemBytes, {2 + SigLength, PubLength}}]),
+							OwnerBinary = binary:part(DataItemBytes, {2 + SigLength, PubLength}),
+							%% Owner = ar_util:encode(OwnerBinary),
+							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____Owner, OwnerBinary}]),
+							TargetBinaryMark = binary:part(DataItemBytes, {2 + SigLength + PubLength, 1}),
+							TargetBinaryLength = case TargetBinaryMark of
+								<<1>> ->
+									TargetBinary = binary:part(DataItemBytes, {2 + SigLength + PubLength + 1, 32}),
+									Target = ar_util:encode(TargetBinary),
+									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TargetBinary, TargetBinary}]),
+									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____Target, Target}]),
+									32 + 1;
+								<<0>> ->
+									Target = <<>>,
+									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TargetBinaryMark, TargetBinaryMark}]),
+									1
+							end,
+							AnchorBinaryMark = binary:part(DataItemBytes, {2 + SigLength + PubLength + TargetBinaryLength, 1}),
+							AnchorBinaryLength = case AnchorBinaryMark of
+								<<1>> ->
+									Anchor = binary:part(DataItemBytes, {2 + SigLength + PubLength + TargetBinaryLength + 1, 32}),
+									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____Anchor, Anchor}]),
+									32 + 1;
+								<<0>> ->
+									Anchor = <<>>,
+									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____AnchorBinaryMark, AnchorBinaryMark}]),
+									1
+							end,
+							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____AnchorBinaryLength, AnchorBinaryLength}]),
+							TagsNumbers = binary:decode_unsigned(binary:part(DataItemBytes, {2 + SigLength + PubLength + TargetBinaryLength + AnchorBinaryLength, 8}), little),
+							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TagsNumbers, TagsNumbers}]),
+							TagsBytesNumbers = binary:decode_unsigned(binary:part(DataItemBytes, {2 + SigLength + PubLength + TargetBinaryLength + AnchorBinaryLength + 8, 8}), little),
+							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TagsBytesNumbers, TagsBytesNumbers}]),
+
+							TagsBytesContent = binary:part(DataItemBytes, {2 + SigLength + PubLength + TargetBinaryLength + AnchorBinaryLength + 8 + 8, TagsBytesNumbers}),
+							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TagsBytesContent, TagsBytesContent}]),
+
+							DataItemDataStart = 2 + SigLength + PubLength + TargetBinaryLength + AnchorBinaryLength + 8 + 8 + TagsBytesNumbers,
+							DataItemContent = binary:part(DataItemBytes, {DataItemDataStart, byte_size(DataItemBytes) - DataItemDataStart}),
+							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____DataItemContent, DataItemContent}]),
+
+							TagType = avro_record:type(
+								<<"rec">>,
+								[avro_record:define_field(name, string), avro_record:define_field(value, string)],
+								[{namespace, 'Tag'}]
+							),
+							TagsType = avro_array:type(TagType),
+							Decoder = avro:make_simple_decoder(TagsType, []),
+							TagsList = Decoder(TagsBytesContent),
+							Tags 	= lists:map(
 											fun(Tag) ->
 												{_, TagName} = lists:nth(1, Tag),
 												{_, TagValue} = lists:nth(2, Tag),
-												[DataItemId, TagName, TagValue]
+												{[{name, TagName},{value, TagValue}]}
 											end,
 											TagsList),
-									?LOG_INFO([{handle_get_tx_unbundle__________________________________________INSERT_ARQL___TagFieldsList, TagFieldsList}]),
-									ar_arql_db:insert_tx(TXFields, TagFieldsList);
+							TagsMap = lists:map(
+											fun(Tag) ->
+												{_, TagName} = lists:nth(1, Tag),
+												{_, TagValue} = lists:nth(2, Tag),
+												{TagName, TagValue}
+											end,
+											TagsList),
+							?LOG_INFO([{handle_get_tx_unbundle________avro_record____TagsList, TagsList}]),
+							?LOG_INFO([{handle_get_tx_unbundle________avro_record____TagsMap, TagsMap}]),
+							?LOG_INFO([{handle_get_tx_unbundle________avro_record____Tags, Tags}]),
+							
+							FromAddress = ar_util:encode(ar_wallet:to_address(OwnerBinary, {rsa, 65537})),
+							DataType = find_value(<<"Content-Type">>, TagsMap),
+							TxStructureItem = #{
+									<<"id">> => DataItemId,
+									<<"owner">> => #{<<"address">> => FromAddress},
+									<<"recipient">> => Target,
+									<<"quantity">> => #{<<"winston">> => 0, <<"xwe">>=> float(0) / float(?WINSTON_PER_AR)},
+									<<"fee">> => #{<<"winston">> => 0, <<"xwe">>=> float(0) / float(?WINSTON_PER_AR)},
+									<<"data">> => #{<<"size">> => byte_size(DataItemContent), <<"type">> => DataType},
+									<<"block">> => BlockStructure,
+									<<"bundleid">> => ar_util:encode(TX#tx.id),
+									<<"anchor">> => Anchor,
+									<<"tags">> => Tags
+								},
+							
+							%% Write Unbundle tx to arql
+							?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________________________BlockStructure, BlockStructure}]),
+							?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________________________BlockStructure_height, maps:get(<<"height">>, BlockStructure)}]),
+							case lists:member(serve_arql, Config#config.enable) of
+								true ->
+									case maps:is_key(<<"height">>, BlockStructure) of
+										true ->
+											BlockHeight = maps:get(<<"height">>, BlockStructure),
+											BlockHash = maps:get(<<"indep_hash">>, BlockStructure),
+											BlockTimestamp = maps:get(<<"timestamp">>, BlockStructure),
+											FileName = find_value(<<"File-Name">>, TagsMap),
+											ContentType = find_value(<<"Content-Type">>, TagsMap),
+											AppName = find_value(<<"App-Name">>, TagsMap),
+											AgentName = find_value(<<"Agent-Name">>, TagsMap),
+											TXFields = [
+												DataItemId,
+												BlockHash,
+												ar_util:encode(TX#tx.last_tx),
+												ar_util:encode(OwnerBinary),
+												FromAddress,
+												Target,
+												0,
+												Signature,
+												0,
+												BlockTimestamp,
+												BlockHeight,
+												byte_size(DataItemContent),
+												"",
+												FileName,
+												ContentType,
+												AppName,
+												AgentName
+											],
+											?LOG_INFO([{handle_get_tx_unbundle__________________________________________INSERT_ARQL___TXFields, TXFields}]),
+											TagFieldsList = lists:map(
+													fun(Tag) ->
+														{_, TagName} = lists:nth(1, Tag),
+														{_, TagValue} = lists:nth(2, Tag),
+														[DataItemId, TagName, TagValue]
+													end,
+													TagsList),
+											?LOG_INFO([{handle_get_tx_unbundle__________________________________________INSERT_ARQL___TagFieldsList, TagFieldsList}]),
+											ar_arql_db:insert_tx(TXFields, TagFieldsList);
+										false ->
+											ok
+									end;
 								false ->
 									ok
-							end;
-						false ->
+							end,
+							
+							%% Compress Image
+							?LOG_INFO([{handle_get_tx_unbundle________DataType_DataType____DataType, DataType}]),
+							image_thumbnail_compress_to_storage(DataType, DataItemContent, FromAddress, DataItemId),
+
+							%% Write Unbundle data to file
+							filelib:ensure_dir(binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, FromAddress])) ++ "/"),
+							OriginalUnBundleDataFilePath = binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, FromAddress, DataItemId])),
+							case filelib:is_file(OriginalUnBundleDataFilePath) of
+								true ->
+									ok;
+								false ->
+									{ok, FileData} = file:open(OriginalUnBundleDataFilePath, [write, binary]),
+									ok = file:write(FileData, DataItemContent),
+									ok = file:close(FileData)
+							end,
+
+							%% Write Unbundle tx to rocksdb
+							?LOG_INFO([{handle_get_tx_unbundle________avro_record____DataItemId, DataItemId}]),
+							ar_kv:put(xwe_storage_txid_in_bundle, DataItemId, term_to_binary(TxStructureItem)),
+
+							%% return Tx structure item
+							TxStructureItem;
+						2 ->
+							%% ED25519
+							ok;
+						3 ->
+							%% ETHEREUM
+							ok;
+						4 ->
+							%% SOLANA
+							ok;
+						_ ->
+							%% None
 							ok
 					end,
-					
-					%% Compress Image
-					?LOG_INFO([{handle_get_tx_unbundle________DataType_DataType____DataType, DataType}]),
-					image_thumbnail_compress_to_storage(DataType, DataItemContent, FromAddress, DataItemId),
-
-					%% Write Unbundle data to file
-					filelib:ensure_dir(binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, FromAddress])) ++ "/"),
-					OriginalUnBundleDataFilePath = binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, FromAddress, DataItemId])),
-					case filelib:is_file(OriginalUnBundleDataFilePath) of
-						true ->
-							ok;
-						false ->
-							{ok, FileData} = file:open(OriginalUnBundleDataFilePath, [write, binary]),
-							ok = file:write(FileData, DataItemContent),
-							ok = file:close(FileData)
+					TxStructure
+				end,
+				GetNumbersList
+			),
+			% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItems, GetDataItems}]),
+			try binary_to_integer(PageRecords) of
+				PageRecordsInt ->				
+					PageRecordsNew = if
+						PageRecordsInt < 0 -> 5;
+						PageRecordsInt > 100 -> 100;
+						true -> PageRecordsInt
 					end,
-
-					%% Write Unbundle tx to rocksdb
-					?LOG_INFO([{handle_get_tx_unbundle________avro_record____DataItemId, DataItemId}]),
-					ar_kv:put(xwe_storage_txid_in_bundle, DataItemId, term_to_binary(TxStructureItem)),
-
-					%% return Tx structure item
-					TxStructureItem;
-				2 ->
-					%% ED25519
-					ok;
-				3 ->
-					%% ETHEREUM
-					ok;
-				4 ->
-					%% SOLANA
-					ok;
-				_ ->
-					%% None
-					ok
-			end,
-			TxStructure
-		end,
-		GetNumbersList
-	),
-	% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItems, GetDataItems}]),
-	try binary_to_integer(PageRecords) of
-		PageRecordsInt ->				
-			PageRecordsNew = if
-				PageRecordsInt < 0 -> 5;
-				PageRecordsInt > 100 -> 100;
-				true -> PageRecordsInt
-			end,
-			try binary_to_integer(PageId) of
-				PageIdInt ->
-					MaxRecords = length(GetDataItems),
-					AllPages = ceil(MaxRecords / PageRecordsNew),
-					PageIdNew = if
-						PageIdInt < 0 -> 0;
-						PageIdInt > AllPages -> AllPages;
-						true -> PageIdInt
-					end,
-					FromIndex = PageIdNew * PageRecordsNew + 1,
-					FromHeightNew = if
-						FromIndex < 1 -> 1;
-						FromIndex > MaxRecords -> MaxRecords;
-						true -> FromIndex
-					end,
-					TXIDsInPage = lists:sublist(GetDataItems, FromHeightNew, FromHeightNew + PageRecordsNew - 1 ),
-					TxInfor = case read_txrecord_by_txid(ar_util:encode(TX#tx.id)) of
-						not_found ->
-							[];
-						Res ->
-							Res
-					end,
-					TxResult = #{ 
-								<<"txs">> => TXIDsInPage, 
-								<<"tx">> => TxInfor,
-								<<"total">> => MaxRecords,
-								<<"from">> => FromHeightNew,
-								<<"pageid">> => PageIdNew,
-								<<"pagesize">> => PageRecordsNew,
-								<<"allpages">> => AllPages
-								},
-					TxResult
+					try binary_to_integer(PageId) of
+						PageIdInt ->
+							MaxRecords = length(GetDataItems),
+							AllPages = ceil(MaxRecords / PageRecordsNew),
+							PageIdNew = if
+								PageIdInt < 0 -> 0;
+								PageIdInt > AllPages -> AllPages;
+								true -> PageIdInt
+							end,
+							FromIndex = PageIdNew * PageRecordsNew + 1,
+							FromHeightNew = if
+								FromIndex < 1 -> 1;
+								FromIndex > MaxRecords -> MaxRecords;
+								true -> FromIndex
+							end,
+							TXIDsInPage = lists:sublist(GetDataItems, FromHeightNew, FromHeightNew + PageRecordsNew - 1 ),
+							TxInfor = case read_txrecord_by_txid(ar_util:encode(TX#tx.id)) of
+								not_found ->
+									[];
+								Res ->
+									Res
+							end,
+							TxResult = #{ 
+										<<"txs">> => TXIDsInPage, 
+										<<"tx">> => TxInfor,
+										<<"total">> => MaxRecords,
+										<<"from">> => FromHeightNew,
+										<<"pageid">> => PageIdNew,
+										<<"pagesize">> => PageRecordsNew,
+										<<"allpages">> => AllPages
+										},
+							TxResult
+					catch _:_ ->
+						TxInfor = case read_txrecord_by_txid(ar_util:encode(TX#tx.id)) of
+							not_found ->
+								[];
+							Res ->
+								Res
+						end,
+						TxResult = #{ 
+									<<"txs">> => [], 
+									<<"tx">> => TxInfor,
+									<<"total">> => 0,
+									<<"from">> => 0,
+									<<"pageid">> => 0,
+									<<"pagesize">> => 0,
+									<<"allpages">> => 0
+									},
+						TxResult
+					end
 			catch _:_ ->
 				TxInfor = case read_txrecord_by_txid(ar_util:encode(TX#tx.id)) of
 					not_found ->
@@ -2555,24 +2577,9 @@ parse_bundle_data(TxData, TX, PageId, PageRecords) ->
 							},
 				TxResult
 			end
-	catch _:_ ->
-		TxInfor = case read_txrecord_by_txid(ar_util:encode(TX#tx.id)) of
-			not_found ->
-				[];
-			Res ->
-				Res
-		end,
-		TxResult = #{ 
-					<<"txs">> => [], 
-					<<"tx">> => TxInfor,
-					<<"total">> => 0,
-					<<"from">> => 0,
-					<<"pageid">> => 0,
-					<<"pagesize">> => 0,
-					<<"allpages">> => 0
-					},
-		TxResult
 	end.
+
+	
 
 image_thumbnail_compress_to_storage(ContentType, Data, Address, TxId) ->
 	case binary:match(ContentType, <<"image">>) of

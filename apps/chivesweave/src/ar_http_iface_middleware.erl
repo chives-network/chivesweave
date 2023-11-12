@@ -2000,8 +2000,10 @@ handle_get_tx_unbundle(Hash, Req, PageId, PageRecords) ->
 				unavailable ->
 					case ar_storage:read_txrecord_by_txid(ar_util:encode(ID)) of
 						not_found ->
+							?LOG_INFO([{handle_get_tx_unbundle_____________maybe_tx_is_pending_response, ar_util:encode(ID)}]),
 							maybe_tx_is_pending_response(ID, Req);
 						Res ->
+							?LOG_INFO([{handle_get_tx_unbundle_____________read_tx_unavailable, ar_util:encode(ID)}]),
 							TxResult = #{ <<"txs">> => [], <<"tx">> => Res },
 							{200, #{}, ar_serialize:jsonify(TxResult), Req}
 					end;					
@@ -2011,7 +2013,7 @@ handle_get_tx_unbundle(Hash, Req, PageId, PageRecords) ->
 								{Name, Value}
 							end,
 							TX#tx.tags),
-					% ?LOG_INFO([{handle_get_tx_unbundle_____________TX, TX}]),
+					?LOG_INFO([{handle_get_tx_unbundle_____________TX, TX}]),
 					UnBundleResult = case find_value(<<"Bundle-Version">>, Tags) of
 						<<"2.0.0">> ->
 							% Is Bundle
@@ -2030,10 +2032,10 @@ handle_get_tx_unbundle(Hash, Req, PageId, PageRecords) ->
 									ok = ar_semaphore:acquire(get_tx_data, infinity),
 									case ar_data_sync:get_tx_data(TX#tx.id) of
 										{ok, TxData} ->
-											% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(TX#tx.id)}]),
+											?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(TX#tx.id)}]),
 											ar_storage:parse_bundle_data(TxData, TX, PageId, PageRecords);
 										_ ->
-											% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed, ar_util:encode(TX#tx.id)}]),
+											?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed, ar_util:encode(TX#tx.id)}]),
 											[]
 									end
 							end;

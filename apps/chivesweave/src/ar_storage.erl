@@ -1584,9 +1584,9 @@ read_txs_and_parse_bundle(Addr) ->
 			AllArray = binary_to_term(TxIdBinary),
 			Result = lists:map(
 						fun(TxId) ->
-							case ar_storage:read_tx(TxId) of
+							case ar_storage:read_tx(ar_util:encode(TxId)) of
 								unavailable ->
-									unavailable;
+									TxId;
 								#tx{} = TX ->
 									case ar_data_sync:get_tx_data(TxId) of
 										{ok, TxData} ->

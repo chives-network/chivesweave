@@ -1528,6 +1528,18 @@ handle(<<"GET">>, [<<"wallet">>, Addr, <<"txs">>, PageId, PageRecords], Req, _Pi
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
 
+%% Parse all bundle data and into tx table for address
+%% This version all parse all txs
+handle(<<"GET">>, [<<"wallet">>, Addr, <<"parsebundle">>], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_wallet_txs, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_parsebundle_for_address(Addr),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
 %% Return transaction identifiers (hashes) for the wallet specified via wallet_address.
 %% GET request to endpoint /wallet/{wallet_address}/txsrecord.
 handle(<<"GET">>, [<<"wallet">>, Addr, <<"txsrecord">>, PageId, PageRecords], Req, _Pid) ->
@@ -2033,7 +2045,7 @@ handle_get_tx_unbundle(Hash, Req, PageId, PageRecords) ->
 									case ar_data_sync:get_tx_data(TX#tx.id) of
 										{ok, TxData} ->
 											?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(TX#tx.id)}]),
-											ar_storage:parse_bundle_data(TxData, TX, PageId, PageRecords);
+											ar_storage:parse_bundle_data(TxData, TX, PageId, PageRecords, true);
 										_ ->
 											?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed, ar_util:encode(TX#tx.id)}]),
 											[]
@@ -2522,6 +2534,20 @@ handle_get_wallet_txs(Addr, PageId, PageRecords) ->
 			{400, #{}, <<"Invalid address.">>};
 		{ok, _} ->
 			case ar_storage:read_txs_by_addr(Addr, PageId, PageRecords) of
+				not_found ->
+					{404, #{}, []};
+				Res ->
+					% ?LOG_INFO([{handle_get_wallet_txs, Res}]),
+					{200, #{}, ar_serialize:jsonify(Res)}
+			end
+	end.
+
+handle_parsebundle_for_address(Addr) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			case ar_storage:read_txs_and_parse_bundle(Addr) of
 				not_found ->
 					{404, #{}, []};
 				Res ->

@@ -21,7 +21,7 @@
 		get_mempool_tx_data_records/1, get_mempool_tx_send_records/1, get_mempool_tx_deposits_records/1, 
 		get_mempool_tx_txs_records/1, get_mempool_tx_txs_records/0, 
 		image_thumbnail_compress_to_storage/4, 
-		parse_bundle_data/4
+		parse_bundle_data/5, read_txs_and_parse_bundle/1
 	]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
@@ -1258,7 +1258,7 @@ write_block(B) ->
 			case ar_data_sync:get_tx_data(TX#tx.id) of
 				{ok, TxData} ->
 					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(TX#tx.id)}]),
-					parse_bundle_data(TxData, TX, 0, 100);
+					parse_bundle_data(TxData, TX, 0, 100, false);
 				_ ->
 					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed_______________________, ar_util:encode(TX#tx.id)}]),
 					[]
@@ -1576,6 +1576,31 @@ read_txs_by_addr(Addr, PageId, PageRecords) ->
 		[]
 	end.
 
+read_txs_and_parse_bundle(Addr) ->
+	case ar_kv:get(address_tx_db, Addr) of
+		not_found ->
+			[];
+		{ok, TxIdBinary} ->
+			AllArray = binary_to_term(TxIdBinary),
+			Result = lists:map(
+						fun(TxId) ->
+							case ar_storage:read_tx(TxId) of
+								unavailable ->
+									unavailable;
+								#tx{} = TX ->
+									case ar_data_sync:get_tx_data(TxId) of
+										{ok, TxData} ->
+											?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(TxId)}]),
+											parse_bundle_data(TxData, TX, 0, 100, false);
+										_ ->
+											?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed_______________________, ar_util:encode(TxId)}]),
+											[]
+									end
+							end							
+						end,
+						AllArray),
+			Result
+	end.
 
 read_txrecord_by_txid(TxId) ->
 	case ar_util:safe_decode(TxId) of
@@ -2253,7 +2278,7 @@ parse_bundle_dataitem_index(From, Offset) ->
     NewValue = From + Offset,
     NewValue.
 
-parse_bundle_data(TxData, TX, PageId, PageRecords) ->
+parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 	%% Begin to save unbundle data
 	{ok, Config} = application:get_env(chivesweave, config),
 	DataDir = Config#config.data_dir,
@@ -2316,7 +2341,7 @@ parse_bundle_data(TxData, TX, PageId, PageRecords) ->
 							ets:delete(cache_table, ar_util:encode(TX#tx.id)),
 							ets:insert(cache_table, {ar_util:encode(TX#tx.id), ValueItem1 + _OFFSET})
 					end,
-					Tab2list = ets:tab2list(cache_table),
+					% Tab2list = ets:tab2list(cache_table),
 					% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____Tab2list, Tab2list}]),
 					SignatureTypeVal = binary:decode_unsigned(binary:part(DataItemBytes, {0, 2}), little),
 					%% [w.ARWEAVE]:{sigLength:512,pubLength:512,sigName:"arweave"},
@@ -2359,7 +2384,7 @@ parse_bundle_data(TxData, TX, PageId, PageRecords) ->
 									1
 							end,
 							% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____AnchorBinaryLength, AnchorBinaryLength}]),
-							TagsNumbers = binary:decode_unsigned(binary:part(DataItemBytes, {2 + SigLength + PubLength + TargetBinaryLength + AnchorBinaryLength, 8}), little),
+							% TagsNumbers = binary:decode_unsigned(binary:part(DataItemBytes, {2 + SigLength + PubLength + TargetBinaryLength + AnchorBinaryLength, 8}), little),
 							% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TagsNumbers, TagsNumbers}]),
 							TagsBytesNumbers = binary:decode_unsigned(binary:part(DataItemBytes, {2 + SigLength + PubLength + TargetBinaryLength + AnchorBinaryLength + 8, 8}), little),
 							% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TagsBytesNumbers, TagsBytesNumbers}]),
@@ -2502,45 +2527,65 @@ parse_bundle_data(TxData, TX, PageId, PageRecords) ->
 				GetNumbersList
 			),
 			% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItems, GetDataItems}]),
-			try binary_to_integer(PageRecords) of
-				PageRecordsInt ->				
-					PageRecordsNew = if
-						PageRecordsInt < 0 -> 5;
-						PageRecordsInt > 100 -> 100;
-						true -> PageRecordsInt
-					end,
-					try binary_to_integer(PageId) of
-						PageIdInt ->
-							MaxRecords = length(GetDataItems),
-							AllPages = ceil(MaxRecords / PageRecordsNew),
-							PageIdNew = if
-								PageIdInt < 0 -> 0;
-								PageIdInt > AllPages -> AllPages;
-								true -> PageIdInt
+			case IsReturn of
+				true ->
+					try binary_to_integer(PageRecords) of
+						PageRecordsInt ->				
+							PageRecordsNew = if
+								PageRecordsInt < 0 -> 5;
+								PageRecordsInt > 100 -> 100;
+								true -> PageRecordsInt
 							end,
-							FromIndex = PageIdNew * PageRecordsNew + 1,
-							FromHeightNew = if
-								FromIndex < 1 -> 1;
-								FromIndex > MaxRecords -> MaxRecords;
-								true -> FromIndex
-							end,
-							TXIDsInPage = lists:sublist(GetDataItems, FromHeightNew, FromHeightNew + PageRecordsNew - 1 ),
-							TxInfor = case read_txrecord_by_txid(ar_util:encode(TX#tx.id)) of
-								not_found ->
-									[];
-								Res ->
-									Res
-							end,
-							TxResult = #{ 
-										<<"txs">> => TXIDsInPage, 
-										<<"tx">> => TxInfor,
-										<<"total">> => MaxRecords,
-										<<"from">> => FromHeightNew,
-										<<"pageid">> => PageIdNew,
-										<<"pagesize">> => PageRecordsNew,
-										<<"allpages">> => AllPages
-										},
-							TxResult
+							try binary_to_integer(PageId) of
+								PageIdInt ->
+									MaxRecords = length(GetDataItems),
+									AllPages = ceil(MaxRecords / PageRecordsNew),
+									PageIdNew = if
+										PageIdInt < 0 -> 0;
+										PageIdInt > AllPages -> AllPages;
+										true -> PageIdInt
+									end,
+									FromIndex = PageIdNew * PageRecordsNew + 1,
+									FromHeightNew = if
+										FromIndex < 1 -> 1;
+										FromIndex > MaxRecords -> MaxRecords;
+										true -> FromIndex
+									end,
+									TXIDsInPage = lists:sublist(GetDataItems, FromHeightNew, FromHeightNew + PageRecordsNew - 1 ),
+									TxInfor = case read_txrecord_by_txid(ar_util:encode(TX#tx.id)) of
+										not_found ->
+											[];
+										Res ->
+											Res
+									end,
+									TxResult = #{ 
+												<<"txs">> => TXIDsInPage, 
+												<<"tx">> => TxInfor,
+												<<"total">> => MaxRecords,
+												<<"from">> => FromHeightNew,
+												<<"pageid">> => PageIdNew,
+												<<"pagesize">> => PageRecordsNew,
+												<<"allpages">> => AllPages
+												},
+									TxResult
+							catch _:_ ->
+								TxInfor = case read_txrecord_by_txid(ar_util:encode(TX#tx.id)) of
+									not_found ->
+										[];
+									Res ->
+										Res
+								end,
+								TxResult = #{ 
+											<<"txs">> => [], 
+											<<"tx">> => TxInfor,
+											<<"total">> => 0,
+											<<"from">> => 0,
+											<<"pageid">> => 0,
+											<<"pagesize">> => 0,
+											<<"allpages">> => 0
+											},
+								TxResult
+							end
 					catch _:_ ->
 						TxInfor = case read_txrecord_by_txid(ar_util:encode(TX#tx.id)) of
 							not_found ->
@@ -2558,24 +2603,10 @@ parse_bundle_data(TxData, TX, PageId, PageRecords) ->
 									<<"allpages">> => 0
 									},
 						TxResult
-					end
-			catch _:_ ->
-				TxInfor = case read_txrecord_by_txid(ar_util:encode(TX#tx.id)) of
-					not_found ->
-						[];
-					Res ->
-						Res
-				end,
-				TxResult = #{ 
-							<<"txs">> => [], 
-							<<"tx">> => TxInfor,
-							<<"total">> => 0,
-							<<"from">> => 0,
-							<<"pageid">> => 0,
-							<<"pagesize">> => 0,
-							<<"allpages">> => 0
-							},
-				TxResult
+					end;
+				false ->
+					% Not Return, only parse bundle data and into tx table
+					[]
 			end
 	end.
 

@@ -1584,16 +1584,16 @@ read_txs_and_parse_bundle(Addr) ->
 			AllArray = binary_to_term(TxIdBinary),
 			Result = lists:map(
 						fun(TxId) ->
-							case ar_storage:read_tx(ar_util:encode(TxId)) of
+							case ar_storage:read_tx(ar_util:safe_decode(TxId)) of
 								unavailable ->
 									TxId;
 								#tx{} = TX ->
 									case ar_data_sync:get_tx_data(TxId) of
 										{ok, TxData} ->
-											?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(TxId)}]),
+											?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, TxId}]),
 											parse_bundle_data(TxData, TX, 0, 100, false);
 										_ ->
-											?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed_______________________, ar_util:encode(TxId)}]),
+											?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed_______________________, TxId}]),
 											[]
 									end
 							end							

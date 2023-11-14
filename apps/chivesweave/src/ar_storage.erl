@@ -21,7 +21,7 @@
 		get_mempool_tx_data_records/1, get_mempool_tx_send_records/1, get_mempool_tx_deposits_records/1, 
 		get_mempool_tx_txs_records/1, get_mempool_tx_txs_records/0, 
 		image_thumbnail_compress_to_storage/4, 
-		parse_bundle_data/5, read_txs_and_parse_bundle/1
+		parse_bundle_data/5, read_txs_and_into_parse_bundle_list/1
 	]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
@@ -1033,6 +1033,8 @@ init([]) ->
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_storage_address_data_db"), address_data_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_storage_txid_block_db"), xwe_storage_txid_block_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_storage_txid_in_bundle"), xwe_storage_txid_in_bundle),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_storage_parse_bundle_txid_list"), xwe_storage_parse_bundle_txid_list),
+	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_storage_parse_bundle_address_status"), xwe_storage_parse_bundle_address_status),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "xwe_storage_block_db"), block_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "reward_history_db"), reward_history_db),
 	ok = ar_kv:open(filename:join(?ROCKS_DB_DIR, "account_tree_db"), account_tree_db),
@@ -1255,12 +1257,38 @@ write_block(B) ->
 					ar_kv:put(statistics_transaction, DateString, StatisticsTxElementBin2)				
 			end,
 			%% parse bundle tx data
-			case ar_data_sync:get_tx_data(TX#tx.id) of
-				{ok, TxData} ->
-					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(TX#tx.id)}]),
-					parse_bundle_data(TxData, TX, 0, 100, false);
+			Tags = lists:map(
+				fun({Name, Value}) ->
+					{Name, Value}
+				end,
+				TX#tx.tags),
+			UnBundleResult = case find_value(<<"Bundle-Version">>, Tags) of
+				<<"2.0.0">> ->
+					% Is Bundle
+					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____Tags, Tags}]),
+					case ar_storage:read_tx_data(TX) of
+						{ok, TxData} ->
+							<<GetDataItemCountBinary:32/binary, DataItemsBinary/binary>> = TxData,
+							GetDataItemCount = binary:decode_unsigned(GetDataItemCountBinary,little),
+							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____read_tx_data___TX, TxData}]),
+							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCountBinary, GetDataItemCountBinary}]),
+							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____DataItemsBinary, DataItemsBinary}]),
+							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCountBinary, binary_to_integer(GetDataItemCount)}]),
+							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCount, GetDataItemCount}]),
+							[];
+						{error, enoent} ->
+							ok = ar_semaphore:acquire(get_tx_data, infinity),
+							case ar_data_sync:get_tx_data(TX#tx.id) of
+								{ok, TxData} ->
+									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(TX#tx.id)}]),
+									parse_bundle_data(TxData, TX, 0, 100, false);
+								_ ->
+									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed, ar_util:encode(TX#tx.id)}]),
+									[]
+							end
+					end;
 				_ ->
-					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed_______________________, ar_util:encode(TX#tx.id)}]),
+					% Not a Bundle
 					[]
 			end
         end,
@@ -1576,28 +1604,85 @@ read_txs_by_addr(Addr, PageId, PageRecords) ->
 		[]
 	end.
 
-read_txs_and_parse_bundle(Addr) ->
+read_txs_and_into_parse_bundle_list(Addr) ->
+	case ar_kv:get(xwe_storage_parse_bundle_address_status, Addr) of
+		not_found ->
+			case ar_kv:get(address_tx_db, Addr) of
+				not_found ->
+					[];
+				{ok, TxIdBinary} ->
+					ar_kv:put(xwe_storage_parse_bundle_address_status, Addr, term_to_binary([<<"1">>])),
+					AllArray = binary_to_term(TxIdBinary),
+					case ar_kv:get(statistics_summary, list_to_binary("parsebundletxlist")) of
+						not_found ->
+							ParseBundleTxListBinEmpty = term_to_binary(AllArray),
+							ar_kv:put(statistics_summary, list_to_binary("parsebundletxlist"), ParseBundleTxListBinEmpty),
+							AllArray;
+						{ok, ParseBundleTxListResult} ->
+							ParseBundleTxlLstArray = binary_to_term(ParseBundleTxListResult),
+							MergedList = lists:usort(lists:merge(ParseBundleTxlLstArray, AllArray)),
+							ParseBundleTxListNewBin = term_to_binary(MergedList),
+							ar_kv:put(statistics_summary, list_to_binary("parsebundletxlist"), ParseBundleTxListNewBin),
+							MergedList							
+					end
+			end;
+		_ ->
+			ok
+	end.
+
+parse_bundle_tx_from_list(Addr) ->
 	case ar_kv:get(address_tx_db, Addr) of
 		not_found ->
 			[];
 		{ok, TxIdBinary} ->
 			AllArray = binary_to_term(TxIdBinary),
+			?LOG_INFO([{handle_get_tx_unbundle________AllArray, AllArray}]),
 			Result = lists:map(
 						fun(TxId) ->
+							?LOG_INFO([{handle_get_tx_unbundle________TxId, TxId}]),
 							case ar_util:safe_decode(TxId) of
 								{error, invalid} ->
 									TxId;
 								{ok, ID} ->
+									?LOG_INFO([{handle_get_tx_unbundle________ID, ID}]),
 									case ar_storage:read_tx(ID) of
 										unavailable ->
 											TxId;
 										#tx{} = TX ->
-											case ar_data_sync:get_tx_data(ID) of
-												{ok, TxData} ->
-													?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(ID)}]),
-													parse_bundle_data(TxData, TX, 0, 100, false);
+											Tags = lists:map(
+												fun({Name, Value}) ->
+													{Name, Value}
+												end,
+												TX#tx.tags),
+											?LOG_INFO([{handle_get_tx_unbundle_____________TX, TX}]),
+											UnBundleResult = case find_value(<<"Bundle-Version">>, Tags) of
+												<<"2.0.0">> ->
+													% Is Bundle
+													?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____Tags, Tags}]),
+													case ar_storage:read_tx_data(TX) of
+														{ok, TxData} ->
+															<<GetDataItemCountBinary:32/binary, DataItemsBinary/binary>> = TxData,
+															GetDataItemCount = binary:decode_unsigned(GetDataItemCountBinary,little),
+															?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____read_tx_data___TX, TxData}]),
+															?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCountBinary, GetDataItemCountBinary}]),
+															?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____DataItemsBinary, DataItemsBinary}]),
+															?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCountBinary, binary_to_integer(GetDataItemCount)}]),
+															?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCount, GetDataItemCount}]),
+															[];
+														{error, enoent} ->
+															ok = ar_semaphore:acquire(get_tx_data, infinity),
+															case ar_data_sync:get_tx_data(TX#tx.id) of
+																{ok, TxData} ->
+																	?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(TX#tx.id)}]);
+																	% ar_storage:parse_bundle_data(TxData, TX, PageId, PageRecords, true);
+																_ ->
+																	?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed, ar_util:encode(TX#tx.id)}]),
+																	[]
+															end
+													end;
 												_ ->
-													?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed_______________________, ar_util:encode(ID)}]),
+													% Not a Bundle
+													?LOG_INFO([{handle_get_tx_unbundle________NOT_A_Bundle_____Tags, Tags}]),
 													[]
 											end
 									end
@@ -1606,7 +1691,6 @@ read_txs_and_parse_bundle(Addr) ->
 						AllArray),
 			Result
 	end.
-
 read_txrecord_by_txid(TxId) ->
 	case ar_util:safe_decode(TxId) of
 		{ok, ID} ->

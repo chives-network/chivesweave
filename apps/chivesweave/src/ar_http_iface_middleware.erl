@@ -1528,13 +1528,25 @@ handle(<<"GET">>, [<<"wallet">>, Addr, <<"txs">>, PageId, PageRecords], Req, _Pi
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
 
+
 %% Parse all bundle data and into tx table for address
 %% This version all parse all txs
 handle(<<"GET">>, [<<"wallet">>, Addr, <<"parsebundle">>], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_wallet_txs, Config#config.enable) of
 		true ->
-			{Status, Headers, Body} = handle_parsebundle_for_address(Addr),
+			{Status, Headers, Body} = handle_parsebundle_into_list(Addr),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+%% Get a parse bundle tx list to parse
+handle(<<"GET">>, [<<"wallet">>, Addr, <<"getparsebundlelist">>], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_wallet_txs, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_parsebundle_get_list(Addr),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -2542,17 +2554,31 @@ handle_get_wallet_txs(Addr, PageId, PageRecords) ->
 			end
 	end.
 
-handle_parsebundle_for_address(Addr) ->
+handle_parsebundle_into_list(Addr) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->
 			{400, #{}, <<"Invalid address.">>};
 		{ok, _} ->
-			case ar_storage:read_txs_and_parse_bundle(Addr) of
+			case ar_storage:read_txs_and_into_parse_bundle_list(Addr) of
 				not_found ->
 					{404, #{}, []};
 				Res ->
 					% ?LOG_INFO([{handle_get_wallet_txs, Res}]),
 					{200, #{}, ar_serialize:jsonify(Res)}
+			end
+	end.
+
+handle_parsebundle_get_list(Addr) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			case ar_kv:get_any_10_records(statistics_network, 10) of
+				not_found ->
+					{404, #{}, []};
+				Res ->
+					?LOG_INFO([{xwe_storage_parse_bundle_txid_list____________________, Res}]),
+					{200, #{}, []}
 			end
 	end.
 

@@ -7,7 +7,9 @@
 		select_address_range/2, select_address_total/0,
 		select_transaction_range/2, select_transaction_total/0, 
 		select_transaction_range_filter/3, select_transaction_total_filter/1, 
-		select_transaction_range_filter_address/4, select_transaction_total_filter_address/2
+		select_transaction_range_filter_address/4, select_transaction_total_filter_address/2, 
+		select_transaction_range_filter_address_filename/5, select_transaction_total_filter_address_filename/3, 
+		select_transaction_range_filter_filename/4, select_transaction_total_filter_filename/2
 		]).
 
 -export([init/1, handle_call/3, handle_cast/2, terminate/2]).
@@ -153,6 +155,12 @@ DROP INDEX idx_address_timestamp;
 -define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_SQL, "SELECT * FROM tx where content_type = ? and from_address = ? order by timestamp desc LIMIT ? OFFSET ?").
 -define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where content_type = ? and from_address = ?").
 
+-define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_FILENAME_SQL, "SELECT * FROM tx where content_type = ? and from_address = ? and file_name like ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where content_type = ? and from_address = ? and file_name like ?").
+
+-define(SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, "SELECT * FROM tx where content_type = ? and file_name like ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where content_type = ? and file_name like ?").
+
 %%%===================================================================
 %%% Public API.
 %%%===================================================================
@@ -195,6 +203,18 @@ select_transaction_range_filter_address(CONTENT_TYPE, FROM_ADDRESS, LIMIT, OFFSE
 
 select_transaction_total_filter_address(CONTENT_TYPE, FROM_ADDRESS) ->
 	gen_server:call(?MODULE, {select_transaction_total_filter_address, CONTENT_TYPE, FROM_ADDRESS}, ?SELECT_TIMEOUT).
+	
+select_transaction_range_filter_address_filename(CONTENT_TYPE, FROM_ADDRESS, FILE_NAME, LIMIT, OFFSET) ->
+	gen_server:call(?MODULE, {select_transaction_range_filter_address_filename, CONTENT_TYPE, FROM_ADDRESS, FILE_NAME, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
+
+select_transaction_total_filter_address_filename(CONTENT_TYPE, FROM_ADDRESS, FILE_NAME) ->
+	gen_server:call(?MODULE, {select_transaction_total_filter_address_filename, CONTENT_TYPE, FROM_ADDRESS, FILE_NAME}, ?SELECT_TIMEOUT).
+	
+select_transaction_range_filter_filename(CONTENT_TYPE, FILE_NAME, LIMIT, OFFSET) ->
+	gen_server:call(?MODULE, {select_transaction_range_filter_filename, CONTENT_TYPE, FILE_NAME, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
+
+select_transaction_total_filter_filename(CONTENT_TYPE, FILE_NAME) ->
+	gen_server:call(?MODULE, {select_transaction_total_filter_filename, CONTENT_TYPE, FILE_NAME}, ?SELECT_TIMEOUT).
 
 eval_legacy_arql(Query) ->
 	gen_server:call(?MODULE, {eval_legacy_arql, Query}, ?SELECT_TIMEOUT).
@@ -273,6 +293,10 @@ init([]) ->
 	{ok, SelectTransactionTotalFilterStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_FILTER, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionRangeFilterAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionTotalFilterAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS, ?DRIVER_TIMEOUT),
+	{ok, SelectTransactionRangeFilterAddressFileNameStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_FILENAME_SQL, ?DRIVER_TIMEOUT),
+	{ok, SelectTransactionTotalFilterAddressFileNameStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS_FILENAME, ?DRIVER_TIMEOUT),
+	{ok, SelectTransactionRangeFilterFileNameStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, ?DRIVER_TIMEOUT),
+	{ok, SelectTransactionTotalFilterFileNameStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, ?DRIVER_TIMEOUT),
 	{ok, #{
 		data_dir => DataDir,
 		conn => Conn,
@@ -290,7 +314,11 @@ init([]) ->
 		select_transaction_range_filter_stmt => SelectTransactionRangeFilterStmt,
 		select_transaction_total_filter_stmt => SelectTransactionTotalFilterStmt,
 		select_transaction_range_filter_address_stmt => SelectTransactionRangeFilterAddressStmt,
-		select_transaction_total_filter_address_stmt => SelectTransactionTotalFilterAddressStmt
+		select_transaction_total_filter_address_stmt => SelectTransactionTotalFilterAddressStmt,
+		select_transaction_range_filter_address_filename_stmt => SelectTransactionRangeFilterAddressFileNameStmt,
+		select_transaction_total_filter_address_filename_stmt => SelectTransactionTotalFilterAddressFileNameStmt,
+		select_transaction_range_filter_filename_stmt => SelectTransactionRangeFilterFileNameStmt,
+		select_transaction_total_filter_filename_stmt => SelectTransactionTotalFilterFileNameStmt
 	}}.
 
 handle_call({insert_full_block, BlockFields, TxFieldsList, TagFieldsList}, _From, State) ->
@@ -508,6 +536,54 @@ handle_call({select_transaction_total_filter_address, CONTENT_TYPE, FROM_ADDRESS
 		end
 	end),
 	record_query_time(select_transaction_total_filter_address, Time),
+	{reply, Reply, State};
+
+handle_call({select_transaction_range_filter_address_filename, CONTENT_TYPE, FROM_ADDRESS, FILE_NAME, LIMIT, OFFSET}, _, State) ->
+	#{ select_transaction_range_filter_address_filename_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [CONTENT_TYPE, FROM_ADDRESS, FILE_NAME, LIMIT, OFFSET], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:map(fun tx_map/1, Rows)
+		end
+	end),
+	record_query_time(select_transaction_range_filter_address_filename, Time),
+	{reply, Reply, State};
+
+handle_call({select_transaction_total_filter_address_filename, CONTENT_TYPE, FROM_ADDRESS, FILE_NAME}, _, State) ->
+	#{ select_transaction_total_filter_address_filename_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [CONTENT_TYPE, FROM_ADDRESS, FILE_NAME], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:nth(1, lists:nth(1, Rows))
+		end
+	end),
+	record_query_time(select_transaction_total_filter_address_filename, Time),
+	{reply, Reply, State};
+
+handle_call({select_transaction_range_filter_filename, CONTENT_TYPE, FILE_NAME, LIMIT, OFFSET}, _, State) ->
+	#{ select_transaction_range_filter_filename_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		?LOG_INFO([{ar_arql_db_CONTENT_TYPE, CONTENT_TYPE}]),
+		?LOG_INFO([{ar_arql_db_FILE_NAME, FILE_NAME}]),
+		?LOG_INFO([{ar_arql_db_LIMIT, LIMIT}]),
+		?LOG_INFO([{ar_arql_db_OFFSET, OFFSET}]),
+		case stmt_fetchall(Stmt, [CONTENT_TYPE, FILE_NAME, LIMIT, OFFSET], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:map(fun tx_map/1, Rows)
+		end
+	end),
+	record_query_time(select_transaction_range_filter_filename, Time),
+	{reply, Reply, State};
+
+handle_call({select_transaction_total_filter_filename, CONTENT_TYPE, FILE_NAME}, _, State) ->
+	#{ select_transaction_total_filter_filename_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [CONTENT_TYPE, FILE_NAME], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:nth(1, lists:nth(1, Rows))
+		end
+	end),
+	record_query_time(select_transaction_total_filter_filename, Time),
 	{reply, Reply, State};
 
 handle_call({eval_legacy_arql, Query}, _, #{ conn := Conn } = State) ->

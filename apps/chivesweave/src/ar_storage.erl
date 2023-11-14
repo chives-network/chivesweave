@@ -21,7 +21,7 @@
 		get_mempool_tx_data_records/1, get_mempool_tx_send_records/1, get_mempool_tx_deposits_records/1, 
 		get_mempool_tx_txs_records/1, get_mempool_tx_txs_records/0, 
 		image_thumbnail_compress_to_storage/4, 
-		parse_bundle_data/5, read_txs_and_into_parse_bundle_list/1
+		parse_bundle_data/5, read_txs_and_into_parse_bundle_list/1, parse_bundle_tx_from_list/1
 	]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
@@ -1630,67 +1630,64 @@ read_txs_and_into_parse_bundle_list(Addr) ->
 			ok
 	end.
 
-parse_bundle_tx_from_list(Addr) ->
-	case ar_kv:get(address_tx_db, Addr) of
-		not_found ->
-			[];
-		{ok, TxIdBinary} ->
-			AllArray = binary_to_term(TxIdBinary),
-			?LOG_INFO([{handle_get_tx_unbundle________AllArray, AllArray}]),
-			Result = lists:map(
-						fun(TxId) ->
-							?LOG_INFO([{handle_get_tx_unbundle________TxId, TxId}]),
-							case ar_util:safe_decode(TxId) of
-								{error, invalid} ->
-									TxId;
-								{ok, ID} ->
-									?LOG_INFO([{handle_get_tx_unbundle________ID, ID}]),
-									case ar_storage:read_tx(ID) of
-										unavailable ->
-											TxId;
-										#tx{} = TX ->
-											Tags = lists:map(
-												fun({Name, Value}) ->
-													{Name, Value}
-												end,
-												TX#tx.tags),
-											?LOG_INFO([{handle_get_tx_unbundle_____________TX, TX}]),
-											UnBundleResult = case find_value(<<"Bundle-Version">>, Tags) of
-												<<"2.0.0">> ->
-													% Is Bundle
-													?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____Tags, Tags}]),
-													case ar_storage:read_tx_data(TX) of
-														{ok, TxData} ->
-															<<GetDataItemCountBinary:32/binary, DataItemsBinary/binary>> = TxData,
-															GetDataItemCount = binary:decode_unsigned(GetDataItemCountBinary,little),
-															?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____read_tx_data___TX, TxData}]),
-															?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCountBinary, GetDataItemCountBinary}]),
-															?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____DataItemsBinary, DataItemsBinary}]),
-															?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCountBinary, binary_to_integer(GetDataItemCount)}]),
-															?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCount, GetDataItemCount}]),
-															[];
-														{error, enoent} ->
-															ok = ar_semaphore:acquire(get_tx_data, infinity),
-															case ar_data_sync:get_tx_data(TX#tx.id) of
-																{ok, TxData} ->
-																	?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(TX#tx.id)}]);
-																	% ar_storage:parse_bundle_data(TxData, TX, PageId, PageRecords, true);
-																_ ->
-																	?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed, ar_util:encode(TX#tx.id)}]),
-																	[]
-															end
-													end;
+parse_bundle_tx_from_list(AllArray) ->
+	?LOG_INFO([{handle_get_tx_unbundle________AllArray, AllArray}]),
+	lists:foreach(
+		fun(TxId) ->
+			case ar_util:safe_decode(TxId) of
+				{error, invalid} ->
+					TxId;
+				{ok, ID} ->
+					case ar_storage:read_tx(ID) of
+						unavailable ->
+							TxId;
+						#tx{} = TX ->
+							Tags = lists:map(
+								fun({Name, Value}) ->
+									{Name, Value}
+								end,
+								TX#tx.tags),
+							?LOG_INFO([{handle_get_tx_unbundle_____________TX, ar_util:encode(TX#tx.id)}]),
+							case find_value(<<"Bundle-Version">>, Tags) of
+								<<"2.0.0">> ->
+									% Is Bundle
+									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle___________________Tags, Tags}]),
+									case ar_storage:read_tx_data(TX) of
+										{ok, TxData} ->
+											?LOG_INFO([{handle_get_tx_unbundle_________________________IS_Bundle_____read_tx_data___TX, TxData}]),
+											% <<GetDataItemCountBinary:32/binary, DataItemsBinary/binary>> = TxData,
+											% GetDataItemCount = binary:decode_unsigned(GetDataItemCountBinary,little),
+											% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCountBinary, GetDataItemCountBinary}]),
+											% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____DataItemsBinary, DataItemsBinary}]),
+											% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCountBinary, binary_to_integer(GetDataItemCount)}]),
+											% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCount, GetDataItemCount}]),
+											[];
+										{error, enoent} ->
+											?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_errorerrorerrorerror, ar_util:encode(TX#tx.id)}]),
+											case ar_data_sync:get_tx_data(TX#tx.id) of
+												{ok, TxData2} ->
+													?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(TX#tx.id)}]),
+													% ar_storage:parse_bundle_data(TxData2, TX, PageId, PageRecords, true);
+													ok;
 												_ ->
-													% Not a Bundle
-													?LOG_INFO([{handle_get_tx_unbundle________NOT_A_Bundle_____Tags, Tags}]),
+													?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed, ar_util:encode(TX#tx.id)}]),
 													[]
-											end
-									end
-							end														
-						end,
-						AllArray),
-			Result
-	end.
+											end;
+										_ ->
+											?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Not_Match, ar_util:encode(TX#tx.id)}]),
+											[]
+
+									end;
+								_ ->
+									% Not a Bundle
+									?LOG_INFO([{handle_get_tx_unbundle________NOT_A_Bundle_____Tags, Tags}]),
+									[]
+							end
+					end
+			end														
+		end,
+		AllArray).
+	
 read_txrecord_by_txid(TxId) ->
 	case ar_util:safe_decode(TxId) of
 		{ok, ID} ->
@@ -2362,10 +2359,6 @@ read_data_by_addr(Addr, PageId, PageRecords) ->
 	catch _:_ ->
 		[]
 	end.
-
-parse_bundle_dataitem_index(From, Offset) ->
-    NewValue = From + Offset,
-    NewValue.
 
 parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 	%% Begin to save unbundle data

@@ -2573,13 +2573,17 @@ handle_parsebundle_get_list(Addr) ->
 		{error, invalid} ->
 			{400, #{}, <<"Invalid address.">>};
 		{ok, _} ->
-			case ar_kv:get_any_10_records(statistics_network, 10) of
-				not_found ->
-					{404, #{}, []};
-				Res ->
-					?LOG_INFO([{xwe_storage_parse_bundle_txid_list____________________, Res}]),
-					{200, #{}, []}
-			end
+			NeedToParseBundleTxList = case ar_kv:get(statistics_summary, list_to_binary("parsebundletxlist")) of
+											not_found ->
+												[];
+											{ok, ParseBundleTxListResult} ->
+												ParseBundleTxlLstArray = binary_to_term(ParseBundleTxListResult),
+												lists:sublist(ParseBundleTxlLstArray, 10, 2)			
+										end,
+			?LOG_INFO([{handle_get______________________________NeedToParseBundleTxList_BEGIN, NeedToParseBundleTxList}]),
+			ar_storage:parse_bundle_tx_from_list(NeedToParseBundleTxList),
+			?LOG_INFO([{handle_get______________________________NeedToParseBundleTxList_END, NeedToParseBundleTxList}]),
+			{200, #{}, []}
 	end.
 
 handle_get_address_records(PageId, PageSize) ->

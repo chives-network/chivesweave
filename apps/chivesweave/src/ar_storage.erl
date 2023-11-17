@@ -1099,10 +1099,17 @@ write_block(B) ->
 		Error ->
 			Error
 	end,
-	
+
 	%%% Make block data for explorer
 	BlockBin = term_to_binary([B#block.height, ar_util:encode(B#block.indep_hash), ar_util:encode(B#block.reward_addr), B#block.reward, B#block.timestamp, length(B#block.txs), B#block.weave_size, B#block.block_size]),
-	ar_kv:put(explorer_block, list_to_binary(integer_to_list(B#block.height)), BlockBin),
+	case ar_kv:put(explorer_block, list_to_binary(integer_to_list(B#block.height)), BlockBin) of
+		ok ->
+			?LOG_INFO([{write_block______________________________________________________________________________explorer_block, list_to_binary(integer_to_list(B#block.height)) }]);
+		Error2 ->
+			?LOG_ERROR([{write_block__________________________________________________________________________explorer_block____failed, Error2}, {height, B#block.height}]),
+			{error, Error2}
+	end,
+	?LOG_INFO([{write_block______________________________________________________________________________explorer_block____txs, B#block.txs }]),
 
 	TotalTxReward = 0,
 	lists:foreach(
@@ -1262,7 +1269,7 @@ write_block(B) ->
 					{Name, Value}
 				end,
 				TX#tx.tags),
-			UnBundleResult = case find_value(<<"Bundle-Version">>, Tags) of
+			case find_value(<<"Bundle-Version">>, Tags) of
 				<<"2.0.0">> ->
 					% Is Bundle
 					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____Tags, Tags}]),
@@ -1277,7 +1284,6 @@ write_block(B) ->
 							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCount, GetDataItemCount}]),
 							[];
 						{error, enoent} ->
-							ok = ar_semaphore:acquire(get_tx_data, infinity),
 							case ar_data_sync:get_tx_data(TX#tx.id) of
 								{ok, TxData} ->
 									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(TX#tx.id)}]),
@@ -1377,18 +1383,25 @@ generate_range(A, B) ->
 read_block_from_height_by_number(FromHeight, BlockNumber, PageId) ->
 	BlockHeightArray = generate_range(FromHeight, FromHeight + BlockNumber),
 	BlockHeightArrayReverse = lists:reverse(BlockHeightArray),
+	?LOG_INFO([{read_block_from_height_by_number________BlockHeightArray, BlockHeightArray}]),
 	BlockListElement = lists:map(
 		fun(X) -> 
 			case X > 0 of 
 				true ->
+					?LOG_INFO([{read_block_from_height_by_number________BlockIdBinaryPrevious, X-1}]),
 					case ar_kv:get(explorer_block, list_to_binary(integer_to_list(X-1))) of 
-						not_found -> []; 
+						not_found -> [not_found_1]; 
 						{ok, BlockIdBinaryPrevious} -> 
+							?LOG_INFO([{read_block_from_height_by_number________BlockIdBinaryPrevious, X-1}]),
+							?LOG_INFO([{read_block_from_height_by_number________BlockIdBinaryPrevious, integer_to_list(X-1)}]),
+							?LOG_INFO([{read_block_from_height_by_number________BlockIdBinaryPrevious, list_to_binary(integer_to_list(X-1))}]),
+							?LOG_INFO([{read_block_from_height_by_number________BlockIdBinaryPrevious, BlockIdBinaryPrevious}]),
 							BlockIdBinaryResultPrevious = binary_to_term(BlockIdBinaryPrevious),
 							TimestampPrevious = lists:nth(5, BlockIdBinaryResultPrevious),
 							case ar_kv:get(explorer_block, list_to_binary(integer_to_list(X))) of 
-								not_found -> []; 
+								not_found -> [not_found_2]; 
 								{ok, BlockIdBinary} -> 
+									?LOG_INFO([{read_block_from_height_by_number________BlockIdBinary, BlockIdBinary}]),
 									BlockIdBinaryResult = binary_to_term(BlockIdBinary),
 									BlockMap = #{
 											<<"id">> => lists:nth(1, BlockIdBinaryResult),
@@ -1409,6 +1422,7 @@ read_block_from_height_by_number(FromHeight, BlockNumber, PageId) ->
 					[]
 			end
 		end, BlockHeightArrayReverse),
+	?LOG_INFO([{read_block_from_height_by_number________BlockListElement, BlockListElement}]),
 	BlockListElementMap = lists:filter(fun(Element) -> is_map(Element) end, BlockListElement),
 	CurrentBlockHeight = ar_node:get_height(),
 	BlockListElementResult = #{

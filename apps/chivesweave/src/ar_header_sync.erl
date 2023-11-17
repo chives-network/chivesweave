@@ -375,8 +375,7 @@ add_block2(B, #state{ is_disk_space_sufficient = false } = State) ->
 		ok ->
 			{ok, State};
 		Error ->
-			?LOG_ERROR([{event, failed_to_record_block_confirmations},
-				{reason, io_lib:format("~p", [Error])}]),
+			?LOG_INFO([{event, failed_to_record_block_confirmations}, {reason, io_lib:format("~p", [Error])}]),
 			{Error, State}
 	end;
 add_block2(B, #state{ sync_record = SyncRecord, retry_record = RetryRecord } = State) ->

@@ -1102,15 +1102,10 @@ write_block(B) ->
 
 	%%% Make block data for explorer
 	BlockBin = term_to_binary([B#block.height, ar_util:encode(B#block.indep_hash), ar_util:encode(B#block.reward_addr), B#block.reward, B#block.timestamp, length(B#block.txs), B#block.weave_size, B#block.block_size]),
-	case ar_kv:put(explorer_block, list_to_binary(integer_to_list(B#block.height)), BlockBin) of
-		ok ->
-			?LOG_INFO([{write_block______________________________________________________________________________explorer_block, list_to_binary(integer_to_list(B#block.height)) }]);
-		Error2 ->
-			?LOG_ERROR([{write_block__________________________________________________________________________explorer_block____failed, Error2}, {height, B#block.height}]),
-			{error, Error2}
-	end,
-	?LOG_INFO([{write_block______________________________________________________________________________explorer_block____txs, B#block.txs }]),
+	ar_kv:put(explorer_block, list_to_binary(integer_to_list(B#block.height)), BlockBin),
 
+	?LOG_INFO([{write_block______________________________________________________________________________explorer_block, list_to_binary(integer_to_list(B#block.height)) }]),
+	
 	TotalTxReward = 0,
 	lists:foreach(
         fun(TX) ->
@@ -1646,13 +1641,13 @@ read_txs_and_into_parse_bundle_list(Addr) ->
 
 parse_bundle_tx_from_list(AllArray) ->
 	?LOG_INFO([{handle_get_tx_unbundle________AllArray, AllArray}]),
-	lists:foreach(
+	ParseResultList = lists:map(
 		fun(TxId) ->
 			case ar_util:safe_decode(TxId) of
 				{error, invalid} ->
 					TxId;
 				{ok, ID} ->
-					case ar_storage:read_tx(ID) of
+					case read_tx(ID) of
 						unavailable ->
 							TxId;
 						#tx{} = TX ->
@@ -1662,45 +1657,60 @@ parse_bundle_tx_from_list(AllArray) ->
 								end,
 								TX#tx.tags),
 							?LOG_INFO([{handle_get_tx_unbundle_____________TX, ar_util:encode(TX#tx.id)}]),
-							case find_value(<<"Bundle-Version">>, Tags) of
+							ParseResultItem = case find_value(<<"Bundle-Version">>, Tags) of
 								<<"2.0.0">> ->
 									% Is Bundle
-									?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle___________________Tags, Tags}]),
-									case ar_storage:read_tx_data(TX) of
+									% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle___________________Tags, Tags}]),
+									case read_tx_data(TX) of
 										{ok, TxData} ->
-											?LOG_INFO([{handle_get_tx_unbundle_________________________IS_Bundle_____read_tx_data___TX, TxData}]),
+											% ?LOG_INFO([{handle_get_tx_unbundle_________________________IS_Bundle_____read_tx_data___TX, TxData}]),
 											% <<GetDataItemCountBinary:32/binary, DataItemsBinary/binary>> = TxData,
 											% GetDataItemCount = binary:decode_unsigned(GetDataItemCountBinary,little),
 											% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCountBinary, GetDataItemCountBinary}]),
 											% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____DataItemsBinary, DataItemsBinary}]),
 											% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCountBinary, binary_to_integer(GetDataItemCount)}]),
 											% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItemCount, GetDataItemCount}]),
-											[];
+											<<"Read_Tx_Data_Success">>;
 										{error, enoent} ->
 											?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_errorerrorerrorerror, ar_util:encode(TX#tx.id)}]),
 											case ar_data_sync:get_tx_data(TX#tx.id) of
 												{ok, TxData2} ->
-													?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(TX#tx.id)}]),
-													% ar_storage:parse_bundle_data(TxData2, TX, PageId, PageRecords, true);
-													ok;
+													% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__parse_bundle_data, ar_util:encode(TX#tx.id)}]),
+													ParseBundleData = parse_bundle_data(TxData2, TX, 0, 5, true),
+													?LOG_INFO([{handle_get_tx_unbundle_________________________ParseBundleData, ParseBundleData}]),
+													ar_util:encode(TX#tx.id);
 												_ ->
-													?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed, ar_util:encode(TX#tx.id)}]),
-													[]
+													% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Failed, ar_util:encode(TX#tx.id)}]),
+													<<"Get_Bundle_Failed">>
 											end;
 										_ ->
-											?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Not_Match, ar_util:encode(TX#tx.id)}]),
-											[]
+											% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle__get_tx_data___Not_Match, ar_util:encode(TX#tx.id)}]),
+											<<"Not_Match_Bundle">>
 
 									end;
 								_ ->
 									% Not a Bundle
-									?LOG_INFO([{handle_get_tx_unbundle________NOT_A_Bundle_____Tags, Tags}]),
-									[]
-							end
+									% ?LOG_INFO([{handle_get_tx_unbundle________NOT_A_Bundle_____Tags, Tags}]),
+									<<"NOT_A_Bundle">>
+							end,
+							% ?LOG_INFO([{handle_get_tx_unbundle________ParseResultItem, ParseResultItem}]),
+							ParseResultItem
 					end
 			end														
 		end,
-		AllArray).
+		AllArray),
+	% Finished Parse Bundle, Delete The TxId From Task
+	case ar_kv:get(statistics_summary, list_to_binary("parsebundletxlist")) of
+		{ok, ParseBundleTxListResult} ->
+			ParseBundleTxlLstArray = binary_to_term(ParseBundleTxListResult),
+			MergedList = lists:usort(lists:subtract(ParseBundleTxlLstArray, AllArray)),
+			ParseBundleTxListNewBin = term_to_binary(MergedList),
+			ar_kv:put(statistics_summary, list_to_binary("parsebundletxlist"), ParseBundleTxListNewBin),
+			% ?LOG_INFO([{handle_get_tx_unbundle________ParseBundleTxListResult, ParseBundleTxListResult}]),
+			% ?LOG_INFO([{handle_get_tx_unbundle________ParseBundleTxListNewBin, ParseBundleTxListNewBin}]),
+			MergedList
+	end,
+	ParseResultList.
 	
 read_txrecord_by_txid(TxId) ->
 	case ar_util:safe_decode(TxId) of
@@ -2622,7 +2632,7 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 				end,
 				GetNumbersList
 			),
-			% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItems, GetDataItems}]),
+			?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItems, GetDataItems}]),
 			case IsReturn of
 				true ->
 					try binary_to_integer(PageRecords) of

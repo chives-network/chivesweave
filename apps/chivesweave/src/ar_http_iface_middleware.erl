@@ -2445,7 +2445,7 @@ serve_tx_html_data_thumbnail(Req, _TX, invalid) ->
 image_thumbnail_compress(Req, ContentType, TX) ->
 	case ar_storage:read_tx_data(TX) of
 		{ok, Data} ->
-			?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____read_tx_data______, binary:match(ContentType, <<"image">>)}]),
+			% ?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____read_tx_data______, binary:match(ContentType, <<"image">>)}]),
 			case binary:match(ContentType, <<"image">>) of
 				{0, 5} ->
 					%% Is image, and will to compress this image
@@ -2454,15 +2454,15 @@ image_thumbnail_compress(Req, ContentType, TX) ->
 					{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, MayCompressedData, Req};
 				nomatch ->
 					%% Not a image, just return the original data
-					?LOG_INFO([{serve_format_2_html_data_thumbnail___________binary_starts_with_failed, false}]),
+					% ?LOG_INFO([{serve_format_2_html_data_thumbnail___________binary_starts_with_failed, false}]),
 					{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, Data, Req}
 			end;
 		{error, enoent} ->
-			?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____TXID______, ar_data_sync:get_tx_data(TX#tx.id)}]),
+			% ?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____TXID______, ar_data_sync:get_tx_data(TX#tx.id)}]),
 			ok = ar_semaphore:acquire(get_tx_data, infinity),
 			case ar_data_sync:get_tx_data(TX#tx.id) of
 				{ok, Data} ->
-					?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____Data______, Data}]),
+					% ?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____Data______, Data}]),
 					FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
 					MayCompressedData = ar_storage:image_thumbnail_compress_to_storage(ContentType, Data, FromAddress, ar_util:encode(TX#tx.id)),
 					{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, MayCompressedData, Req};
@@ -2815,12 +2815,23 @@ handle_parsebundle_get_list(Addr) ->
 												[];
 											{ok, ParseBundleTxListResult} ->
 												ParseBundleTxlLstArray = binary_to_term(ParseBundleTxListResult),
-												lists:sublist(ParseBundleTxlLstArray, 10, 2)			
+												case length(ParseBundleTxlLstArray) >= 10 of
+													true ->
+														lists:sublist(ParseBundleTxlLstArray, 1, 10);
+													false ->
+														ParseBundleTxlLstArray
+												end
 										end,
-			?LOG_INFO([{handle_get______________________________NeedToParseBundleTxList_BEGIN, NeedToParseBundleTxList}]),
-			ar_storage:parse_bundle_tx_from_list(NeedToParseBundleTxList),
-			?LOG_INFO([{handle_get______________________________NeedToParseBundleTxList_END, NeedToParseBundleTxList}]),
-			{200, #{}, []}
+			?LOG_INFO([{handle_get______________________________NeedToParseBundleTxList, NeedToParseBundleTxList}]),
+			
+			ParseResultList = case length(NeedToParseBundleTxList) > 0 of
+									true ->
+										ar_storage:parse_bundle_tx_from_list(NeedToParseBundleTxList);
+									false ->
+										[]
+								end,
+			?LOG_INFO([{handle_get______________________________ParseResultList, ParseResultList}]),
+			{200, #{}, ar_serialize:jsonify(ParseResultList)}
 	end.
 
 handle_get_address_records(PageId, PageSize) ->

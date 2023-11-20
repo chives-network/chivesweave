@@ -2067,24 +2067,33 @@ handle(<<"GET">>, [<<Hash:43/binary>>, <<"thumbnail">>], Req, _Pid) ->
 									Address = maps:get(<<"address">>, maps:get(<<"owner">>, BundleTx, undefined), undefined),
 									% ?LOG_INFO([{handle_get_tx_unbundle_____________Address, Address}]),
 									DataDir = Config#config.data_dir,
-									NewFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(ar_util:encode(ID)) ++ "_thumbnail"])),
-									% ?LOG_INFO([{handle_get_tx_unbundle_____________NewFilePath, NewFilePath}]),
+									NewFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(ar_util:encode(ID)) ++ ".png"])),
+									?LOG_INFO([{handle_get_tx_unbundle_____________NewFilePath, NewFilePath}]),
+									% Return the result
 									case file:read_file_info(NewFilePath) of
 										{ok, FileInfo} ->
 											case file:read_file(NewFilePath) of
 												{ok, FileContent} ->
-													{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, FileContent, Req};
+													{200, #{ <<"content-type">> => <<"image/png">>,  <<"Cache-Control">> => <<"max-age=604800">> }, FileContent, Req};
 												{error, _Reason} ->
 													{404, #{}, sendfile("data/not_found.html"), Req}
 											end;
 										{error, _} ->
 											OriginalFilePath = binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, Address, ar_util:encode(ID) ])),
+											% ?LOG_INFO([{handle_get_tx_unbundle_____________OriginalFilePath, OriginalFilePath}]),
 											% ?LOG_INFO([{handle_get_tx_unbundle_____________NewFilePath, NewFilePath}]),
+											% ?LOG_INFO([{handle_get_tx_unbundle_____________NewFilePath, ar_util:encode(ID)}]),
+											% ?LOG_INFO([{handle_get_tx_unbundle_____________NewFilePath, ID}]),
+											% ?LOG_INFO([{handle_get_tx_unbundle_____________Address, Address}]),
+											% Make the thumbnail png and return this png
 											case file:read_file_info(OriginalFilePath) of
 												{ok, FileInfo} ->
 													case file:read_file(OriginalFilePath) of
 														{ok, FileContent} ->
-															{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, FileContent, Req};
+															{ContentTypeNew, NewFileData} = image_thumbnail_compress_data(ContentType, ar_util:encode(ID), Address, FileContent),
+															?LOG_INFO([{handle_get_tx_unbundle_____________FileContentNew, NewFileData}]),
+															?LOG_INFO([{handle_get_tx_unbundle_____________ContentTypeNew, ContentTypeNew}]),
+															{200, #{ <<"content-type">> => ContentTypeNew,  <<"Cache-Control">> => <<"max-age=604800">> }, NewFileData, Req};
 														{error, _Reason} ->
 															{404, #{}, sendfile("data/not_found.html"), Req}
 													end;
@@ -2442,30 +2451,53 @@ serve_tx_html_data_thumbnail(Req, #tx{ format = 2 } = TX, none) ->
 serve_tx_html_data_thumbnail(Req, _TX, invalid) ->
 	{421, #{}, <<>>, Req}.
 
+contentTypeToFileTYpe(ContentType) ->
+	case ContentType of
+		<<"image/png">> -> <<"image">>;
+		<<"image/jpeg">> -> <<"image">>;
+		<<"image/jpg">> -> <<"image">>;
+		<<"image/gif">> -> <<"image">>;
+		<<"image/png">> -> <<"image">>;
+		<<"application/pdf">> -> <<"pdf">>;
+		<<"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">> -> <<"xlsx">>;
+		<<"model/stl">> -> <<"stl">>;
+		<<"application/x-msdownload">> -> <<"exe">>;
+		<<"video/mp4">> -> <<"video">>;
+		_ -> <<"unknown">>
+	end.
+
+image_thumbnail_compress_data(ContentType, TxId, FromAddress, Data) ->
+	?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____ContentType, ContentType}]),
+	FileType = contentTypeToFileTYpe(ContentType),
+	case FileType of
+		<<"image">> ->
+			%% Is image, and will to compress this image
+			MayCompressedData = ar_storage:image_thumbnail_compress_to_storage(ContentType, Data, FromAddress, TxId),
+			{<<"image/png">>, MayCompressedData};
+		<<"pdf">> ->
+			%% Is image, and will to compress this image
+			MayCompressedData = ar_storage:pdf_thumbnail_png_to_storage(FileType, Data, FromAddress, TxId),
+			{<<"image/png">>, MayCompressedData};
+		_ ->
+			%% Not a image, just return the original data
+			% ?LOG_INFO([{serve_format_2_html_data_thumbnail___________binary_starts_with_failed, false}]),
+			{ContentType, Data}
+	end.
+
 image_thumbnail_compress(Req, ContentType, TX) ->
 	case ar_storage:read_tx_data(TX) of
 		{ok, Data} ->
-			% ?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____read_tx_data______, binary:match(ContentType, <<"image">>)}]),
-			case binary:match(ContentType, <<"image">>) of
-				{0, 5} ->
-					%% Is image, and will to compress this image
-					FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
-					MayCompressedData = ar_storage:image_thumbnail_compress_to_storage(ContentType, Data, FromAddress, ar_util:encode(TX#tx.id)),
-					{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, MayCompressedData, Req};
-				nomatch ->
-					%% Not a image, just return the original data
-					% ?LOG_INFO([{serve_format_2_html_data_thumbnail___________binary_starts_with_failed, false}]),
-					{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, Data, Req}
-			end;
+			FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+			{ContentTypeNew, NewFileData} = image_thumbnail_compress_data(ContentType, ar_util:encode(TX#tx.id), FromAddress, Data),
+			{200, #{ <<"content-type">> => ContentTypeNew,  <<"Cache-Control">> => <<"max-age=604800">> }, NewFileData, Req};
 		{error, enoent} ->
 			% ?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____TXID______, ar_data_sync:get_tx_data(TX#tx.id)}]),
 			ok = ar_semaphore:acquire(get_tx_data, infinity),
 			case ar_data_sync:get_tx_data(TX#tx.id) of
 				{ok, Data} ->
-					% ?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____Data______, Data}]),
 					FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
-					MayCompressedData = ar_storage:image_thumbnail_compress_to_storage(ContentType, Data, FromAddress, ar_util:encode(TX#tx.id)),
-					{200, #{ <<"content-type">> => ContentType,  <<"Cache-Control">> => <<"max-age=604800">> }, MayCompressedData, Req};
+					{ContentTypeNew, NewFileData} = image_thumbnail_compress_data(ContentType, ar_util:encode(TX#tx.id), FromAddress, Data),
+					{200, #{ <<"content-type">> => ContentTypeNew,  <<"Cache-Control">> => <<"max-age=604800">> }, NewFileData, Req};
 				{error, tx_data_too_big} ->
 					{400, #{}, jiffy:encode(#{ error => tx_data_too_big }), Req};
 				{error, not_found} ->

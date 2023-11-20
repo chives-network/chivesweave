@@ -2091,8 +2091,6 @@ handle(<<"GET">>, [<<Hash:43/binary>>, <<"thumbnail">>], Req, _Pid) ->
 													case file:read_file(OriginalFilePath) of
 														{ok, FileContent} ->
 															{ContentTypeNew, NewFileData} = image_thumbnail_compress_data(ContentType, ar_util:encode(ID), Address, FileContent),
-															?LOG_INFO([{handle_get_tx_unbundle_____________FileContentNew, NewFileData}]),
-															?LOG_INFO([{handle_get_tx_unbundle_____________ContentTypeNew, ContentTypeNew}]),
 															{200, #{ <<"content-type">> => ContentTypeNew,  <<"Cache-Control">> => <<"max-age=604800">> }, NewFileData, Req};
 														{error, _Reason} ->
 															{404, #{}, sendfile("data/not_found.html"), Req}
@@ -2472,13 +2470,25 @@ image_thumbnail_compress_data(ContentType, TxId, FromAddress, Data) ->
 	case FileType of
 		<<"image">> ->
 			%% Is image, and will to compress this image
-			MayCompressedData = ar_storage:image_thumbnail_compress_to_storage(ContentType, Data, FromAddress, TxId),
+			MayCompressedData = ar_storage:image_thumbnail_compress_to_storage(Data, FromAddress, TxId),
 			{<<"image/png">>, MayCompressedData};
 		<<"pdf">> ->
 			%% Is image, and will to compress this image
-			MayCompressedData = ar_storage:pdf_thumbnail_png_to_storage(FileType, Data, FromAddress, TxId),
+			MayCompressedData = ar_storage:pdf_office_video_thumbnail_png_to_storage(Data, FromAddress, TxId),
 			{<<"image/png">>, MayCompressedData};
-		_ ->
+		<<"docx">> ->
+			%% Is image, and will to compress this image
+			MayCompressedData = ar_storage:pdf_office_video_thumbnail_png_to_storage(Data, FromAddress, TxId),
+			{<<"image/png">>, MayCompressedData};
+		<<"xlsx">> ->
+			%% Is image, and will to compress this image
+			MayCompressedData = ar_storage:pdf_office_video_thumbnail_png_to_storage(Data, FromAddress, TxId),
+			{<<"image/png">>, MayCompressedData};
+		<<"pptx">> ->
+			%% Is image, and will to compress this image
+			MayCompressedData = ar_storage:pdf_office_video_thumbnail_png_to_storage(Data, FromAddress, TxId),
+			{<<"image/png">>, MayCompressedData};
+		nomatch ->
 			%% Not a image, just return the original data
 			% ?LOG_INFO([{serve_format_2_html_data_thumbnail___________binary_starts_with_failed, false}]),
 			{ContentType, Data}

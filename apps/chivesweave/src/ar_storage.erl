@@ -20,8 +20,8 @@
 		read_statistics_address/0, read_statistics_transaction/0, read_datarecord_function/1, 
 		get_mempool_tx_data_records/1, get_mempool_tx_send_records/1, get_mempool_tx_deposits_records/1, 
 		get_mempool_tx_txs_records/1, get_mempool_tx_txs_records/0, 
-		image_thumbnail_compress_to_storage/4, 
-		pdf_thumbnail_png_to_storage/4,
+		image_thumbnail_compress_to_storage/3, 
+		pdf_office_video_thumbnail_png_to_storage/3,
 		parse_bundle_data/5, read_txs_and_into_parse_bundle_list/1, parse_bundle_tx_from_list/1
 	]).
 
@@ -2596,7 +2596,7 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 							
 							%% Compress Image
 							% ?LOG_INFO([{handle_get_tx_unbundle________DataType_DataType____DataType, DataType}]),
-							image_thumbnail_compress_to_storage(DataType, DataItemContent, FromAddress, DataItemId),
+							image_thumbnail_compress_to_storage(DataItemContent, FromAddress, DataItemId),
 
 							%% Write Unbundle data to file
 							filelib:ensure_dir(binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, FromAddress])) ++ "/"),
@@ -2717,71 +2717,12 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 			end
 	end.
 
-image_thumbnail_compress_to_storage(ContentType, Data, Address, TxId) ->
-	case binary:match(ContentType, <<"image">>) of
-		{0, 5} ->
-			%% Is image, and will to compress this image
-			DataSize = byte_size(Data),
-			case DataSize > 500 * 1024 of
-				true ->
-					%% Begin to comporess
-					%% Step 1: copy the data as a file, the path is [ADDRESS]/[TX]
-					{ok, Config} = application:get_env(chivesweave, config),
-					DataDir = Config#config.data_dir,
-					% Address = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
-					ImageThumbnailDir = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address])),
-					filelib:ensure_dir(ImageThumbnailDir ++ "/"),
-					OriginalFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, TxId])),
-					NewFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(TxId) ++ ".png"])),
-					case file:read_file_info(NewFilePath) of
-						{ok, _FileInfo} ->
-							ok;
-						_ ->
-							%% First to copy data to file
-							{ok, File} = file:open(OriginalFilePath, [write]),
-							case file:write(File, Data) of
-								ok ->
-									% ?LOG_INFO([{image_thumbnail_compress_to_storage_____________write, OriginalFilePath}]),
-									%% Not Exist, need to compress									
-									CompressCommand = "convert " ++ OriginalFilePath ++ " -resize 600x " ++ NewFilePath,
-									case os:cmd(CompressCommand) of
-										"" ->
-											file:delete(OriginalFilePath);
-										ErrorOutput ->
-											NewFilePathFailed = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(TxId) ++ ""])),
-											case file:read_file_info(NewFilePathFailed) of
-												{ok, FileInfo} when FileInfo#file_info.type == regular ->
-													ok = file:delete(NewFilePathFailed);
-												{error, _} ->
-													ok
-											end,
-											?LOG_INFO([{image_thumbnail_compress_to_storage_Compress_Command_Failed________, ErrorOutput}])
-									end;
-								{error, Reason} ->													
-									?LOG_INFO([{image_thumbnail_compress_to_storage_____________write_original_file_failed, Reason}])
-							end
-					end,
-					%% Begin to output			
-					case file:read_file(NewFilePath) of
-						{ok, FileContent} ->
-							FileContent;
-						{error, _Reason} ->
-							Data
-					end;
-				false ->
-					?LOG_INFO([{image_thumbnail_compress_to_storage_____________DataSize_is_too_small, DataSize}]),
-					Data
-			end;
-		_ ->
-			%% Not a image, just return the original data
-			?LOG_INFO([{image_thumbnail_compress_to_storage___________Not_a_image, false}]),
-			Data
-	end.
-
-pdf_thumbnail_png_to_storage(FileType, Data, Address, TxId) ->
-	case FileType of
-		<<"pdf">> ->
-			%% Begin to convert to png
+image_thumbnail_compress_to_storage(Data, Address, TxId) ->
+	%% Is image, and will to compress this image
+	DataSize = byte_size(Data),
+	case DataSize > 500 * 1024 of
+		true ->
+			%% Begin to comporess
 			%% Step 1: copy the data as a file, the path is [ADDRESS]/[TX]
 			{ok, Config} = application:get_env(chivesweave, config),
 			DataDir = Config#config.data_dir,
@@ -2789,7 +2730,6 @@ pdf_thumbnail_png_to_storage(FileType, Data, Address, TxId) ->
 			ImageThumbnailDir = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address])),
 			filelib:ensure_dir(ImageThumbnailDir ++ "/"),
 			OriginalFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, TxId])),
-			TargetDir = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address])),
 			NewFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(TxId) ++ ".png"])),
 			case file:read_file_info(NewFilePath) of
 				{ok, _FileInfo} ->
@@ -2799,11 +2739,9 @@ pdf_thumbnail_png_to_storage(FileType, Data, Address, TxId) ->
 					{ok, File} = file:open(OriginalFilePath, [write]),
 					case file:write(File, Data) of
 						ok ->
-							?LOG_INFO([{image_thumbnail_compress_to_storage_____________write, OriginalFilePath}]),
-							%% Not Exist, need to compress			
-							% libreoffice --headless --invisible --convert-to png input.pdf						
-							CompressCommand = "libreoffice --headless --invisible --convert-to png --outdir " ++ TargetDir ++ " " ++ OriginalFilePath,
-							?LOG_INFO([{image_thumbnail_compress_to_storage_____________CompressCommand, CompressCommand}]),
+							% ?LOG_INFO([{image_thumbnail_compress_to_storage_____________write, OriginalFilePath}]),
+							%% Not Exist, need to compress									
+							CompressCommand = "convert " ++ OriginalFilePath ++ " -resize 600x " ++ NewFilePath,
 							case os:cmd(CompressCommand) of
 								"" ->
 									file:delete(OriginalFilePath);
@@ -2828,9 +2766,57 @@ pdf_thumbnail_png_to_storage(FileType, Data, Address, TxId) ->
 				{error, _Reason} ->
 					Data
 			end;
+		false ->
+			?LOG_INFO([{image_thumbnail_compress_to_storage_____________DataSize_is_too_small, DataSize}]),
+			Data
+	end.
+
+pdf_office_video_thumbnail_png_to_storage(Data, Address, TxId) ->
+	%% Begin to convert to png
+	%% Step 1: copy the data as a file, the path is [ADDRESS]/[TX]
+	{ok, Config} = application:get_env(chivesweave, config),
+	DataDir = Config#config.data_dir,
+	% Address = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+	ImageThumbnailDir = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address])),
+	filelib:ensure_dir(ImageThumbnailDir ++ "/"),
+	OriginalFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, TxId])),
+	TargetDir = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address])),
+	NewFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(TxId) ++ ".png"])),
+	case file:read_file_info(NewFilePath) of
+		{ok, _FileInfo} ->
+			ok;
 		_ ->
-			%% Not a image, just return the original data
-			?LOG_INFO([{image_thumbnail_compress_to_storage___________Not_a_image, false}]),
+			%% First to copy data to file
+			{ok, File} = file:open(OriginalFilePath, [write]),
+			case file:write(File, Data) of
+				ok ->
+					?LOG_INFO([{image_thumbnail_compress_to_storage_____________write, OriginalFilePath}]),
+					%% Not Exist, need to compress			
+					% libreoffice --headless --invisible --convert-to png input.pdf						
+					CompressCommand = "libreoffice --headless --invisible --convert-to png --outdir " ++ TargetDir ++ " " ++ OriginalFilePath,
+					?LOG_INFO([{image_thumbnail_compress_to_storage_____________CompressCommand, CompressCommand}]),
+					case os:cmd(CompressCommand) of
+						"" ->
+							file:delete(OriginalFilePath);
+						ErrorOutput ->
+							NewFilePathFailed = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(TxId) ++ ""])),
+							case file:read_file_info(NewFilePathFailed) of
+								{ok, FileInfo} when FileInfo#file_info.type == regular ->
+									ok = file:delete(NewFilePathFailed);
+								{error, _} ->
+									ok
+							end,
+							?LOG_INFO([{image_thumbnail_compress_to_storage_Compress_Command_Failed________, ErrorOutput}])
+					end;
+				{error, Reason} ->													
+					?LOG_INFO([{image_thumbnail_compress_to_storage_____________write_original_file_failed, Reason}])
+			end
+	end,
+	%% Begin to output			
+	case file:read_file(NewFilePath) of
+		{ok, FileContent} ->
+			FileContent;
+		{error, _Reason} ->
 			Data
 	end.
 

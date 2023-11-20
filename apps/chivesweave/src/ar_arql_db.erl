@@ -334,6 +334,7 @@ handle_call({insert_full_block, BlockFields, TxFieldsList, TagFieldsList}, _From
 		ok = ar_sqlite3:bind(InsertBlockStmt, BlockFields, ?INSERT_STEP_TIMEOUT),
 		done = ar_sqlite3:step(InsertBlockStmt, ?INSERT_STEP_TIMEOUT),
 		ok = ar_sqlite3:reset(InsertBlockStmt, ?INSERT_STEP_TIMEOUT),
+		
 		lists:foreach(
 			fun(TxFields) ->
 				ok = ar_sqlite3:bind(InsertTxStmt, TxFields, ?INSERT_STEP_TIMEOUT),
@@ -563,10 +564,10 @@ handle_call({select_transaction_total_filter_address_filename, CONTENT_TYPE, FRO
 handle_call({select_transaction_range_filter_filename, CONTENT_TYPE, FILE_NAME, LIMIT, OFFSET}, _, State) ->
 	#{ select_transaction_range_filter_filename_stmt := Stmt } = State,
 	{Time, Reply} = timer:tc(fun() ->
-		?LOG_INFO([{ar_arql_db_CONTENT_TYPE, CONTENT_TYPE}]),
-		?LOG_INFO([{ar_arql_db_FILE_NAME, FILE_NAME}]),
-		?LOG_INFO([{ar_arql_db_LIMIT, LIMIT}]),
-		?LOG_INFO([{ar_arql_db_OFFSET, OFFSET}]),
+		% ?LOG_INFO([{ar_arql_db_CONTENT_TYPE, CONTENT_TYPE}]),
+		% ?LOG_INFO([{ar_arql_db_FILE_NAME, FILE_NAME}]),
+		% ?LOG_INFO([{ar_arql_db_LIMIT, LIMIT}]),
+		% ?LOG_INFO([{ar_arql_db_OFFSET, OFFSET}]),
 		case stmt_fetchall(Stmt, [CONTENT_TYPE, FILE_NAME, LIMIT, OFFSET], ?DRIVER_TIMEOUT) of
 			Rows when is_list(Rows) ->
 				lists:map(fun tx_map/1, Rows)
@@ -683,7 +684,7 @@ terminate(Reason, State) ->
 	ar_sqlite3:finalize(SelectTransactionTotalFilterStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectTransactionRangeFilterAddressStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectTransactionTotalFilterAddressStmt, ?DRIVER_TIMEOUT),
-	ok = ar_sqlite3:close(Conn, ?DRIVER_TIMEOUT).
+	ar_sqlite3:close(Conn, ?DRIVER_TIMEOUT).
 
 %%%===================================================================
 %%% Internal functions.
@@ -968,7 +969,7 @@ full_block_to_fields(FullBlock) ->
 				ar_util:encode(TX#tx.owner),
 				ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
 				ar_util:encode(TX#tx.target),
-				TX#tx.quantity,
+				integer_to_binary(TX#tx.quantity div 100000000),
 				ar_util:encode(TX#tx.signature),
 				TX#tx.reward,
 				integer_to_binary(lists:nth(4, BlockFields)),

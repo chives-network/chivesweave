@@ -72,9 +72,16 @@ CREATE TABLE tx (
 	block_height INTEGER,
 	data_size INTEGER,
 	bundleid TEXT,
-	file_name TEXT,
+	item_name TEXT,
+	item_type TEXT,
+	item_parent TEXT,
 	content_type TEXT,
+	item_hash TEXT,
+	item_summary TEXT,
+	is_encrypt INTEGER,
+	is_public TEXT,
 	app_name TEXT,
+	app_version TEXT,
 	agent_name TEXT
 );
 
@@ -95,9 +102,15 @@ CREATE INDEX idx_tx_target ON tx (target);
 CREATE INDEX idx_tx_timestamp ON tx (timestamp);
 CREATE INDEX idx_tx_block_height ON tx (block_height);
 CREATE INDEX idx_tx_bundleid ON tx (bundleid);
-CREATE INDEX idx_tx_file_name ON tx (file_name);
+CREATE INDEX idx_tx_item_name ON tx (item_name);
+CREATE INDEX idx_tx_item_type ON tx (item_type);
+CREATE INDEX idx_tx_item_parent ON tx (item_parent);
 CREATE INDEX idx_tx_content_type ON tx (content_type);
+CREATE INDEX idx_tx_item_hash ON tx (item_hash);
+CREATE INDEX idx_tx_is_encrypt ON tx (is_encrypt);
+CREATE INDEX idx_tx_is_public ON tx (is_public);
 CREATE INDEX idx_tx_app_name ON tx (app_name);
+CREATE INDEX idx_tx_app_version ON tx (app_version);
 CREATE INDEX idx_tx_agent_name ON tx (agent_name);
 
 CREATE INDEX idx_tag_tx_id ON tag (tx_id);
@@ -117,7 +130,7 @@ DROP INDEX idx_tx_from_address;
 DROP INDEX idx_tx_timestamp;
 DROP INDEX idx_tx_block_height;
 DROP INDEX idx_tx_bundleid;
-DROP INDEX idx_tx_file_name;
+DROP INDEX idx_tx_item_name;
 DROP INDEX idx_tx_content_type;
 DROP INDEX idx_tx_app_name;
 DROP INDEX idx_tx_agent_name;
@@ -131,7 +144,7 @@ DROP INDEX idx_address_timestamp;
 ").
 
 -define(INSERT_BLOCK_SQL, "INSERT OR REPLACE INTO block VALUES (?, ?, ?, ?)").
--define(INSERT_TX_SQL, "INSERT OR REPLACE INTO tx VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").
+-define(INSERT_TX_SQL, "INSERT OR REPLACE INTO tx VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").
 -define(INSERT_TAG_SQL, "INSERT OR REPLACE INTO tag VALUES (?, ?, ?)").
 -define(SELECT_TX_BY_ID_SQL, "SELECT * FROM tx WHERE id = ?").
 
@@ -156,11 +169,11 @@ DROP INDEX idx_address_timestamp;
 -define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_SQL, "SELECT * FROM tx where content_type = ? and from_address = ? order by timestamp desc LIMIT ? OFFSET ?").
 -define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where content_type = ? and from_address = ?").
 
--define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_FILENAME_SQL, "SELECT * FROM tx where content_type = ? and from_address = ? and file_name like ? order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where content_type = ? and from_address = ? and file_name like ?").
+-define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_FILENAME_SQL, "SELECT * FROM tx where content_type = ? and from_address = ? and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where content_type = ? and from_address = ? and item_name like ?").
 
--define(SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, "SELECT * FROM tx where content_type = ? and file_name like ? order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where content_type = ? and file_name like ?").
+-define(SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, "SELECT * FROM tx where content_type = ? and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where content_type = ? and item_name like ?").
 
 %%%===================================================================
 %%% Public API.
@@ -871,7 +884,7 @@ tx_map([
 	block_height => Height,
 	data_size => DataSize,
 	bundleid => BundleId,
-	file_name => FileName,
+	item_name => FileName,
 	content_type => ContentType,
 	app_name => AppName,
 	agent_name => AgentName
@@ -946,7 +959,12 @@ eval_legacy_arql_where_clause(_) ->
 find_value(Key, List) ->
 	case lists:keyfind(Key, 1, List) of
 		{Key, Val} -> Val;
-		false -> <<"">>
+		false -> 
+			case Key of
+				<<"File-Parent">> -> <<"Root">>;
+				<<"File-Public">> -> <<"Public">>;
+				_ -> <<"">>
+			end
 	end.
 
 full_block_to_fields(FullBlock) ->
@@ -961,8 +979,16 @@ full_block_to_fields(FullBlock) ->
 									TX#tx.tags),
 			FileName = find_value(<<"File-Name">>, TagsMap),
 			ContentType = find_value(<<"Content-Type">>, TagsMap),
+			FileType = ar_storage:contentTypeToFileType(ContentType),
+			FileParent = find_value(<<"File-Parent">>, TagsMap),
+			FileHash = find_value(<<"File-Hash">>, TagsMap),
+			FileSummary = find_value(<<"File-Summary">>, TagsMap),
+			CipherALG = find_value(<<"Cipher-ALG">>, TagsMap),
+			IsPublic = find_value(<<"File-Public">>, TagsMap),
 			AppName = find_value(<<"App-Name">>, TagsMap),
+			AppVersion = find_value(<<"App-Version">>, TagsMap),
 			AgentName = find_value(<<"Agent-Name">>, TagsMap),
+			Bundleid = <<"">>,
 			[
 				ar_util:encode(TX#tx.id),
 				BlockIndepHash,
@@ -976,12 +1002,19 @@ full_block_to_fields(FullBlock) ->
 				integer_to_binary(lists:nth(4, BlockFields)),
 				integer_to_binary(lists:nth(3, BlockFields)),
 				TX#tx.data_size,
-				"",
+				Bundleid,
 				FileName,
+				FileType,
+				FileParent,
 				ContentType,
+				FileHash,
+				FileSummary,
+				CipherALG,
+				IsPublic,
 				AppName,
+				AppVersion,
 				AgentName
-			] 
+			]
 		end,
 		FullBlock#block.txs
 	),
@@ -1013,8 +1046,16 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 									TX#tx.tags),
 	FileName = find_value(<<"File-Name">>, TagsMap),
 	ContentType = find_value(<<"Content-Type">>, TagsMap),
+	FileType = ar_storage:contentTypeToFileType(ContentType),
+	FileParent = find_value(<<"File-Parent">>, TagsMap),
+	FileHash = find_value(<<"File-Hash">>, TagsMap),
+	FileSummary = find_value(<<"File-Summary">>, TagsMap),
+	CipherALG = find_value(<<"Cipher-ALG">>, TagsMap),
+	IsPublic = find_value(<<"File-Public">>, TagsMap),
 	AppName = find_value(<<"App-Name">>, TagsMap),
+	AppVersion = find_value(<<"App-Version">>, TagsMap),
 	AgentName = find_value(<<"Agent-Name">>, TagsMap),
+	Bundleid = <<"">>,
 	[
 		ar_util:encode(TX#tx.id),
 		ar_util:encode(BH),
@@ -1028,10 +1069,17 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 		Timestamp,
 		Height,
 		TX#tx.data_size,
-		"",
+		Bundleid,
 		FileName,
+		FileType,
+		FileParent,
 		ContentType,
+		FileHash,
+		FileSummary,
+		CipherALG,
+		IsPublic,
 		AppName,
+		AppVersion,
 		AgentName
 	].
 

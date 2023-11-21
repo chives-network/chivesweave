@@ -23,6 +23,8 @@
 		image_thumbnail_compress_to_storage/3, 
 		pdf_office_thumbnail_png_to_storage/3, 
 		video_thumbnail_png_to_storage/3,
+		contentTypeToFileType/1,
+		file_to_thumbnail_data/4,
 		parse_bundle_data/5, read_txs_and_into_parse_bundle_list/1, parse_bundle_tx_from_list/1
 	]).
 
@@ -1578,6 +1580,55 @@ find_value(Key, List) ->
 	case lists:keyfind(Key, 1, List) of
 		{Key, Val} -> Val;
 		false -> <<"text/plain">>
+	end.
+
+contentTypeToFileType(ContentType) ->
+	case ContentType of
+		<<"image/png">> -> <<"image">>;
+		<<"image/jpeg">> -> <<"image">>;
+		<<"image/jpg">> -> <<"image">>;
+		<<"image/gif">> -> <<"image">>;
+		<<"image/png">> -> <<"image">>;
+		<<"application/pdf">> -> <<"pdf">>;
+		<<"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">> -> <<"xlsx">>;
+		<<"model/stl">> -> <<"stl">>;
+		<<"application/x-msdownload">> -> <<"exe">>;
+		<<"video/mp4">> -> <<"video">>;
+		_ -> <<"unknown">>
+	end.
+
+file_to_thumbnail_data(ContentType, TxId, FromAddress, Data) ->
+	?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____ContentType, ContentType}]),
+	FileType = contentTypeToFileType(ContentType),
+	case FileType of
+		<<"image">> ->
+			%% Is image, and will to compress this image
+			MayCompressedData = ar_storage:image_thumbnail_compress_to_storage(Data, FromAddress, TxId),
+			{<<"image/png">>, MayCompressedData};
+		<<"pdf">> ->
+			%% Is pdf, and will to compress this image
+			MayCompressedData = ar_storage:pdf_office_thumbnail_png_to_storage(Data, FromAddress, TxId),
+			{<<"image/png">>, MayCompressedData};
+		<<"docx">> ->
+			%% Is docx, and will to compress this image
+			MayCompressedData = ar_storage:pdf_office_thumbnail_png_to_storage(Data, FromAddress, TxId),
+			{<<"image/png">>, MayCompressedData};
+		<<"xlsx">> ->
+			%% Is xlsx, and will to compress this image
+			MayCompressedData = ar_storage:pdf_office_thumbnail_png_to_storage(Data, FromAddress, TxId),
+			{<<"image/png">>, MayCompressedData};
+		<<"pptx">> ->
+			%% Is pptx, and will to compress this image
+			MayCompressedData = ar_storage:pdf_office_thumbnail_png_to_storage(Data, FromAddress, TxId),
+			{<<"image/png">>, MayCompressedData};
+		<<"video">> ->
+			%% Is video, and will to compress this image
+			MayCompressedData = ar_storage:video_thumbnail_png_to_storage(Data, FromAddress, TxId),
+			{<<"image/png">>, MayCompressedData};
+		_ ->
+			%% Not a image, just return the original data
+			% ?LOG_INFO([{serve_format_2_html_data_thumbnail___________binary_starts_with_failed, false}]),
+			{ContentType, Data}
 	end.
 
 read_txs_by_addr(Addr, PageId, PageRecords) ->

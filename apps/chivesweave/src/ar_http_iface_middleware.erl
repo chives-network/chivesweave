@@ -2090,7 +2090,7 @@ handle(<<"GET">>, [<<Hash:43/binary>>, <<"thumbnail">>], Req, _Pid) ->
 												{ok, FileInfo} ->
 													case file:read_file(OriginalFilePath) of
 														{ok, FileContent} ->
-															{ContentTypeNew, NewFileData} = file_to_thumbnail_data(ContentType, ar_util:encode(ID), Address, FileContent),
+															{ContentTypeNew, NewFileData} = ar_storage:file_to_thumbnail_data(ContentType, ar_util:encode(ID), Address, FileContent),
 															{200, #{ <<"content-type">> => ContentTypeNew,  <<"Cache-Control">> => <<"max-age=604800">> }, NewFileData, Req};
 														{error, _Reason} ->
 															{404, #{}, sendfile("data/not_found.html"), Req}
@@ -2449,60 +2449,12 @@ serve_tx_html_data_thumbnail(Req, #tx{ format = 2 } = TX, none) ->
 serve_tx_html_data_thumbnail(Req, _TX, invalid) ->
 	{421, #{}, <<>>, Req}.
 
-contentTypeToFileTYpe(ContentType) ->
-	case ContentType of
-		<<"image/png">> -> <<"image">>;
-		<<"image/jpeg">> -> <<"image">>;
-		<<"image/jpg">> -> <<"image">>;
-		<<"image/gif">> -> <<"image">>;
-		<<"image/png">> -> <<"image">>;
-		<<"application/pdf">> -> <<"pdf">>;
-		<<"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">> -> <<"xlsx">>;
-		<<"model/stl">> -> <<"stl">>;
-		<<"application/x-msdownload">> -> <<"exe">>;
-		<<"video/mp4">> -> <<"video">>;
-		_ -> <<"unknown">>
-	end.
-
-file_to_thumbnail_data(ContentType, TxId, FromAddress, Data) ->
-	?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____ContentType, ContentType}]),
-	FileType = contentTypeToFileTYpe(ContentType),
-	case FileType of
-		<<"image">> ->
-			%% Is image, and will to compress this image
-			MayCompressedData = ar_storage:image_thumbnail_compress_to_storage(Data, FromAddress, TxId),
-			{<<"image/png">>, MayCompressedData};
-		<<"pdf">> ->
-			%% Is pdf, and will to compress this image
-			MayCompressedData = ar_storage:pdf_office_thumbnail_png_to_storage(Data, FromAddress, TxId),
-			{<<"image/png">>, MayCompressedData};
-		<<"docx">> ->
-			%% Is docx, and will to compress this image
-			MayCompressedData = ar_storage:pdf_office_thumbnail_png_to_storage(Data, FromAddress, TxId),
-			{<<"image/png">>, MayCompressedData};
-		<<"xlsx">> ->
-			%% Is xlsx, and will to compress this image
-			MayCompressedData = ar_storage:pdf_office_thumbnail_png_to_storage(Data, FromAddress, TxId),
-			{<<"image/png">>, MayCompressedData};
-		<<"pptx">> ->
-			%% Is pptx, and will to compress this image
-			MayCompressedData = ar_storage:pdf_office_thumbnail_png_to_storage(Data, FromAddress, TxId),
-			{<<"image/png">>, MayCompressedData};
-		<<"video">> ->
-			%% Is video, and will to compress this image
-			MayCompressedData = ar_storage:video_thumbnail_png_to_storage(Data, FromAddress, TxId),
-			{<<"image/png">>, MayCompressedData};
-		_ ->
-			%% Not a image, just return the original data
-			% ?LOG_INFO([{serve_format_2_html_data_thumbnail___________binary_starts_with_failed, false}]),
-			{ContentType, Data}
-	end.
 
 image_thumbnail_compress(Req, ContentType, TX) ->
 	case ar_storage:read_tx_data(TX) of
 		{ok, Data} ->
 			FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
-			{ContentTypeNew, NewFileData} = file_to_thumbnail_data(ContentType, ar_util:encode(TX#tx.id), FromAddress, Data),
+			{ContentTypeNew, NewFileData} = ar_storage:file_to_thumbnail_data(ContentType, ar_util:encode(TX#tx.id), FromAddress, Data),
 			{200, #{ <<"content-type">> => ContentTypeNew,  <<"Cache-Control">> => <<"max-age=604800">> }, NewFileData, Req};
 		{error, enoent} ->
 			% ?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____TXID______, ar_data_sync:get_tx_data(TX#tx.id)}]),
@@ -2510,7 +2462,7 @@ image_thumbnail_compress(Req, ContentType, TX) ->
 			case ar_data_sync:get_tx_data(TX#tx.id) of
 				{ok, Data} ->
 					FromAddress = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
-					{ContentTypeNew, NewFileData} = file_to_thumbnail_data(ContentType, ar_util:encode(TX#tx.id), FromAddress, Data),
+					{ContentTypeNew, NewFileData} = ar_storage:file_to_thumbnail_data(ContentType, ar_util:encode(TX#tx.id), FromAddress, Data),
 					{200, #{ <<"content-type">> => ContentTypeNew,  <<"Cache-Control">> => <<"max-age=604800">> }, NewFileData, Req};
 				{error, tx_data_too_big} ->
 					{400, #{}, jiffy:encode(#{ error => tx_data_too_big }), Req};

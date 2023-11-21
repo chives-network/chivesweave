@@ -1349,7 +1349,7 @@ handle(<<"GET">>, [<<"file">>, <<"pdf">>, PageId, PageSize], Req, _Pid) ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
 
-handle(<<"GET">>, [<<"file">>, <<"docx">>, PageId, PageSize], Req, _Pid) ->
+handle(<<"GET">>, [<<"file">>, <<"word">>, PageId, PageSize], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
@@ -1360,7 +1360,7 @@ handle(<<"GET">>, [<<"file">>, <<"docx">>, PageId, PageSize], Req, _Pid) ->
 	end;
 
 
-handle(<<"GET">>, [<<"file">>, <<"xlsx">>, PageId, PageSize], Req, _Pid) ->
+handle(<<"GET">>, [<<"file">>, <<"excel">>, PageId, PageSize], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
@@ -1473,7 +1473,7 @@ handle(<<"GET">>, [<<"file">>, <<"pdf">>, Addr, PageId, PageSize], Req, _Pid) ->
 			end
 	end;
 
-handle(<<"GET">>, [<<"file">>, <<"docx">>, Addr, PageId, PageSize], Req, _Pid) ->
+handle(<<"GET">>, [<<"file">>, <<"word">>, Addr, PageId, PageSize], Req, _Pid) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->
 			{400, #{}, <<"Invalid address.">>};
@@ -1488,7 +1488,7 @@ handle(<<"GET">>, [<<"file">>, <<"docx">>, Addr, PageId, PageSize], Req, _Pid) -
 			end
 	end;
 
-handle(<<"GET">>, [<<"file">>, <<"xlsx">>, Addr, PageId, PageSize], Req, _Pid) ->
+handle(<<"GET">>, [<<"file">>, <<"excel">>, Addr, PageId, PageSize], Req, _Pid) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->
 			{400, #{}, <<"Invalid address.">>};
@@ -1581,7 +1581,7 @@ handle(<<"GET">>, [<<"search">>, <<"pdf">>, PageId, PageSize, SearchValue], Req,
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
 
-handle(<<"GET">>, [<<"search">>, <<"docx">>, PageId, PageSize, SearchValue], Req, _Pid) ->
+handle(<<"GET">>, [<<"search">>, <<"word">>, PageId, PageSize, SearchValue], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
@@ -1591,7 +1591,7 @@ handle(<<"GET">>, [<<"search">>, <<"docx">>, PageId, PageSize, SearchValue], Req
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
 
-handle(<<"GET">>, [<<"search">>, <<"xlsx">>, PageId, PageSize, SearchValue], Req, _Pid) ->
+handle(<<"GET">>, [<<"search">>, <<"excel">>, PageId, PageSize, SearchValue], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
@@ -1703,7 +1703,7 @@ handle(<<"GET">>, [<<"search">>, <<"pdf">>, Addr, PageId, PageSize, SearchValue]
 			end
 	end;
 
-handle(<<"GET">>, [<<"search">>, <<"docx">>, Addr, PageId, PageSize, SearchValue], Req, _Pid) ->
+handle(<<"GET">>, [<<"search">>, <<"word">>, Addr, PageId, PageSize, SearchValue], Req, _Pid) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->
 			{400, #{}, <<"Invalid address.">>};
@@ -1718,7 +1718,7 @@ handle(<<"GET">>, [<<"search">>, <<"docx">>, Addr, PageId, PageSize, SearchValue
 			end
 	end;
 
-handle(<<"GET">>, [<<"search">>, <<"xlsx">>, Addr, PageId, PageSize, SearchValue], Req, _Pid) ->
+handle(<<"GET">>, [<<"search">>, <<"excel">>, Addr, PageId, PageSize, SearchValue], Req, _Pid) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->
 			{400, #{}, <<"Invalid address.">>};

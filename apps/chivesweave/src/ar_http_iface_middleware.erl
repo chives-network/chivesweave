@@ -2253,12 +2253,6 @@ handle_get_tx_status(EncodedTXID, Req) ->
 			end
 	end.
 
-find_value(Key, List) ->
-	case lists:keyfind(Key, 1, List) of
-		{Key, Val} -> Val;
-		false -> <<"text/plain">>
-	end.
-
 handle_get_tx_unbundle(Hash, Req, PageId, PageRecords) ->
 	case ar_util:safe_decode(Hash) of
 		{error, invalid} ->
@@ -2282,7 +2276,7 @@ handle_get_tx_unbundle(Hash, Req, PageId, PageRecords) ->
 							end,
 							TX#tx.tags),
 					?LOG_INFO([{handle_get_tx_unbundle_____________TX, TX}]),
-					UnBundleResult = case find_value(<<"Bundle-Version">>, Tags) of
+					UnBundleResult = case ar_storage:find_value_in_tags(<<"Bundle-Version">>, Tags) of
 						<<"2.0.0">> ->
 							% Is Bundle
 							?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____Tags, Tags}]),

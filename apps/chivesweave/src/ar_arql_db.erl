@@ -867,8 +867,15 @@ tx_map([
 	DataSize,
 	BundleId,
 	FileName,
+	FileType,
+	FileParent,
 	ContentType,
+	FileHash,
+	FileSummary,
+	FileEncrypt,
+	IsPublic,
 	AppName,
+	AppVersion,
 	AgentName
 ]) -> #{
 	id => Id,
@@ -885,8 +892,15 @@ tx_map([
 	data_size => DataSize,
 	bundleid => BundleId,
 	item_name => FileName,
+	item_type => FileType,
+	item_parent => FileParent,
 	content_type => ContentType,
+	item_hash => FileHash,
+	item_summary => FileSummary,
+	is_encrypt => FileEncrypt,
+	is_public => IsPublic,
 	app_name => AppName,
+	app_version => AppVersion,
 	agent_name => AgentName
 }.
 
@@ -956,17 +970,6 @@ eval_legacy_arql_where_clause({'or',E1,E2}) ->
 eval_legacy_arql_where_clause(_) ->
 	throw(bad_query).
 
-find_value(Key, List) ->
-	case lists:keyfind(Key, 1, List) of
-		{Key, Val} -> Val;
-		false -> 
-			case Key of
-				<<"File-Parent">> -> <<"Root">>;
-				<<"File-Public">> -> <<"Public">>;
-				_ -> <<"">>
-			end
-	end.
-
 full_block_to_fields(FullBlock) ->
 	BlockFields = block_to_fields(FullBlock),
 	BlockIndepHash = lists:nth(1, BlockFields),
@@ -977,17 +980,17 @@ full_block_to_fields(FullBlock) ->
 										{Name, Value}
 									end,
 									TX#tx.tags),
-			FileName = find_value(<<"File-Name">>, TagsMap),
-			ContentType = find_value(<<"Content-Type">>, TagsMap),
+			FileName = ar_storage:find_value_in_tags(<<"File-Name">>, TagsMap),
+			ContentType = ar_storage:find_value_in_tags(<<"Content-Type">>, TagsMap),
 			FileType = ar_storage:contentTypeToFileType(ContentType),
-			FileParent = find_value(<<"File-Parent">>, TagsMap),
-			FileHash = find_value(<<"File-Hash">>, TagsMap),
-			FileSummary = find_value(<<"File-Summary">>, TagsMap),
-			CipherALG = find_value(<<"Cipher-ALG">>, TagsMap),
-			IsPublic = find_value(<<"File-Public">>, TagsMap),
-			AppName = find_value(<<"App-Name">>, TagsMap),
-			AppVersion = find_value(<<"App-Version">>, TagsMap),
-			AgentName = find_value(<<"Agent-Name">>, TagsMap),
+			FileParent = ar_storage:find_value_in_tags(<<"File-Parent">>, TagsMap),
+			FileHash = ar_storage:find_value_in_tags(<<"File-Hash">>, TagsMap),
+			FileSummary = ar_storage:find_value_in_tags(<<"File-Summary">>, TagsMap),
+			CipherALG = ar_storage:find_value_in_tags(<<"Cipher-ALG">>, TagsMap),
+			IsPublic = ar_storage:find_value_in_tags(<<"File-Public">>, TagsMap),
+			AppName = ar_storage:find_value_in_tags(<<"App-Name">>, TagsMap),
+			AppVersion = ar_storage:find_value_in_tags(<<"App-Version">>, TagsMap),
+			AgentName = ar_storage:find_value_in_tags(<<"Agent-Name">>, TagsMap),
 			Bundleid = <<"">>,
 			[
 				ar_util:encode(TX#tx.id),
@@ -1044,17 +1047,17 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 										{Name, Value}
 									end,
 									TX#tx.tags),
-	FileName = find_value(<<"File-Name">>, TagsMap),
-	ContentType = find_value(<<"Content-Type">>, TagsMap),
+	FileName = ar_storage:find_value_in_tags(<<"File-Name">>, TagsMap),
+	ContentType = ar_storage:find_value_in_tags(<<"Content-Type">>, TagsMap),
 	FileType = ar_storage:contentTypeToFileType(ContentType),
-	FileParent = find_value(<<"File-Parent">>, TagsMap),
-	FileHash = find_value(<<"File-Hash">>, TagsMap),
-	FileSummary = find_value(<<"File-Summary">>, TagsMap),
-	CipherALG = find_value(<<"Cipher-ALG">>, TagsMap),
-	IsPublic = find_value(<<"File-Public">>, TagsMap),
-	AppName = find_value(<<"App-Name">>, TagsMap),
-	AppVersion = find_value(<<"App-Version">>, TagsMap),
-	AgentName = find_value(<<"Agent-Name">>, TagsMap),
+	FileParent = ar_storage:find_value_in_tags(<<"File-Parent">>, TagsMap),
+	FileHash = ar_storage:find_value_in_tags(<<"File-Hash">>, TagsMap),
+	FileSummary = ar_storage:find_value_in_tags(<<"File-Summary">>, TagsMap),
+	CipherALG = ar_storage:find_value_in_tags(<<"Cipher-ALG">>, TagsMap),
+	IsPublic = ar_storage:find_value_in_tags(<<"File-Public">>, TagsMap),
+	AppName = ar_storage:find_value_in_tags(<<"App-Name">>, TagsMap),
+	AppVersion = ar_storage:find_value_in_tags(<<"App-Version">>, TagsMap),
+	AgentName = ar_storage:find_value_in_tags(<<"Agent-Name">>, TagsMap),
 	Bundleid = <<"">>,
 	[
 		ar_util:encode(TX#tx.id),

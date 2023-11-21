@@ -25,6 +25,7 @@
 		video_thumbnail_png_to_storage/3,
 		contentTypeToFileType/1,
 		file_to_thumbnail_data/4,
+		find_value_in_tags/2,
 		parse_bundle_data/5, read_txs_and_into_parse_bundle_list/1, parse_bundle_tx_from_list/1
 	]).
 
@@ -1268,7 +1269,7 @@ write_block(B) ->
 					{Name, Value}
 				end,
 				TX#tx.tags),
-			case find_value(<<"Bundle-Version">>, Tags) of
+			case find_value_in_tags(<<"Bundle-Version">>, Tags) of
 				<<"2.0.0">> ->
 					% Is Bundle
 					?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____Tags, Tags}]),
@@ -1576,10 +1577,16 @@ read_statistics_transaction() ->
 			{200, #{}, ar_serialize:jsonify(binary_to_term(StatisticsTransactionResult))}							
 	end.
 
-find_value(Key, List) ->
+find_value_in_tags(Key, List) ->
 	case lists:keyfind(Key, 1, List) of
 		{Key, Val} -> Val;
-		false -> <<"text/plain">>
+		false -> 
+			case Key of
+				<<"File-Parent">> -> <<"Root">>;
+				<<"File-Public">> -> <<"Public">>;
+				<<"Content-Type">> -> <<"text/plain">>;
+				_ -> <<"">>
+			end
 	end.
 
 contentTypeToFileType(ContentType) ->
@@ -1710,7 +1717,7 @@ parse_bundle_tx_from_list(AllArray) ->
 								end,
 								TX#tx.tags),
 							?LOG_INFO([{handle_get_tx_unbundle_____________TX, ar_util:encode(TX#tx.id)}]),
-							ParseResultItem = case find_value(<<"Bundle-Version">>, Tags) of
+							ParseResultItem = case find_value_in_tags(<<"Bundle-Version">>, Tags) of
 								<<"2.0.0">> ->
 									% Is Bundle
 									% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle___________________Tags, Tags}]),
@@ -1792,7 +1799,7 @@ read_txrecord_by_txid(TxId) ->
 										{Name, Value}
 									end,
 									TX#tx.tags),
-							DataType = find_value(<<"Content-Type">>, TagsMap),
+							DataType = find_value_in_tags(<<"Content-Type">>, TagsMap),
 							TxListMap = #{
 								<<"id">> => ar_util:encode(TX#tx.id),
 								<<"owner">> => #{<<"address">> => FromAddress},
@@ -1820,7 +1827,7 @@ read_txrecord_by_txid(TxId) ->
 								{Name, Value}
 							end,
 							TX#tx.tags),
-					DataType = find_value(<<"Content-Type">>, TagsMap),
+					DataType = find_value_in_tags(<<"Content-Type">>, TagsMap),
 					case ar_kv:get(xwe_storage_txid_block_db, ar_util:encode(TX#tx.id)) of
 						{ok, BlockInfoByTxIdBinary} ->
 							BlockInfoByTxId = binary_to_term(BlockInfoByTxIdBinary),
@@ -1867,7 +1874,7 @@ read_txsrecord_function(TxIdList) ->
 										{Name, Value}
 									end,
 									TX#tx.tags),
-							DataType = find_value(<<"Content-Type">>, TagsMap),
+							DataType = find_value_in_tags(<<"Content-Type">>, TagsMap),
 							case ar_kv:get(xwe_storage_txid_block_db, ar_util:encode(TX#tx.id)) of
 								{ok, BlockInfoByTxIdBinary} ->
 									BlockInfoByTxId = binary_to_term(BlockInfoByTxIdBinary),
@@ -2066,7 +2073,7 @@ read_datarecord_function(TxIdList) ->
 												{Name, Value}
 											end,
 											TX#tx.tags),
-									DataType = find_value(<<"Content-Type">>, TagsMap),
+									DataType = find_value_in_tags(<<"Content-Type">>, TagsMap),
 									case ar_kv:get(xwe_storage_txid_block_db, ar_util:encode(TX#tx.id)) of
 										{ok, BlockInfoByTxIdBinary} ->
 											BlockInfoByTxId = binary_to_term(BlockInfoByTxIdBinary),
@@ -2133,7 +2140,7 @@ get_mempool_tx_data_records(Addr) ->
 								{Name, Value}
 							end,
 							TX#tx.tags),
-					DataType = find_value(<<"Content-Type">>, TagsMap),
+					DataType = find_value_in_tags(<<"Content-Type">>, TagsMap),
 					TxListMap = #{
 						<<"id">> => ar_util:encode(TX#tx.id),
 						<<"owner">> => #{<<"address">> => FromAddress},
@@ -2185,7 +2192,7 @@ get_mempool_tx_send_records(Addr) ->
 								{Name, Value}
 							end,
 							TX#tx.tags),
-					DataType = find_value(<<"Content-Type">>, TagsMap),
+					DataType = find_value_in_tags(<<"Content-Type">>, TagsMap),
 					TxListMap = #{
 						<<"id">> => ar_util:encode(TX#tx.id),
 						<<"owner">> => #{<<"address">> => FromAddress},
@@ -2238,7 +2245,7 @@ get_mempool_tx_deposits_records(Addr) ->
 								{Name, Value}
 							end,
 							TX#tx.tags),
-					DataType = find_value(<<"Content-Type">>, TagsMap),
+					DataType = find_value_in_tags(<<"Content-Type">>, TagsMap),
 					TxListMap = #{
 						<<"id">> => ar_util:encode(TX#tx.id),
 						<<"owner">> => #{<<"address">> => FromAddress},
@@ -2296,7 +2303,7 @@ get_mempool_tx_txs_records(Addr) ->
 								{Name, Value}
 							end,
 							TX#tx.tags),
-					DataType = find_value(<<"Content-Type">>, TagsMap),
+					DataType = find_value_in_tags(<<"Content-Type">>, TagsMap),
 					TxListMap = #{
 						<<"id">> => ar_util:encode(TX#tx.id),
 						<<"owner">> => #{<<"address">> => FromAddress},
@@ -2332,7 +2339,7 @@ get_mempool_tx_txs_records() ->
 								{Name, Value}
 							end,
 							TX#tx.tags),
-					DataType = find_value(<<"Content-Type">>, TagsMap),
+					DataType = find_value_in_tags(<<"Content-Type">>, TagsMap),
 					TxListMap = #{
 						<<"id">> => ar_util:encode(TX#tx.id),
 						<<"owner">> => #{<<"address">> => FromAddress},
@@ -2582,7 +2589,7 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 							% ?LOG_INFO([{handle_get_tx_unbundle________avro_record____Tags, Tags}]),
 							
 							FromAddress = ar_util:encode(ar_wallet:to_address(OwnerBinary, {rsa, 65537})),
-							DataType = find_value(<<"Content-Type">>, TagsMap),
+							DataType = find_value_in_tags(<<"Content-Type">>, TagsMap),
 							TxStructureItem = #{
 									<<"id">> => DataItemId,
 									<<"owner">> => #{<<"address">> => FromAddress},
@@ -2606,10 +2613,10 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 											BlockHeight = maps:get(<<"height">>, BlockStructure),
 											BlockHash = maps:get(<<"indep_hash">>, BlockStructure),
 											BlockTimestamp = maps:get(<<"timestamp">>, BlockStructure),
-											FileName = find_value(<<"File-Name">>, TagsMap),
-											ContentType = find_value(<<"Content-Type">>, TagsMap),
-											AppName = find_value(<<"App-Name">>, TagsMap),
-											AgentName = find_value(<<"Agent-Name">>, TagsMap),
+											FileName = find_value_in_tags(<<"File-Name">>, TagsMap),
+											ContentType = find_value_in_tags(<<"Content-Type">>, TagsMap),
+											AppName = find_value_in_tags(<<"App-Name">>, TagsMap),
+											AgentName = find_value_in_tags(<<"Agent-Name">>, TagsMap),
 											TXFields = [
 												DataItemId,
 												BlockHash,

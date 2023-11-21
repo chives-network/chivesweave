@@ -78,8 +78,9 @@ CREATE TABLE tx (
 	content_type TEXT,
 	item_hash TEXT,
 	item_summary TEXT,
-	is_encrypt INTEGER,
+	is_encrypt TEXT,
 	is_public TEXT,
+	entity_type TEXT,
 	app_name TEXT,
 	app_version TEXT,
 	agent_name TEXT
@@ -109,6 +110,7 @@ CREATE INDEX idx_tx_content_type ON tx (content_type);
 CREATE INDEX idx_tx_item_hash ON tx (item_hash);
 CREATE INDEX idx_tx_is_encrypt ON tx (is_encrypt);
 CREATE INDEX idx_tx_is_public ON tx (is_public);
+CREATE INDEX idx_tx_entity_type ON tx (entity_type);
 CREATE INDEX idx_tx_app_name ON tx (app_name);
 CREATE INDEX idx_tx_app_version ON tx (app_version);
 CREATE INDEX idx_tx_agent_name ON tx (agent_name);
@@ -144,7 +146,7 @@ DROP INDEX idx_address_timestamp;
 ").
 
 -define(INSERT_BLOCK_SQL, "INSERT OR REPLACE INTO block VALUES (?, ?, ?, ?)").
--define(INSERT_TX_SQL, "INSERT OR REPLACE INTO tx VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").
+-define(INSERT_TX_SQL, "INSERT OR REPLACE INTO tx VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").
 -define(INSERT_TAG_SQL, "INSERT OR REPLACE INTO tag VALUES (?, ?, ?)").
 -define(SELECT_TX_BY_ID_SQL, "SELECT * FROM tx WHERE id = ?").
 
@@ -161,19 +163,19 @@ DROP INDEX idx_address_timestamp;
 -define(SELECT_ADDRESS_TOTAL, "SELECT COUNT(*) AS NUM FROM address").
 
 -define(SELECT_TRANSACTION_RANGE_SQL, "SELECT * FROM tx order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_RANGE_FILTER_SQL, "SELECT * FROM tx where content_type = ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_RANGE_FILTER_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' order by timestamp desc LIMIT ? OFFSET ?").
 
 -define(SELECT_TRANSACTION_TOTAL, "SELECT COUNT(*) AS NUM FROM tx").
 -define(SELECT_TRANSACTION_TOTAL_FILTER, "SELECT COUNT(*) AS NUM FROM tx where content_type = ?").
 
--define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_SQL, "SELECT * FROM tx where content_type = ? and from_address = ? order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where content_type = ? and from_address = ?").
+-define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and from_address = ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and from_address = ?").
 
--define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_FILENAME_SQL, "SELECT * FROM tx where content_type = ? and from_address = ? and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where content_type = ? and from_address = ? and item_name like ?").
+-define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_FILENAME_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and from_address = ? and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and from_address = ? and item_name like ?").
 
--define(SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, "SELECT * FROM tx where content_type = ? and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where content_type = ? and item_name like ?").
+-define(SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and item_name like ?").
 
 %%%===================================================================
 %%% Public API.
@@ -874,6 +876,7 @@ tx_map([
 	FileSummary,
 	FileEncrypt,
 	IsPublic,
+	EntityType,
 	AppName,
 	AppVersion,
 	AgentName
@@ -899,6 +902,7 @@ tx_map([
 	item_summary => FileSummary,
 	is_encrypt => FileEncrypt,
 	is_public => IsPublic,
+	entity_type => EntityType,
 	app_name => AppName,
 	app_version => AppVersion,
 	agent_name => AgentName
@@ -988,6 +992,7 @@ full_block_to_fields(FullBlock) ->
 			FileSummary = ar_storage:find_value_in_tags(<<"File-Summary">>, TagsMap),
 			CipherALG = ar_storage:find_value_in_tags(<<"Cipher-ALG">>, TagsMap),
 			IsPublic = ar_storage:find_value_in_tags(<<"File-Public">>, TagsMap),
+			EntityType = ar_storage:find_value_in_tags(<<"Entity-Type">>, TagsMap),
 			AppName = ar_storage:find_value_in_tags(<<"App-Name">>, TagsMap),
 			AppVersion = ar_storage:find_value_in_tags(<<"App-Version">>, TagsMap),
 			AgentName = ar_storage:find_value_in_tags(<<"Agent-Name">>, TagsMap),
@@ -1014,6 +1019,7 @@ full_block_to_fields(FullBlock) ->
 				FileSummary,
 				CipherALG,
 				IsPublic,
+				EntityType,
 				AppName,
 				AppVersion,
 				AgentName
@@ -1055,6 +1061,7 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 	FileSummary = ar_storage:find_value_in_tags(<<"File-Summary">>, TagsMap),
 	CipherALG = ar_storage:find_value_in_tags(<<"Cipher-ALG">>, TagsMap),
 	IsPublic = ar_storage:find_value_in_tags(<<"File-Public">>, TagsMap),
+	EntityType = ar_storage:find_value_in_tags(<<"Entity-Type">>, TagsMap),
 	AppName = ar_storage:find_value_in_tags(<<"App-Name">>, TagsMap),
 	AppVersion = ar_storage:find_value_in_tags(<<"App-Version">>, TagsMap),
 	AgentName = ar_storage:find_value_in_tags(<<"Agent-Name">>, TagsMap),
@@ -1081,6 +1088,7 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 		FileSummary,
 		CipherALG,
 		IsPublic,
+		EntityType,
 		AppName,
 		AppVersion,
 		AgentName

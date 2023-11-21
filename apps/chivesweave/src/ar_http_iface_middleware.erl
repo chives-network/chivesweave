@@ -1289,41 +1289,21 @@ handle(<<"GET">>, [<<"transaction">>, PageId, PageSize], Req, _Pid) ->
 	end;
 
 %% Get Files For All
-handle(<<"GET">>, [<<"file">>, <<"mp4">>, PageId, PageSize], Req, _Pid) ->
+handle(<<"GET">>, [<<"file">>, <<"video">>, PageId, PageSize], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
-			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"video/mp4">>, PageId, PageSize),
+			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"video">>, PageId, PageSize),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
 
-handle(<<"GET">>, [<<"file">>, <<"png">>, PageId, PageSize], Req, _Pid) ->
+handle(<<"GET">>, [<<"file">>, <<"image">>, PageId, PageSize], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
-			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"image/png">>, PageId, PageSize),
-			{Status, Headers, Body, Req};
-		false ->
-			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
-	end;
-
-handle(<<"GET">>, [<<"file">>, <<"jpeg">>, PageId, PageSize], Req, _Pid) ->
-	{ok, Config} = application:get_env(chivesweave, config),
-	case lists:member(serve_arql, Config#config.enable) of
-		true ->
-			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"image/jpeg">>, PageId, PageSize),
-			{Status, Headers, Body, Req};
-		false ->
-			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
-	end;
-
-handle(<<"GET">>, [<<"file">>, <<"gif">>, PageId, PageSize], Req, _Pid) ->
-	{ok, Config} = application:get_env(chivesweave, config),
-	case lists:member(serve_arql, Config#config.enable) of
-		true ->
-			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"image/gif">>, PageId, PageSize),
+			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"image">>, PageId, PageSize),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1333,7 +1313,7 @@ handle(<<"GET">>, [<<"file">>, <<"text">>, PageId, PageSize], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
-			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"text/plain">>, PageId, PageSize),
+			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"text">>, PageId, PageSize),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1343,7 +1323,7 @@ handle(<<"GET">>, [<<"file">>, <<"stl">>, PageId, PageSize], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
-			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"model/stl">>, PageId, PageSize),
+			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"stl">>, PageId, PageSize),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1353,7 +1333,7 @@ handle(<<"GET">>, [<<"file">>, <<"exe">>, PageId, PageSize], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
-			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"application/x-msdownload">>, PageId, PageSize),
+			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"exe">>, PageId, PageSize),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1363,17 +1343,39 @@ handle(<<"GET">>, [<<"file">>, <<"pdf">>, PageId, PageSize], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
-			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"application/pdf">>, PageId, PageSize),
+			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"pdf">>, PageId, PageSize),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
 
-handle(<<"GET">>, [<<"file">>, <<"office">>, PageId, PageSize], Req, _Pid) ->
+handle(<<"GET">>, [<<"file">>, <<"docx">>, PageId, PageSize], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
-			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">>, PageId, PageSize),
+			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"docx">>, PageId, PageSize),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+
+handle(<<"GET">>, [<<"file">>, <<"xlsx">>, PageId, PageSize], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_arql, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"xlsx">>, PageId, PageSize),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+
+handle(<<"GET">>, [<<"file">>, <<"pptx">>, PageId, PageSize], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_arql, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"pptx">>, PageId, PageSize),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1381,7 +1383,7 @@ handle(<<"GET">>, [<<"file">>, <<"office">>, PageId, PageSize], Req, _Pid) ->
 
 %% ===========================================================================================================================
 %% Get Files For Wallet Address
-handle(<<"GET">>, [<<"file">>, <<"mp4">>, Addr, PageId, PageSize], Req, _Pid) ->
+handle(<<"GET">>, [<<"file">>, <<"video">>, Addr, PageId, PageSize], Req, _Pid) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->
 			{400, #{}, <<"Invalid address.">>};
@@ -1389,14 +1391,14 @@ handle(<<"GET">>, [<<"file">>, <<"mp4">>, Addr, PageId, PageSize], Req, _Pid) ->
 			{ok, Config} = application:get_env(chivesweave, config),
 			case lists:member(serve_arql, Config#config.enable) of
 				true ->
-					{Status, Headers, Body} = handle_get_transaction_records_filter_address(<<"video/mp4">>, Addr, PageId, PageSize),
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address(<<"video">>, Addr, PageId, PageSize),
 					{Status, Headers, Body, Req};
 				false ->
 					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 			end
 	end;
 
-handle(<<"GET">>, [<<"file">>, <<"png">>, Addr, PageId, PageSize], Req, _Pid) ->
+handle(<<"GET">>, [<<"file">>, <<"image">>, Addr, PageId, PageSize], Req, _Pid) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->
 			{400, #{}, <<"Invalid address.">>};
@@ -1404,37 +1406,7 @@ handle(<<"GET">>, [<<"file">>, <<"png">>, Addr, PageId, PageSize], Req, _Pid) ->
 			{ok, Config} = application:get_env(chivesweave, config),
 			case lists:member(serve_arql, Config#config.enable) of
 				true ->
-					{Status, Headers, Body} = handle_get_transaction_records_filter_address(<<"image/png">>, Addr, PageId, PageSize),
-					{Status, Headers, Body, Req};
-				false ->
-					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
-			end
-	end;
-
-handle(<<"GET">>, [<<"file">>, <<"jpeg">>, Addr, PageId, PageSize], Req, _Pid) ->
-	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
-		{error, invalid} ->
-			{400, #{}, <<"Invalid address.">>};
-		{ok, _} ->
-			{ok, Config} = application:get_env(chivesweave, config),
-			case lists:member(serve_arql, Config#config.enable) of
-				true ->
-					{Status, Headers, Body} = handle_get_transaction_records_filter_address(<<"image/jpeg">>, Addr, PageId, PageSize),
-					{Status, Headers, Body, Req};
-				false ->
-					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
-			end
-	end;
-
-handle(<<"GET">>, [<<"file">>, <<"gif">>, Addr, PageId, PageSize], Req, _Pid) ->
-	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
-		{error, invalid} ->
-			{400, #{}, <<"Invalid address.">>};
-		{ok, _} ->
-			{ok, Config} = application:get_env(chivesweave, config),
-			case lists:member(serve_arql, Config#config.enable) of
-				true ->
-					{Status, Headers, Body} = handle_get_transaction_records_filter_address(<<"image/gif">>, Addr, PageId, PageSize),
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address(<<"image">>, Addr, PageId, PageSize),
 					{Status, Headers, Body, Req};
 				false ->
 					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1449,7 +1421,7 @@ handle(<<"GET">>, [<<"file">>, <<"text">>, Addr, PageId, PageSize], Req, _Pid) -
 			{ok, Config} = application:get_env(chivesweave, config),
 			case lists:member(serve_arql, Config#config.enable) of
 				true ->
-					{Status, Headers, Body} = handle_get_transaction_records_filter_address(<<"text/plain">>, Addr, PageId, PageSize),
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address(<<"text">>, Addr, PageId, PageSize),
 					{Status, Headers, Body, Req};
 				false ->
 					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1464,7 +1436,7 @@ handle(<<"GET">>, [<<"file">>, <<"stl">>, Addr, PageId, PageSize], Req, _Pid) ->
 			{ok, Config} = application:get_env(chivesweave, config),
 			case lists:member(serve_arql, Config#config.enable) of
 				true ->
-					{Status, Headers, Body} = handle_get_transaction_records_filter_address(<<"model/stl">>, Addr, PageId, PageSize),
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address(<<"stl">>, Addr, PageId, PageSize),
 					{Status, Headers, Body, Req};
 				false ->
 					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1479,7 +1451,7 @@ handle(<<"GET">>, [<<"file">>, <<"exe">>, Addr, PageId, PageSize], Req, _Pid) ->
 			{ok, Config} = application:get_env(chivesweave, config),
 			case lists:member(serve_arql, Config#config.enable) of
 				true ->
-					{Status, Headers, Body} = handle_get_transaction_records_filter_address(<<"application/x-msdownload">>, Addr, PageId, PageSize),
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address(<<"exe">>, Addr, PageId, PageSize),
 					{Status, Headers, Body, Req};
 				false ->
 					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1494,14 +1466,14 @@ handle(<<"GET">>, [<<"file">>, <<"pdf">>, Addr, PageId, PageSize], Req, _Pid) ->
 			{ok, Config} = application:get_env(chivesweave, config),
 			case lists:member(serve_arql, Config#config.enable) of
 				true ->
-					{Status, Headers, Body} = handle_get_transaction_records_filter_address(<<"application/pdf">>, Addr, PageId, PageSize),
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address(<<"pdf">>, Addr, PageId, PageSize),
 					{Status, Headers, Body, Req};
 				false ->
 					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 			end
 	end;
 
-handle(<<"GET">>, [<<"file">>, <<"office">>, Addr, PageId, PageSize], Req, _Pid) ->
+handle(<<"GET">>, [<<"file">>, <<"docx">>, Addr, PageId, PageSize], Req, _Pid) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->
 			{400, #{}, <<"Invalid address.">>};
@@ -1509,7 +1481,37 @@ handle(<<"GET">>, [<<"file">>, <<"office">>, Addr, PageId, PageSize], Req, _Pid)
 			{ok, Config} = application:get_env(chivesweave, config),
 			case lists:member(serve_arql, Config#config.enable) of
 				true ->
-					{Status, Headers, Body} = handle_get_transaction_records_filter_address(<<"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">>, Addr, PageId, PageSize),
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address(<<"docx">>, Addr, PageId, PageSize),
+					{Status, Headers, Body, Req};
+				false ->
+					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+			end
+	end;
+
+handle(<<"GET">>, [<<"file">>, <<"xlsx">>, Addr, PageId, PageSize], Req, _Pid) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			{ok, Config} = application:get_env(chivesweave, config),
+			case lists:member(serve_arql, Config#config.enable) of
+				true ->
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address(<<"xlsx">>, Addr, PageId, PageSize),
+					{Status, Headers, Body, Req};
+				false ->
+					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+			end
+	end;
+
+handle(<<"GET">>, [<<"file">>, <<"pptx">>, Addr, PageId, PageSize], Req, _Pid) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			{ok, Config} = application:get_env(chivesweave, config),
+			case lists:member(serve_arql, Config#config.enable) of
+				true ->
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address(<<"pptx">>, Addr, PageId, PageSize),
 					{Status, Headers, Body, Req};
 				false ->
 					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1519,42 +1521,21 @@ handle(<<"GET">>, [<<"file">>, <<"office">>, Addr, PageId, PageSize], Req, _Pid)
 
 %% ===========================================================================================================================
 %% Get Files For Wallet Address Search
-handle(<<"GET">>, [<<"search">>, <<"mp4">>, PageId, PageSize, SearchValue], Req, _Pid) ->
+handle(<<"GET">>, [<<"search">>, <<"video">>, PageId, PageSize, SearchValue], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
-			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"video/mp4">>, PageId, PageSize, SearchValue),
+			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"video">>, PageId, PageSize, SearchValue),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
 
-handle(<<"GET">>, [<<"search">>, <<"png">>, PageId, PageSize, SearchValue], Req, _Pid) ->
+handle(<<"GET">>, [<<"search">>, <<"image">>, PageId, PageSize, SearchValue], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
-			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"image/png">>, PageId, PageSize, SearchValue),
-			{Status, Headers, Body, Req};
-		false ->
-			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
-	end;
-
-
-handle(<<"GET">>, [<<"search">>, <<"jpeg">>, PageId, PageSize, SearchValue], Req, _Pid) ->
-	{ok, Config} = application:get_env(chivesweave, config),
-	case lists:member(serve_arql, Config#config.enable) of
-		true ->
-			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"image/jpeg">>, PageId, PageSize, SearchValue),
-			{Status, Headers, Body, Req};
-		false ->
-			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
-	end;
-
-handle(<<"GET">>, [<<"search">>, <<"gif">>, PageId, PageSize, SearchValue], Req, _Pid) ->
-	{ok, Config} = application:get_env(chivesweave, config),
-	case lists:member(serve_arql, Config#config.enable) of
-		true ->
-			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"image/gif">>, PageId, PageSize, SearchValue),
+			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"image">>, PageId, PageSize, SearchValue),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1564,7 +1545,7 @@ handle(<<"GET">>, [<<"search">>, <<"text">>, PageId, PageSize, SearchValue], Req
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
-			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"text/plain">>, PageId, PageSize, SearchValue),
+			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"text">>, PageId, PageSize, SearchValue),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1574,7 +1555,7 @@ handle(<<"GET">>, [<<"search">>, <<"stl">>, PageId, PageSize, SearchValue], Req,
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
-			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"model/stl">>, PageId, PageSize, SearchValue),
+			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"stl">>, PageId, PageSize, SearchValue),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1584,7 +1565,7 @@ handle(<<"GET">>, [<<"search">>, <<"exe">>, PageId, PageSize, SearchValue], Req,
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
-			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"application/x-msdownload">>, PageId, PageSize, SearchValue),
+			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"exe">>, PageId, PageSize, SearchValue),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1594,26 +1575,45 @@ handle(<<"GET">>, [<<"search">>, <<"pdf">>, PageId, PageSize, SearchValue], Req,
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
-			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"application/pdf">>, PageId, PageSize, SearchValue),
+			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"pdf">>, PageId, PageSize, SearchValue),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
 
-handle(<<"GET">>, [<<"search">>, <<"office">>, PageId, PageSize, SearchValue], Req, _Pid) ->
+handle(<<"GET">>, [<<"search">>, <<"docx">>, PageId, PageSize, SearchValue], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
-			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">>, PageId, PageSize, SearchValue),
+			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"docx">>, PageId, PageSize, SearchValue),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
 
+handle(<<"GET">>, [<<"search">>, <<"xlsx">>, PageId, PageSize, SearchValue], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_arql, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"xlsx">>, PageId, PageSize, SearchValue),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+handle(<<"GET">>, [<<"search">>, <<"pptx">>, PageId, PageSize, SearchValue], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_arql, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"pptx">>, PageId, PageSize, SearchValue),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
 
 %% ===========================================================================================================================
 %% Get Files For Wallet Address Search
-handle(<<"GET">>, [<<"search">>, <<"mp4">>, Addr, PageId, PageSize, SearchValue], Req, _Pid) ->
+handle(<<"GET">>, [<<"search">>, <<"video">>, Addr, PageId, PageSize, SearchValue], Req, _Pid) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->
 			{400, #{}, <<"Invalid address.">>};
@@ -1621,14 +1621,14 @@ handle(<<"GET">>, [<<"search">>, <<"mp4">>, Addr, PageId, PageSize, SearchValue]
 			{ok, Config} = application:get_env(chivesweave, config),
 			case lists:member(serve_arql, Config#config.enable) of
 				true ->
-					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"video/mp4">>, Addr, PageId, PageSize, SearchValue),
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"video">>, Addr, PageId, PageSize, SearchValue),
 					{Status, Headers, Body, Req};
 				false ->
 					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 			end
 	end;
 
-handle(<<"GET">>, [<<"search">>, <<"png">>, Addr, PageId, PageSize, SearchValue], Req, _Pid) ->
+handle(<<"GET">>, [<<"search">>, <<"image">>, Addr, PageId, PageSize, SearchValue], Req, _Pid) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->
 			{400, #{}, <<"Invalid address.">>};
@@ -1636,37 +1636,7 @@ handle(<<"GET">>, [<<"search">>, <<"png">>, Addr, PageId, PageSize, SearchValue]
 			{ok, Config} = application:get_env(chivesweave, config),
 			case lists:member(serve_arql, Config#config.enable) of
 				true ->
-					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"image/png">>, Addr, PageId, PageSize, SearchValue),
-					{Status, Headers, Body, Req};
-				false ->
-					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
-			end
-	end;
-
-handle(<<"GET">>, [<<"search">>, <<"jpeg">>, Addr, PageId, PageSize, SearchValue], Req, _Pid) ->
-	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
-		{error, invalid} ->
-			{400, #{}, <<"Invalid address.">>};
-		{ok, _} ->
-			{ok, Config} = application:get_env(chivesweave, config),
-			case lists:member(serve_arql, Config#config.enable) of
-				true ->
-					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"image/jpeg">>, Addr, PageId, PageSize, SearchValue),
-					{Status, Headers, Body, Req};
-				false ->
-					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
-			end
-	end;
-
-handle(<<"GET">>, [<<"search">>, <<"gif">>, Addr, PageId, PageSize, SearchValue], Req, _Pid) ->
-	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
-		{error, invalid} ->
-			{400, #{}, <<"Invalid address.">>};
-		{ok, _} ->
-			{ok, Config} = application:get_env(chivesweave, config),
-			case lists:member(serve_arql, Config#config.enable) of
-				true ->
-					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"image/gif">>, Addr, PageId, PageSize, SearchValue),
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"image">>, Addr, PageId, PageSize, SearchValue),
 					{Status, Headers, Body, Req};
 				false ->
 					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1681,7 +1651,7 @@ handle(<<"GET">>, [<<"search">>, <<"text">>, Addr, PageId, PageSize, SearchValue
 			{ok, Config} = application:get_env(chivesweave, config),
 			case lists:member(serve_arql, Config#config.enable) of
 				true ->
-					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"text/plain">>, Addr, PageId, PageSize, SearchValue),
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"text">>, Addr, PageId, PageSize, SearchValue),
 					{Status, Headers, Body, Req};
 				false ->
 					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1696,7 +1666,7 @@ handle(<<"GET">>, [<<"search">>, <<"stl">>, Addr, PageId, PageSize, SearchValue]
 			{ok, Config} = application:get_env(chivesweave, config),
 			case lists:member(serve_arql, Config#config.enable) of
 				true ->
-					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"model/stl">>, Addr, PageId, PageSize, SearchValue),
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"stl">>, Addr, PageId, PageSize, SearchValue),
 					{Status, Headers, Body, Req};
 				false ->
 					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1711,7 +1681,7 @@ handle(<<"GET">>, [<<"search">>, <<"exe">>, Addr, PageId, PageSize, SearchValue]
 			{ok, Config} = application:get_env(chivesweave, config),
 			case lists:member(serve_arql, Config#config.enable) of
 				true ->
-					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"application/x-msdownload">>, Addr, PageId, PageSize, SearchValue),
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"exe">>, Addr, PageId, PageSize, SearchValue),
 					{Status, Headers, Body, Req};
 				false ->
 					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -1726,14 +1696,14 @@ handle(<<"GET">>, [<<"search">>, <<"pdf">>, Addr, PageId, PageSize, SearchValue]
 			{ok, Config} = application:get_env(chivesweave, config),
 			case lists:member(serve_arql, Config#config.enable) of
 				true ->
-					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"application/pdf">>, Addr, PageId, PageSize, SearchValue),
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"pdf">>, Addr, PageId, PageSize, SearchValue),
 					{Status, Headers, Body, Req};
 				false ->
 					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 			end
 	end;
 
-handle(<<"GET">>, [<<"search">>, <<"office">>, Addr, PageId, PageSize, SearchValue], Req, _Pid) ->
+handle(<<"GET">>, [<<"search">>, <<"docx">>, Addr, PageId, PageSize, SearchValue], Req, _Pid) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->
 			{400, #{}, <<"Invalid address.">>};
@@ -1741,7 +1711,37 @@ handle(<<"GET">>, [<<"search">>, <<"office">>, Addr, PageId, PageSize, SearchVal
 			{ok, Config} = application:get_env(chivesweave, config),
 			case lists:member(serve_arql, Config#config.enable) of
 				true ->
-					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">>, Addr, PageId, PageSize, SearchValue),
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"docx">>, Addr, PageId, PageSize, SearchValue),
+					{Status, Headers, Body, Req};
+				false ->
+					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+			end
+	end;
+
+handle(<<"GET">>, [<<"search">>, <<"xlsx">>, Addr, PageId, PageSize, SearchValue], Req, _Pid) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			{ok, Config} = application:get_env(chivesweave, config),
+			case lists:member(serve_arql, Config#config.enable) of
+				true ->
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"xlsx">>, Addr, PageId, PageSize, SearchValue),
+					{Status, Headers, Body, Req};
+				false ->
+					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+			end
+	end;
+
+handle(<<"GET">>, [<<"search">>, <<"pptx">>, Addr, PageId, PageSize, SearchValue], Req, _Pid) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			{ok, Config} = application:get_env(chivesweave, config),
+			case lists:member(serve_arql, Config#config.enable) of
+				true ->
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"pptx">>, Addr, PageId, PageSize, SearchValue),
 					{Status, Headers, Body, Req};
 				false ->
 					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}

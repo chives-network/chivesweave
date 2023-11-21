@@ -1595,11 +1595,11 @@ contentTypeToFileType(ContentType) ->
 		<<"image/jpeg">> -> <<"image">>;
 		<<"image/jpg">> -> <<"image">>;
 		<<"image/gif">> -> <<"image">>;
-		<<"image/png">> -> <<"image">>;
+		<<"text/plain">> -> <<"text">>;
+		<<"application/x-msdownload">> -> <<"exe">>;
 		<<"application/pdf">> -> <<"pdf">>;
 		<<"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">> -> <<"xlsx">>;
 		<<"model/stl">> -> <<"stl">>;
-		<<"application/x-msdownload">> -> <<"exe">>;
 		<<"video/mp4">> -> <<"video">>;
 		_ -> <<"unknown">>
 	end.
@@ -2621,6 +2621,7 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 											FileSummary = ar_storage:find_value_in_tags(<<"File-Summary">>, TagsMap),
 											CipherALG = ar_storage:find_value_in_tags(<<"Cipher-ALG">>, TagsMap),
 											IsPublic = ar_storage:find_value_in_tags(<<"File-Public">>, TagsMap),
+											EntityType = ar_storage:find_value_in_tags(<<"Entity-Type">>, TagsMap),
 											AppName = ar_storage:find_value_in_tags(<<"App-Name">>, TagsMap),
 											AppVersion = ar_storage:find_value_in_tags(<<"App-Version">>, TagsMap),
 											AgentName = ar_storage:find_value_in_tags(<<"Agent-Name">>, TagsMap),
@@ -2647,6 +2648,7 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 												FileSummary,
 												CipherALG,
 												IsPublic,
+												EntityType,
 												AppName,
 												AppVersion,
 												AgentName

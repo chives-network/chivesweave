@@ -1598,8 +1598,15 @@ contentTypeToFileType(ContentType) ->
 		<<"text/plain">> -> <<"text">>;
 		<<"application/x-msdownload">> -> <<"exe">>;
 		<<"application/pdf">> -> <<"pdf">>;
+		<<"application/vnd.ms-excel">> -> <<"xlsx">>;
+		<<"application/vnd.openxmlformats-officedocument.wordprocessingml.document">> -> <<"docx">>;
+		<<"application/vnd.ms-powerpoint">> -> <<"pptx">>;
 		<<"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">> -> <<"xlsx">>;
+		<<"application/msword">> -> <<"docx">>;
+		<<"application/vnd.openxmlformats-officedocument.presentationml.presentation">> -> <<"pptx">>;
 		<<"model/stl">> -> <<"stl">>;
+		<<"application/stl">> -> <<"stl">>;
+		<<"application/sla">> -> <<"stl">>;
 		<<"video/mp4">> -> <<"video">>;
 		_ -> <<"unknown">>
 	end.

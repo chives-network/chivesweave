@@ -162,20 +162,20 @@ DROP INDEX idx_address_timestamp;
 -define(SELECT_ADDRESS_RANGE_SQL, "SELECT * FROM address order by balance desc LIMIT ? OFFSET ?").
 -define(SELECT_ADDRESS_TOTAL, "SELECT COUNT(*) AS NUM FROM address").
 
--define(SELECT_TRANSACTION_RANGE_SQL, "SELECT * FROM tx order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_RANGE_FILTER_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_RANGE_SQL, "SELECT * FROM tx where is_encrypt = '' and entity_type = 'file' order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_RANGE_FILTER_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file' order by timestamp desc LIMIT ? OFFSET ?").
 
--define(SELECT_TRANSACTION_TOTAL, "SELECT COUNT(*) AS NUM FROM tx").
--define(SELECT_TRANSACTION_TOTAL_FILTER, "SELECT COUNT(*) AS NUM FROM tx where item_type = ?").
+-define(SELECT_TRANSACTION_TOTAL, "SELECT COUNT(*) AS NUM FROM tx where is_encrypt = '' and entity_type = 'file'").
+-define(SELECT_TRANSACTION_TOTAL_FILTER, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file'").
 
--define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and from_address = ? order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and from_address = ?").
+-define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file' and from_address = ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file' and from_address = ?").
 
--define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_FILENAME_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and from_address = ? and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and from_address = ? and item_name like ?").
+-define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_FILENAME_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file' and from_address = ? and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file' and from_address = ? and item_name like ?").
 
--define(SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and item_name like ?").
+-define(SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file' and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file' and item_name like ?").
 
 %%%===================================================================
 %%% Public API.

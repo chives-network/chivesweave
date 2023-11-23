@@ -2629,13 +2629,43 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 							
 							%% Write Unbundle tx to arql
 							?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FileTxId, FileTxId}]),
-							?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________TxRecord, TxRecord}]),
+							?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________TagsMap, TagsMap}]),
 							% ?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________TxStructureItem, TxStructureItem}]),
 							% ?LOG_INFO([{handle_get_tx_unbundle_____________________________________________________BlockStructure_height, maps:get(<<"height">>, BlockStructure)}]),
 							case lists:member(serve_arql, Config#config.enable) of
 								true ->
 									case maps:is_key(<<"height">>, BlockStructure) of
 										true ->
+											%% Update File Status
+											EntityType = find_value_in_tags(<<"Entity-Type">>, TagsMap),
+											EntityAction = find_value_in_tags(<<"Entity-Action">>, TagsMap),
+											EntityTarget = find_value_in_tags(<<"Entity-Target">>, TagsMap),
+											FileTxId = find_value_in_tags(<<"File-TxId">>, TagsMap),
+											BlockTimestamp = maps:get(<<"timestamp">>, BlockStructure),
+											case EntityType of
+												<<"Action">> ->
+													% Do The Action Operation
+													?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FileTxId, FileTxId}]),
+													case ar_util:safe_decode(FileTxId) of
+														{ok, _} ->
+															case EntityAction of
+																<<"Label">> -> 
+																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
+																	ar_arql_db:update_tx_label(EntityTarget, FileTxId, BlockTimestamp);
+																<<"Star">> -> 
+																	ar_arql_db:update_tx_label(EntityTarget, FileTxId, BlockTimestamp);
+																<<"Folder">> -> 
+																	ar_arql_db:update_tx_label(EntityTarget, FileTxId, BlockTimestamp);
+																<<"Public">> -> 
+																	ar_arql_db:update_tx_label(EntityTarget, FileTxId, BlockTimestamp);
+																_ -> ok
+															end;
+														false ->[]
+													end;
+												_ ->
+													ok
+											end,
+											%% Insert into Txs & Tags
 											BlockHeight = maps:get(<<"height">>, BlockStructure),
 											BlockHash = maps:get(<<"indep_hash">>, BlockStructure),
 											BlockTimestamp = maps:get(<<"timestamp">>, BlockStructure),
@@ -2652,6 +2682,16 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 											AppVersion = ar_storage:find_value_in_tags(<<"App-Version">>, TagsMap),
 											AgentName = ar_storage:find_value_in_tags(<<"Agent-Name">>, TagsMap),
 											Bundleid = ar_util:encode(TX#tx.id),
+											Item_star = <<"">>,
+											Item_label = <<"">>,
+											Item_download = <<"">>,
+											Item_language = ar_storage:find_value_in_tags(<<"File-Language">>, TagsMap),
+											Item_pages = ar_storage:find_value_in_tags(<<"File-Pages">>, TagsMap),
+											Item_node_label = <<"">>,
+											Item_node_group = <<"">>,
+											Item_node_star = <<"">>,
+											Item_node_hot = <<"">>,
+											Item_node_delete = <<"">>,
 											TXFields = [
 												DataItemId,
 												BlockHash,
@@ -2672,12 +2712,22 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 												ContentType,
 												FileHash,
 												FileSummary,
+												Item_star,
+												Item_label,
+												Item_download,
+												Item_language,
+												Item_pages,
 												CipherALG,
 												IsPublic,
 												EntityType,
 												AppName,
 												AppVersion,
-												AgentName
+												AgentName,
+												Item_node_label,
+												Item_node_group,
+												Item_node_star,
+												Item_node_hot,
+												Item_node_delete
 											],
 											% ?LOG_INFO([{handle_get_tx_unbundle__________________________________________INSERT_ARQL___TXFields, TXFields}]),
 											TagFieldsList = lists:map(
@@ -2735,7 +2785,7 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 				end,
 				GetNumbersList
 			),
-			?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItems, GetDataItems}]),
+			% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItems, GetDataItems}]),
 			case IsReturn of
 				true ->
 					try binary_to_integer(PageRecords) of

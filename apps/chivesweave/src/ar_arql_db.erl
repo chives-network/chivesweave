@@ -9,7 +9,8 @@
 		select_transaction_range_filter/3, select_transaction_total_filter/1, 
 		select_transaction_range_filter_address/4, select_transaction_total_filter_address/2, 
 		select_transaction_range_filter_address_filename/5, select_transaction_total_filter_address_filename/3, 
-		select_transaction_range_filter_filename/4, select_transaction_total_filter_filename/2
+		select_transaction_range_filter_filename/4, select_transaction_total_filter_filename/2,
+		update_tx_label/3
 		]).
 
 -export([init/1, handle_call/3, handle_cast/2, terminate/2]).
@@ -27,6 +28,9 @@
 
 %% Time to wait until an operation (bind, step, etc) required for inserting an entity is complete.
 -define(INSERT_STEP_TIMEOUT, 60000).
+
+%% Time to wait until an operation (bind, step, etc) required for inserting an entity is complete.
+-define(UPDATE_STEP_TIMEOUT, 60000).
 
 %% The migration name should follow the format YYYYMMDDHHMMSS_human_readable_name
 %% where the date is picked at the time of naming the migration.
@@ -78,12 +82,22 @@ CREATE TABLE tx (
 	content_type TEXT,
 	item_hash TEXT,
 	item_summary TEXT,
+	item_star TEXT,
+	item_label TEXT,
+	item_download TEXT,
+	item_language TEXT,
+	item_pages TEXT,
 	is_encrypt TEXT,
 	is_public TEXT,
 	entity_type TEXT,
 	app_name TEXT,
 	app_version TEXT,
-	agent_name TEXT
+	agent_name TEXT,
+	item_node_label TEXT,
+	item_node_group TEXT,
+	item_node_star TEXT,
+	item_node_hot TEXT,
+	item_node_delete TEXT
 );
 
 CREATE TABLE tag (
@@ -115,6 +129,14 @@ CREATE INDEX idx_tx_app_name ON tx (app_name);
 CREATE INDEX idx_tx_app_version ON tx (app_version);
 CREATE INDEX idx_tx_agent_name ON tx (agent_name);
 
+CREATE INDEX idx_tx_item_label ON tx (item_label);
+CREATE INDEX idx_tx_item_language ON tx (item_language);
+CREATE INDEX idx_tx_item_node_label ON tx (item_node_label);
+CREATE INDEX idx_tx_item_node_group ON tx (item_node_group);
+CREATE INDEX idx_tx_item_node_star ON tx (item_node_star);
+CREATE INDEX idx_tx_item_node_hot ON tx (item_node_hot);
+CREATE INDEX idx_tx_item_node_delete ON tx (item_node_delete);
+
 CREATE INDEX idx_tag_tx_id ON tag (tx_id);
 CREATE INDEX idx_tag_name ON tag (name);
 CREATE INDEX idx_tag_name_value ON tag (name, value);
@@ -137,6 +159,14 @@ DROP INDEX idx_tx_content_type;
 DROP INDEX idx_tx_app_name;
 DROP INDEX idx_tx_agent_name;
 
+DROP INDEX idx_tx_item_label;
+DROP INDEX idx_tx_item_language;
+DROP INDEX idx_tx_item_node_label;
+DROP INDEX idx_tx_item_node_group;
+DROP INDEX idx_tx_item_node_star;
+DROP INDEX idx_tx_item_node_hot;
+DROP INDEX idx_tx_item_node_delete;
+
 DROP INDEX idx_tag_tx_id;
 DROP INDEX idx_tag_name;
 DROP INDEX idx_tag_name_value;
@@ -146,7 +176,7 @@ DROP INDEX idx_address_timestamp;
 ").
 
 -define(INSERT_BLOCK_SQL, "INSERT OR REPLACE INTO block VALUES (?, ?, ?, ?)").
--define(INSERT_TX_SQL, "INSERT OR REPLACE INTO tx VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").
+-define(INSERT_TX_SQL, "INSERT OR REPLACE INTO tx VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").
 -define(INSERT_TAG_SQL, "INSERT OR REPLACE INTO tag VALUES (?, ?, ?)").
 -define(SELECT_TX_BY_ID_SQL, "SELECT * FROM tx WHERE id = ?").
 
@@ -176,6 +206,8 @@ DROP INDEX idx_address_timestamp;
 
 -define(SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file' and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
 -define(SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file' and item_name like ?").
+
+-define(UPDATE_TX_LABEL_SQL, "update tx set item_label = ? where id = ? and timestamp < ?").
 
 %%%===================================================================
 %%% Public API.
@@ -234,6 +266,10 @@ select_transaction_total_filter_filename(CONTENT_TYPE, FILE_NAME) ->
 
 eval_legacy_arql(Query) ->
 	gen_server:call(?MODULE, {eval_legacy_arql, Query}, ?SELECT_TIMEOUT).
+
+update_tx_label(ITEM_LABEL, TXID, TIMESTAMP) ->
+	gen_server:cast(?MODULE, {update_tx_label, ITEM_LABEL, TXID, TIMESTAMP}),
+	ok.
 
 insert_full_block(FullBlock) ->
 	insert_full_block(FullBlock, store_tags).
@@ -313,6 +349,7 @@ init([]) ->
 	{ok, SelectTransactionTotalFilterAddressFileNameStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS_FILENAME, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionRangeFilterFileNameStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionTotalFilterFileNameStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, ?DRIVER_TIMEOUT),
+	{ok, UpdateTxLabelStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_TX_LABEL_SQL, ?DRIVER_TIMEOUT),
 	{ok, #{
 		data_dir => DataDir,
 		conn => Conn,
@@ -334,7 +371,8 @@ init([]) ->
 		select_transaction_range_filter_address_filename_stmt => SelectTransactionRangeFilterAddressFileNameStmt,
 		select_transaction_total_filter_address_filename_stmt => SelectTransactionTotalFilterAddressFileNameStmt,
 		select_transaction_range_filter_filename_stmt => SelectTransactionRangeFilterFileNameStmt,
-		select_transaction_total_filter_filename_stmt => SelectTransactionTotalFilterFileNameStmt
+		select_transaction_total_filter_filename_stmt => SelectTransactionTotalFilterFileNameStmt,
+		update_tx_label_stmt => UpdateTxLabelStmt
 	}}.
 
 handle_call({insert_full_block, BlockFields, TxFieldsList, TagFieldsList}, _From, State) ->
@@ -640,6 +678,21 @@ handle_cast({insert_block, BlockFields}, State) ->
 	record_query_time(insert_block, Time),
 	{noreply, State};
 
+handle_cast({update_tx_label, ITEM_LABEL, TXID, TIMESTAMP}, State) ->
+	#{ conn := Conn, update_tx_label_stmt := Stmt } = State,
+	{Time, ok} = timer:tc(fun() ->
+		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
+
+		ok = ar_sqlite3:bind(Stmt, [ITEM_LABEL, TXID, TIMESTAMP], ?INSERT_STEP_TIMEOUT),
+		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
+		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
+
+		ok = ar_sqlite3:exec(Conn, "COMMIT TRANSACTION", ?INSERT_STEP_TIMEOUT),
+		ok
+	end),
+	record_query_time(update_tx_label, Time),
+	{noreply, State};
+
 handle_cast({insert_tx, TXFields, TagFieldsList}, State) ->
 	#{
 		conn := Conn,
@@ -682,7 +735,8 @@ terminate(Reason, State) ->
 		select_transaction_range_filter_stmt := SelectTransactionRangeFilterStmt,
 		select_transaction_total_filter_stmt := SelectTransactionTotalFilterStmt,
 		select_transaction_range_filter_address_stmt := SelectTransactionRangeFilterAddressStmt,
-		select_transaction_total_filter_address_stmt := SelectTransactionTotalFilterAddressStmt
+		select_transaction_total_filter_address_stmt := SelectTransactionTotalFilterAddressStmt,
+		update_tx_label_stmt := UpdateTxLabelStmt
 	} = State,
 	?LOG_INFO([{ar_arql_db, terminate}, {reason, Reason}]),
 	ar_sqlite3:finalize(InsertBlockStmt, ?DRIVER_TIMEOUT),
@@ -700,6 +754,7 @@ terminate(Reason, State) ->
 	ar_sqlite3:finalize(SelectTransactionTotalFilterStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectTransactionRangeFilterAddressStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectTransactionTotalFilterAddressStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(UpdateTxLabelStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:close(Conn, ?DRIVER_TIMEOUT).
 
 %%%===================================================================
@@ -874,12 +929,22 @@ tx_map([
 	ContentType,
 	FileHash,
 	FileSummary,
+	Item_star,
+	Item_label,
+	Item_download,
+	Item_language,
+	Item_pages,
 	FileEncrypt,
 	IsPublic,
 	EntityType,
 	AppName,
 	AppVersion,
-	AgentName
+	AgentName,
+	Item_node_label,
+	Item_node_group,
+	Item_node_star,
+	Item_node_hot,
+	Item_node_delete
 ]) -> #{
 	id => Id,
 	block_indep_hash => BlockIndepHash,
@@ -900,12 +965,22 @@ tx_map([
 	content_type => ContentType,
 	item_hash => FileHash,
 	item_summary => FileSummary,
+	item_star => Item_star,
+	item_label => Item_label,
+	item_download => Item_download,
+	item_language => Item_language,
+	item_pages => Item_pages,
 	is_encrypt => FileEncrypt,
 	is_public => IsPublic,
 	entity_type => EntityType,
 	app_name => AppName,
 	app_version => AppVersion,
-	agent_name => AgentName
+	agent_name => AgentName,
+	item_node_label => Item_node_label,
+	item_node_group => Item_node_group,
+	item_node_star => Item_node_star,
+	item_node_hot => Item_node_hot,
+	item_node_delete => Item_node_delete
 }.
 
 block_map([
@@ -997,6 +1072,16 @@ full_block_to_fields(FullBlock) ->
 			AppVersion = ar_storage:find_value_in_tags(<<"App-Version">>, TagsMap),
 			AgentName = ar_storage:find_value_in_tags(<<"Agent-Name">>, TagsMap),
 			Bundleid = <<"">>,
+			Item_star = <<"">>,
+			Item_label = <<"">>,
+			Item_download = <<"">>,
+			Item_language = ar_storage:find_value_in_tags(<<"File-Language">>, TagsMap),
+			Item_pages = ar_storage:find_value_in_tags(<<"File-Pages">>, TagsMap),
+			Item_node_label = <<"">>,
+			Item_node_group = <<"">>,
+			Item_node_star = <<"">>,
+			Item_node_hot = <<"">>,
+			Item_node_delete = <<"">>,
 			[
 				ar_util:encode(TX#tx.id),
 				BlockIndepHash,
@@ -1017,12 +1102,22 @@ full_block_to_fields(FullBlock) ->
 				ContentType,
 				FileHash,
 				FileSummary,
+				Item_star,
+				Item_label,
+				Item_download,
+				Item_language,
+				Item_pages,
 				CipherALG,
 				IsPublic,
 				EntityType,
 				AppName,
 				AppVersion,
-				AgentName
+				AgentName,
+				Item_node_label,
+				Item_node_group,
+				Item_node_star,
+				Item_node_hot,
+				Item_node_delete
 			]
 		end,
 		FullBlock#block.txs
@@ -1066,6 +1161,16 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 	AppVersion = ar_storage:find_value_in_tags(<<"App-Version">>, TagsMap),
 	AgentName = ar_storage:find_value_in_tags(<<"Agent-Name">>, TagsMap),
 	Bundleid = <<"">>,
+	Item_star = <<"">>,
+	Item_label = <<"">>,
+	Item_download = <<"">>,
+	Item_language = ar_storage:find_value_in_tags(<<"File-Language">>, TagsMap),
+	Item_pages = ar_storage:find_value_in_tags(<<"File-Pages">>, TagsMap),
+	Item_node_label = <<"">>,
+	Item_node_group = <<"">>,
+	Item_node_star = <<"">>,
+	Item_node_hot = <<"">>,
+	Item_node_delete = <<"">>,
 	[
 		ar_util:encode(TX#tx.id),
 		ar_util:encode(BH),
@@ -1078,7 +1183,7 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 		TX#tx.reward,
 		Timestamp,
 		Height,
-		TX#tx.data_size,
+		TX#tx.data_size,		
 		Bundleid,
 		FileName,
 		FileType,
@@ -1086,12 +1191,22 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 		ContentType,
 		FileHash,
 		FileSummary,
+		Item_star,
+		Item_label,
+		Item_download,
+		Item_language,
+		Item_pages,
 		CipherALG,
 		IsPublic,
 		EntityType,
 		AppName,
 		AppVersion,
-		AgentName
+		AgentName,
+		Item_node_label,
+		Item_node_group,
+		Item_node_star,
+		Item_node_hot,
+		Item_node_delete
 	].
 
 tx_to_tag_fields_list(TX) ->

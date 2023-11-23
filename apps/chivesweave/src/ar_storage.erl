@@ -2575,8 +2575,13 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 								[{namespace, 'Tag'}]
 							),
 							TagsType = avro_array:type(TagType),
+							% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TagsType, TagsType}]),
 							Decoder = avro:make_simple_decoder(TagsType, []),
-							TagsList = Decoder(TagsBytesContent),
+							TagsList = case TagsBytesContent of
+											<<>> -> [];
+											Data -> Decoder(Data)
+										end,
+							% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle____TagsList, TagsList}]),
 							Tags 	= lists:map(
 											fun(Tag) ->
 												{_, TagName} = lists:nth(1, Tag),
@@ -2597,6 +2602,18 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 							
 							FromAddress = ar_util:encode(ar_wallet:to_address(OwnerBinary, {rsa, 65537})),
 							DataType = find_value_in_tags(<<"Content-Type">>, TagsMap),
+							FileTxId = find_value_in_tags(<<"File-TxId">>, TagsMap),
+							TxRecord =  case ar_util:safe_decode(FileTxId) of
+											{ok, ID} ->
+												case ar_kv:get(xwe_storage_txid_in_bundle, ar_util:encode(ID))  of
+													{ok, BundleTxBinary} ->
+														binary_to_term(BundleTxBinary);
+													_ ->
+														[]
+												end;
+											_ -> 
+												[]
+										end,
 							TxStructureItem = #{
 									<<"id">> => DataItemId,
 									<<"owner">> => #{<<"address">> => FromAddress},
@@ -2611,8 +2628,10 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 								},
 							
 							%% Write Unbundle tx to arql
-							% ?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________________________BlockStructure, BlockStructure}]),
-							% ?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________________________BlockStructure_height, maps:get(<<"height">>, BlockStructure)}]),
+							?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FileTxId, FileTxId}]),
+							?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________TxRecord, TxRecord}]),
+							% ?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________TxStructureItem, TxStructureItem}]),
+							% ?LOG_INFO([{handle_get_tx_unbundle_____________________________________________________BlockStructure_height, maps:get(<<"height">>, BlockStructure)}]),
 							case lists:member(serve_arql, Config#config.enable) of
 								true ->
 									case maps:is_key(<<"height">>, BlockStructure) of
@@ -2660,7 +2679,7 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 												AppVersion,
 												AgentName
 											],
-											?LOG_INFO([{handle_get_tx_unbundle__________________________________________INSERT_ARQL___TXFields, TXFields}]),
+											% ?LOG_INFO([{handle_get_tx_unbundle__________________________________________INSERT_ARQL___TXFields, TXFields}]),
 											TagFieldsList = lists:map(
 													fun(Tag) ->
 														{_, TagName} = lists:nth(1, Tag),
@@ -2694,7 +2713,7 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 							end,
 
 							%% Write Unbundle tx to rocksdb
-							% ?LOG_INFO([{handle_get_tx_unbundle________avro_record____DataItemId, DataItemId}]),
+							% ?LOG_INFO([{handle_get_tx_unbundle________avro_record____TxStructureItem, TxStructureItem}]),
 							ar_kv:put(xwe_storage_txid_in_bundle, DataItemId, term_to_binary(TxStructureItem)),
 
 							%% return Tx structure item

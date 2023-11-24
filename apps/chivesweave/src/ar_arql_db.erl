@@ -10,6 +10,7 @@
 		select_transaction_range_filetype_address/4, select_transaction_total_filetype_address/2, 
 		select_transaction_range_folder_address/4, select_transaction_total_folder_address/2, 
 		select_transaction_range_label_address/4, select_transaction_total_label_address/2, 
+		select_transaction_range_star_address/4, select_transaction_total_star_address/2, 
 		select_transaction_range_filter_address_filename/5, select_transaction_total_filter_address_filename/3, 
 		select_transaction_range_filter_filename/4, select_transaction_total_filter_filename/2,
 		update_tx_label/3, update_tx_folder/3, update_tx_star/3, update_tx_public/3
@@ -132,6 +133,7 @@ CREATE INDEX idx_tx_app_version ON tx (app_version);
 CREATE INDEX idx_tx_agent_name ON tx (agent_name);
 
 CREATE INDEX idx_tx_item_label ON tx (item_label);
+CREATE INDEX idx_tx_item_star ON tx (item_star);
 CREATE INDEX idx_tx_item_language ON tx (item_language);
 CREATE INDEX idx_tx_item_node_label ON tx (item_node_label);
 CREATE INDEX idx_tx_item_node_group ON tx (item_node_group);
@@ -162,6 +164,7 @@ DROP INDEX idx_tx_app_name;
 DROP INDEX idx_tx_agent_name;
 
 DROP INDEX idx_tx_item_label;
+DROP INDEX idx_tx_item_star;
 DROP INDEX idx_tx_item_language;
 DROP INDEX idx_tx_item_node_label;
 DROP INDEX idx_tx_item_node_group;
@@ -220,6 +223,9 @@ DROP INDEX idx_address_timestamp;
 -define(SELECT_TRANSACTION_RANGE_LABEL_ADDRESS_SQL, "SELECT * FROM tx where item_label = ? and is_encrypt = '' and entity_type = 'File' and from_address = ? order by timestamp desc LIMIT ? OFFSET ?").
 -define(SELECT_TRANSACTION_TOTAL_LABEL_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where item_label = ? and is_encrypt = '' and entity_type = 'File' and from_address = ?").
 
+-define(SELECT_TRANSACTION_RANGE_STAR_ADDRESS_SQL, "SELECT * FROM tx where item_star = ? and is_encrypt = '' and entity_type = 'File' and from_address = ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_STAR_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where item_star = ? and is_encrypt = '' and entity_type = 'File' and from_address = ?").
+
 %%%===================================================================
 %%% Public API.
 %%%===================================================================
@@ -274,6 +280,12 @@ select_transaction_range_label_address(LABEL, FROM_ADDRESS, LIMIT, OFFSET) ->
 
 select_transaction_total_label_address(LABEL, FROM_ADDRESS) ->
 	gen_server:call(?MODULE, {select_transaction_total_label_address, LABEL, FROM_ADDRESS}, ?SELECT_TIMEOUT).
+
+select_transaction_range_star_address(STAR, FROM_ADDRESS, LIMIT, OFFSET) ->
+	gen_server:call(?MODULE, {select_transaction_range_star_address, STAR, FROM_ADDRESS, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
+
+select_transaction_total_star_address(STAR, FROM_ADDRESS) ->
+	gen_server:call(?MODULE, {select_transaction_total_star_address, STAR, FROM_ADDRESS}, ?SELECT_TIMEOUT).
 
 select_transaction_range_filter_address_filename(CONTENT_TYPE, FROM_ADDRESS, FILE_NAME, LIMIT, OFFSET) ->
 	gen_server:call(?MODULE, {select_transaction_range_filter_address_filename, CONTENT_TYPE, FROM_ADDRESS, FILE_NAME, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
@@ -384,6 +396,8 @@ init([]) ->
 	{ok, SelectTransactionTotalFolderAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_FOLDER_ADDRESS, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionRangeLabelAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_LABEL_ADDRESS_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionTotalLabelAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_LABEL_ADDRESS, ?DRIVER_TIMEOUT),
+	{ok, SelectTransactionRangeStarAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_STAR_ADDRESS_SQL, ?DRIVER_TIMEOUT),
+	{ok, SelectTransactionTotalStarAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_STAR_ADDRESS, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionRangeFilterAddressFileNameStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_FILENAME_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionTotalFilterAddressFileNameStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS_FILENAME, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionRangeFilterFileNameStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, ?DRIVER_TIMEOUT),
@@ -414,6 +428,8 @@ init([]) ->
 		select_transaction_total_folder_address_stmt => SelectTransactionTotalFolderAddressStmt,
 		select_transaction_range_label_address_stmt => SelectTransactionRangeLabelAddressStmt,
 		select_transaction_total_label_address_stmt => SelectTransactionTotalLabelAddressStmt,
+		select_transaction_range_star_address_stmt => SelectTransactionRangeStarAddressStmt,
+		select_transaction_total_star_address_stmt => SelectTransactionTotalStarAddressStmt,
 		select_transaction_range_filter_address_filename_stmt => SelectTransactionRangeFilterAddressFileNameStmt,
 		select_transaction_total_filter_address_filename_stmt => SelectTransactionTotalFilterAddressFileNameStmt,
 		select_transaction_range_filter_filename_stmt => SelectTransactionRangeFilterFileNameStmt,
@@ -686,6 +702,28 @@ handle_call({select_transaction_total_label_address, LABEL, FROM_ADDRESS}, _, St
 	record_query_time(select_transaction_total_label_address, Time),
 	{reply, Reply, State};
 
+handle_call({select_transaction_range_star_address, STAR, FROM_ADDRESS, LIMIT, OFFSET}, _, State) ->
+	#{ select_transaction_range_star_address_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [STAR, FROM_ADDRESS, LIMIT, OFFSET], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:map(fun tx_map/1, Rows)
+		end
+	end),
+	record_query_time(select_transaction_range_star_address, Time),
+	{reply, Reply, State};
+
+handle_call({select_transaction_total_star_address, STAR, FROM_ADDRESS}, _, State) ->
+	#{ select_transaction_total_star_address_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [STAR, FROM_ADDRESS], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:nth(1, lists:nth(1, Rows))
+		end
+	end),
+	record_query_time(select_transaction_total_star_address, Time),
+	{reply, Reply, State};
+
 handle_call({select_transaction_range_filter_address_filename, CONTENT_TYPE, FROM_ADDRESS, FILE_NAME, LIMIT, OFFSET}, _, State) ->
 	#{ select_transaction_range_filter_address_filename_stmt := Stmt } = State,
 	{Time, Reply} = timer:tc(fun() ->
@@ -878,6 +916,8 @@ terminate(Reason, State) ->
 		select_transaction_total_folder_address_stmt := SelectTransactionTotalFolderAddressStmt,
 		select_transaction_range_label_address_stmt := SelectTransactionRangeLabelAddressStmt,
 		select_transaction_total_label_address_stmt := SelectTransactionTotalLabelAddressStmt,
+		select_transaction_range_star_address_stmt := SelectTransactionRangeStarAddressStmt,
+		select_transaction_total_star_address_stmt := SelectTransactionTotalStarAddressStmt,
 		update_tx_label_stmt := UpdateTxLabelStmt,
 		update_tx_star_stmt := UpdateTxStarStmt,
 		update_tx_folder_stmt := UpdateTxFolderStmt,
@@ -903,6 +943,8 @@ terminate(Reason, State) ->
 	ar_sqlite3:finalize(SelectTransactionTotalFolderAddressStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectTransactionRangeLabelAddressStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectTransactionTotalLabelAddressStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectTransactionRangeStarAddressStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectTransactionTotalStarAddressStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(UpdateTxLabelStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(UpdateTxStarStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(UpdateTxFolderStmt, ?DRIVER_TIMEOUT),

@@ -10,7 +10,7 @@
 		select_transaction_range_filter_address/4, select_transaction_total_filter_address/2, 
 		select_transaction_range_filter_address_filename/5, select_transaction_total_filter_address_filename/3, 
 		select_transaction_range_filter_filename/4, select_transaction_total_filter_filename/2,
-		update_tx_label/3
+		update_tx_label/3, update_tx_folder/3, update_tx_star/3, update_tx_public/3
 		]).
 
 -export([init/1, handle_call/3, handle_cast/2, terminate/2]).
@@ -208,6 +208,9 @@ DROP INDEX idx_address_timestamp;
 -define(SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file' and item_name like ?").
 
 -define(UPDATE_TX_LABEL_SQL, "update tx set item_label = ? where id = ? and timestamp < ?").
+-define(UPDATE_TX_STAR_SQL, "update tx set item_star = ? where id = ? and timestamp < ?").
+-define(UPDATE_TX_FOLDER_SQL, "update tx set item_parent = ? where id = ? and timestamp < ?").
+-define(UPDATE_TX_PUBLIC_SQL, "update tx set is_public = ? where id = ? and timestamp < ?").
 
 %%%===================================================================
 %%% Public API.
@@ -269,6 +272,18 @@ eval_legacy_arql(Query) ->
 
 update_tx_label(ITEM_LABEL, TXID, TIMESTAMP) ->
 	gen_server:cast(?MODULE, {update_tx_label, ITEM_LABEL, TXID, TIMESTAMP}),
+	ok.
+
+update_tx_star(ITEM_STAR, TXID, TIMESTAMP) ->
+	gen_server:cast(?MODULE, {update_tx_star, ITEM_STAR, TXID, TIMESTAMP}),
+	ok.
+
+update_tx_folder(ITEM_PARENT, TXID, TIMESTAMP) ->
+	gen_server:cast(?MODULE, {update_tx_folder, ITEM_PARENT, TXID, TIMESTAMP}),
+	ok.
+
+update_tx_public(IS_PUBLIC, TXID, TIMESTAMP) ->
+	gen_server:cast(?MODULE, {update_tx_public, IS_PUBLIC, TXID, TIMESTAMP}),
 	ok.
 
 insert_full_block(FullBlock) ->
@@ -350,6 +365,9 @@ init([]) ->
 	{ok, SelectTransactionRangeFilterFileNameStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionTotalFilterFileNameStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, ?DRIVER_TIMEOUT),
 	{ok, UpdateTxLabelStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_TX_LABEL_SQL, ?DRIVER_TIMEOUT),
+	{ok, UpdateTxStarStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_TX_STAR_SQL, ?DRIVER_TIMEOUT),
+	{ok, UpdateTxFolderStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_TX_FOLDER_SQL, ?DRIVER_TIMEOUT),
+	{ok, UpdateTxPublicStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_TX_PUBLIC_SQL, ?DRIVER_TIMEOUT),
 	{ok, #{
 		data_dir => DataDir,
 		conn => Conn,
@@ -372,7 +390,10 @@ init([]) ->
 		select_transaction_total_filter_address_filename_stmt => SelectTransactionTotalFilterAddressFileNameStmt,
 		select_transaction_range_filter_filename_stmt => SelectTransactionRangeFilterFileNameStmt,
 		select_transaction_total_filter_filename_stmt => SelectTransactionTotalFilterFileNameStmt,
-		update_tx_label_stmt => UpdateTxLabelStmt
+		update_tx_label_stmt => UpdateTxLabelStmt,
+		update_tx_star_stmt => UpdateTxStarStmt,
+		update_tx_folder_stmt => UpdateTxFolderStmt,
+		update_tx_public_stmt => UpdateTxPublicStmt
 	}}.
 
 handle_call({insert_full_block, BlockFields, TxFieldsList, TagFieldsList}, _From, State) ->
@@ -693,6 +714,51 @@ handle_cast({update_tx_label, ITEM_LABEL, TXID, TIMESTAMP}, State) ->
 	record_query_time(update_tx_label, Time),
 	{noreply, State};
 
+handle_cast({update_tx_star, ITEM_STAR, TXID, TIMESTAMP}, State) ->
+	#{ conn := Conn, update_tx_star_stmt := Stmt } = State,
+	{Time, ok} = timer:tc(fun() ->
+		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
+
+		ok = ar_sqlite3:bind(Stmt, [ITEM_STAR, TXID, TIMESTAMP], ?INSERT_STEP_TIMEOUT),
+		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
+		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
+
+		ok = ar_sqlite3:exec(Conn, "COMMIT TRANSACTION", ?INSERT_STEP_TIMEOUT),
+		ok
+	end),
+	record_query_time(update_tx_star, Time),
+	{noreply, State};
+
+handle_cast({update_tx_folder, ITEM_PARENT, TXID, TIMESTAMP}, State) ->
+	#{ conn := Conn, update_tx_folder_stmt := Stmt } = State,
+	{Time, ok} = timer:tc(fun() ->
+		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
+
+		ok = ar_sqlite3:bind(Stmt, [ITEM_PARENT, TXID, TIMESTAMP], ?INSERT_STEP_TIMEOUT),
+		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
+		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
+
+		ok = ar_sqlite3:exec(Conn, "COMMIT TRANSACTION", ?INSERT_STEP_TIMEOUT),
+		ok
+	end),
+	record_query_time(update_tx_folder, Time),
+	{noreply, State};
+
+handle_cast({update_tx_public, IS_PUBLIC, TXID, TIMESTAMP}, State) ->
+	#{ conn := Conn, update_tx_public_stmt := Stmt } = State,
+	{Time, ok} = timer:tc(fun() ->
+		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
+
+		ok = ar_sqlite3:bind(Stmt, [IS_PUBLIC, TXID, TIMESTAMP], ?INSERT_STEP_TIMEOUT),
+		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
+		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
+
+		ok = ar_sqlite3:exec(Conn, "COMMIT TRANSACTION", ?INSERT_STEP_TIMEOUT),
+		ok
+	end),
+	record_query_time(update_tx_public, Time),
+	{noreply, State};
+
 handle_cast({insert_tx, TXFields, TagFieldsList}, State) ->
 	#{
 		conn := Conn,
@@ -736,7 +802,10 @@ terminate(Reason, State) ->
 		select_transaction_total_filter_stmt := SelectTransactionTotalFilterStmt,
 		select_transaction_range_filter_address_stmt := SelectTransactionRangeFilterAddressStmt,
 		select_transaction_total_filter_address_stmt := SelectTransactionTotalFilterAddressStmt,
-		update_tx_label_stmt := UpdateTxLabelStmt
+		update_tx_label_stmt := UpdateTxLabelStmt,
+		update_tx_star_stmt := UpdateTxStarStmt,
+		update_tx_folder_stmt := UpdateTxFolderStmt,
+		update_tx_public_stmt := UpdateTxPublicStmt
 	} = State,
 	?LOG_INFO([{ar_arql_db, terminate}, {reason, Reason}]),
 	ar_sqlite3:finalize(InsertBlockStmt, ?DRIVER_TIMEOUT),
@@ -755,6 +824,9 @@ terminate(Reason, State) ->
 	ar_sqlite3:finalize(SelectTransactionRangeFilterAddressStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectTransactionTotalFilterAddressStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(UpdateTxLabelStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(UpdateTxStarStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(UpdateTxFolderStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(UpdateTxPublicStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:close(Conn, ?DRIVER_TIMEOUT).
 
 %%%===================================================================

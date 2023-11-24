@@ -2653,11 +2653,11 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
 																	ar_arql_db:update_tx_label(EntityTarget, FileTxId, BlockTimestamp);
 																<<"Star">> -> 
-																	ar_arql_db:update_tx_label(EntityTarget, FileTxId, BlockTimestamp);
+																	ar_arql_db:update_tx_star(EntityTarget, FileTxId, BlockTimestamp);
 																<<"Folder">> -> 
-																	ar_arql_db:update_tx_label(EntityTarget, FileTxId, BlockTimestamp);
+																	ar_arql_db:update_tx_folder(EntityTarget, FileTxId, BlockTimestamp);
 																<<"Public">> -> 
-																	ar_arql_db:update_tx_label(EntityTarget, FileTxId, BlockTimestamp);
+																	ar_arql_db:update_tx_public(EntityTarget, FileTxId, BlockTimestamp);
 																_ -> ok
 															end;
 														false ->[]

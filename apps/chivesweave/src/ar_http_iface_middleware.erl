@@ -1400,6 +1400,23 @@ handle(<<"GET">>, [<<"file">>, <<"folder">>, Folder, Addr, PageId, PageSize], Re
 
 %% ===========================================================================================================================
 %% Get Files For Wallet Address
+handle(<<"GET">>, [<<"file">>, <<"label">>, Label, Addr, PageId, PageSize], Req, _Pid) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			{ok, Config} = application:get_env(chivesweave, config),
+			case lists:member(serve_arql, Config#config.enable) of
+				true ->
+					{Status, Headers, Body} = handle_get_transaction_records_label_address(Label, Addr, PageId, PageSize),
+					{Status, Headers, Body, Req};
+				false ->
+					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+			end
+	end;
+
+%% ===========================================================================================================================
+%% Get Files For Wallet Address
 handle(<<"GET">>, [<<"file">>, <<"video">>, Addr, PageId, PageSize], Req, _Pid) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->
@@ -3005,6 +3022,55 @@ handle_get_transaction_records_folder_address(Folder, Address, PageId, PageSize)
 							0
 					end,
 					case ar_arql_db:select_transaction_range_folder_address(Folder, Address, PageSizeNew, PageIdNew * PageSizeNew) of
+						not_found ->
+							{404, #{}, []};
+						Res ->
+							% ?LOG_INFO([{handle_get_blocklist_data, Res}]),
+							TxsResult = lists:map(
+								fun(TxResult) ->
+									maps:get(id, TxResult)
+								end,
+								Res
+							),
+							TxRecordFunction = ar_storage:read_txsrecord_function(TxsResult),
+							TransactionResult = #{
+									<<"data">> => TxRecordFunction,
+									<<"total">> => TransactionsTotal,
+									<<"from">> => PageIdNew * PageSizeNew,
+									<<"pageid">> => PageIdNew,
+									<<"pagesize">> => PageSize,
+									<<"allpages">> => ceil(TransactionsTotal / PageSizeNew) div 1
+								},
+							{200, #{}, ar_serialize:jsonify(TransactionResult)}
+					end
+			catch _:_ ->
+				{404, #{}, []}
+			end
+	catch _:_ ->
+		{404, #{}, []}
+	end.
+
+handle_get_transaction_records_label_address(Label, Address, PageId, PageSize) ->
+	try binary_to_integer(PageSize) of
+		PageSizeInt ->
+			PageSizeNew = if
+				PageSizeInt < 0 -> 5;
+				PageSizeInt > 100 -> 100;
+				true -> PageSizeInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						true -> PageIdInt
+					end,
+					TransactionsTotal  = case ar_arql_db:select_transaction_total_label_address(Label, Address) of
+						TotalRes ->
+							TotalRes;
+						_ ->
+							0
+					end,
+					case ar_arql_db:select_transaction_range_label_address(Label, Address, PageSizeNew, PageIdNew * PageSizeNew) of
 						not_found ->
 							{404, #{}, []};
 						Res ->

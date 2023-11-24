@@ -9,6 +9,7 @@
 		select_transaction_range_filter/3, select_transaction_total_filter/1, 
 		select_transaction_range_filetype_address/4, select_transaction_total_filetype_address/2, 
 		select_transaction_range_folder_address/4, select_transaction_total_folder_address/2, 
+		select_transaction_range_label_address/4, select_transaction_total_label_address/2, 
 		select_transaction_range_filter_address_filename/5, select_transaction_total_filter_address_filename/3, 
 		select_transaction_range_filter_filename/4, select_transaction_total_filter_filename/2,
 		update_tx_label/3, update_tx_folder/3, update_tx_star/3, update_tx_public/3
@@ -196,25 +197,28 @@ DROP INDEX idx_address_timestamp;
 -define(SELECT_TRANSACTION_RANGE_SQL, "SELECT * FROM tx where is_encrypt = '' order by timestamp desc LIMIT ? OFFSET ?").
 -define(SELECT_TRANSACTION_RANGE_FILTER_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' order by timestamp desc LIMIT ? OFFSET ?").
 
--define(SELECT_TRANSACTION_TOTAL, "SELECT COUNT(*) AS NUM FROM tx where is_encrypt = '' and (entity_type = 'file' or entity_type = '')").
--define(SELECT_TRANSACTION_TOTAL_FILTER, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and (entity_type = 'file' or entity_type = '')").
+-define(SELECT_TRANSACTION_TOTAL, "SELECT COUNT(*) AS NUM FROM tx where is_encrypt = '' and entity_type = 'File'").
+-define(SELECT_TRANSACTION_TOTAL_FILTER, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'File'").
 
--define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and (entity_type = 'file' or entity_type = '') and from_address = ? order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and (entity_type = 'file' or entity_type = '') and from_address = ?").
+-define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'File' and from_address = ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'File' and from_address = ?").
 
--define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_FILENAME_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and (entity_type = 'file' or entity_type = '') and from_address = ? and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and (entity_type = 'file' or entity_type = '') and from_address = ? and item_name like ?").
+-define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_FILENAME_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'File' and from_address = ? and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'File' and from_address = ? and item_name like ?").
 
--define(SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and (entity_type = 'file' or entity_type = '') and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and (entity_type = 'file' or entity_type = '') and item_name like ?").
+-define(SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'File' and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'File' and item_name like ?").
 
 -define(UPDATE_TX_LABEL_SQL, "update tx set item_label = ? where id = ? and timestamp < ?").
 -define(UPDATE_TX_STAR_SQL, "update tx set item_star = ? where id = ? and timestamp < ?").
 -define(UPDATE_TX_FOLDER_SQL, "update tx set item_parent = ? where id = ? and timestamp < ?").
 -define(UPDATE_TX_PUBLIC_SQL, "update tx set is_public = ? where id = ? and timestamp < ?").
 
--define(SELECT_TRANSACTION_RANGE_FOLDER_ADDRESS_SQL, "SELECT * FROM tx where item_parent = ? and is_encrypt = '' and (entity_type = 'file' or entity_type = '') and from_address = ? order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_TOTAL_FOLDER_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where item_parent = ? and is_encrypt = '' and (entity_type = 'file' or entity_type = '') and from_address = ?").
+-define(SELECT_TRANSACTION_RANGE_FOLDER_ADDRESS_SQL, "SELECT * FROM tx where item_parent = ? and is_encrypt = '' and entity_type = 'File' and from_address = ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FOLDER_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where item_parent = ? and is_encrypt = '' and entity_type = 'File' and from_address = ?").
+
+-define(SELECT_TRANSACTION_RANGE_LABEL_ADDRESS_SQL, "SELECT * FROM tx where item_label = ? and is_encrypt = '' and entity_type = 'File' and from_address = ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_LABEL_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where item_label = ? and is_encrypt = '' and entity_type = 'File' and from_address = ?").
 
 %%%===================================================================
 %%% Public API.
@@ -264,6 +268,12 @@ select_transaction_range_folder_address(FOLDER, FROM_ADDRESS, LIMIT, OFFSET) ->
 
 select_transaction_total_folder_address(FOLDER, FROM_ADDRESS) ->
 	gen_server:call(?MODULE, {select_transaction_total_folder_address, FOLDER, FROM_ADDRESS}, ?SELECT_TIMEOUT).
+
+select_transaction_range_label_address(LABEL, FROM_ADDRESS, LIMIT, OFFSET) ->
+	gen_server:call(?MODULE, {select_transaction_range_label_address, LABEL, FROM_ADDRESS, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
+
+select_transaction_total_label_address(LABEL, FROM_ADDRESS) ->
+	gen_server:call(?MODULE, {select_transaction_total_label_address, LABEL, FROM_ADDRESS}, ?SELECT_TIMEOUT).
 
 select_transaction_range_filter_address_filename(CONTENT_TYPE, FROM_ADDRESS, FILE_NAME, LIMIT, OFFSET) ->
 	gen_server:call(?MODULE, {select_transaction_range_filter_address_filename, CONTENT_TYPE, FROM_ADDRESS, FILE_NAME, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
@@ -372,6 +382,8 @@ init([]) ->
 	{ok, SelectTransactionTotalFilterAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionRangeFolderAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_FOLDER_ADDRESS_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionTotalFolderAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_FOLDER_ADDRESS, ?DRIVER_TIMEOUT),
+	{ok, SelectTransactionRangeLabelAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_LABEL_ADDRESS_SQL, ?DRIVER_TIMEOUT),
+	{ok, SelectTransactionTotalLabelAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_LABEL_ADDRESS, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionRangeFilterAddressFileNameStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_FILENAME_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionTotalFilterAddressFileNameStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS_FILENAME, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionRangeFilterFileNameStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, ?DRIVER_TIMEOUT),
@@ -400,6 +412,8 @@ init([]) ->
 		select_transaction_total_filter_address_stmt => SelectTransactionTotalFilterAddressStmt,
 		select_transaction_range_folder_address_stmt => SelectTransactionRangeFolderAddressStmt,
 		select_transaction_total_folder_address_stmt => SelectTransactionTotalFolderAddressStmt,
+		select_transaction_range_label_address_stmt => SelectTransactionRangeLabelAddressStmt,
+		select_transaction_total_label_address_stmt => SelectTransactionTotalLabelAddressStmt,
 		select_transaction_range_filter_address_filename_stmt => SelectTransactionRangeFilterAddressFileNameStmt,
 		select_transaction_total_filter_address_filename_stmt => SelectTransactionTotalFilterAddressFileNameStmt,
 		select_transaction_range_filter_filename_stmt => SelectTransactionRangeFilterFileNameStmt,
@@ -628,7 +642,6 @@ handle_call({select_transaction_total_filetype_address, CONTENT_TYPE, FROM_ADDRE
 	record_query_time(select_transaction_total_filetype_address, Time),
 	{reply, Reply, State};
 
-
 handle_call({select_transaction_range_folder_address, FOLDER, FROM_ADDRESS, LIMIT, OFFSET}, _, State) ->
 	#{ select_transaction_range_folder_address_stmt := Stmt } = State,
 	{Time, Reply} = timer:tc(fun() ->
@@ -649,6 +662,28 @@ handle_call({select_transaction_total_folder_address, FOLDER, FROM_ADDRESS}, _, 
 		end
 	end),
 	record_query_time(select_transaction_total_folder_address, Time),
+	{reply, Reply, State};
+
+handle_call({select_transaction_range_label_address, LABEL, FROM_ADDRESS, LIMIT, OFFSET}, _, State) ->
+	#{ select_transaction_range_label_address_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [LABEL, FROM_ADDRESS, LIMIT, OFFSET], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:map(fun tx_map/1, Rows)
+		end
+	end),
+	record_query_time(select_transaction_range_label_address, Time),
+	{reply, Reply, State};
+
+handle_call({select_transaction_total_label_address, LABEL, FROM_ADDRESS}, _, State) ->
+	#{ select_transaction_total_label_address_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [LABEL, FROM_ADDRESS], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:nth(1, lists:nth(1, Rows))
+		end
+	end),
+	record_query_time(select_transaction_total_label_address, Time),
 	{reply, Reply, State};
 
 handle_call({select_transaction_range_filter_address_filename, CONTENT_TYPE, FROM_ADDRESS, FILE_NAME, LIMIT, OFFSET}, _, State) ->
@@ -841,6 +876,8 @@ terminate(Reason, State) ->
 		select_transaction_total_filter_address_stmt := SelectTransactionTotalFilterAddressStmt,
 		select_transaction_range_folder_address_stmt := SelectTransactionRangeFolderAddressStmt,
 		select_transaction_total_folder_address_stmt := SelectTransactionTotalFolderAddressStmt,
+		select_transaction_range_label_address_stmt := SelectTransactionRangeLabelAddressStmt,
+		select_transaction_total_label_address_stmt := SelectTransactionTotalLabelAddressStmt,
 		update_tx_label_stmt := UpdateTxLabelStmt,
 		update_tx_star_stmt := UpdateTxStarStmt,
 		update_tx_folder_stmt := UpdateTxFolderStmt,
@@ -864,6 +901,8 @@ terminate(Reason, State) ->
 	ar_sqlite3:finalize(SelectTransactionTotalFilterAddressStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectTransactionRangeFolderAddressStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectTransactionTotalFolderAddressStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectTransactionRangeLabelAddressStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectTransactionTotalLabelAddressStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(UpdateTxLabelStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(UpdateTxStarStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(UpdateTxFolderStmt, ?DRIVER_TIMEOUT),
@@ -1180,10 +1219,28 @@ full_block_to_fields(FullBlock) ->
 			FileSummary = ar_storage:find_value_in_tags(<<"File-Summary">>, TagsMap),
 			CipherALG = ar_storage:find_value_in_tags(<<"Cipher-ALG">>, TagsMap),
 			IsPublic = ar_storage:find_value_in_tags(<<"File-Public">>, TagsMap),
-			EntityType = ar_storage:find_value_in_tags(<<"Entity-Type">>, TagsMap),
+			% EntityType = ar_storage:find_value_in_tags(<<"Entity-Type">>, TagsMap),
 			AppName = ar_storage:find_value_in_tags(<<"App-Name">>, TagsMap),
 			AppVersion = ar_storage:find_value_in_tags(<<"App-Version">>, TagsMap),
 			AgentName = ar_storage:find_value_in_tags(<<"Agent-Name">>, TagsMap),
+			BundleFormat = ar_storage:find_value_in_tags(<<"Bundle-Format">>, TagsMap),
+			EntityType = case BundleFormat of 
+							"binary" -> 
+								"Bundle";
+							_ -> 
+								EntityTypeItem = ar_storage:find_value_in_tags(<<"Entity-Type">>, TagsMap),
+								case byte_size(EntityTypeItem) > 0 of
+									true ->
+										EntityTypeItem;
+									false ->
+										case byte_size(FileName) > 0 of
+											true ->
+												"File";
+											false ->
+												"Tx"
+										end
+								end
+						end,
 			Bundleid = <<"">>,
 			Item_star = <<"">>,
 			Item_label = <<"">>,
@@ -1269,10 +1326,28 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 	FileSummary = ar_storage:find_value_in_tags(<<"File-Summary">>, TagsMap),
 	CipherALG = ar_storage:find_value_in_tags(<<"Cipher-ALG">>, TagsMap),
 	IsPublic = ar_storage:find_value_in_tags(<<"File-Public">>, TagsMap),
-	EntityType = ar_storage:find_value_in_tags(<<"Entity-Type">>, TagsMap),
+	% EntityType = ar_storage:find_value_in_tags(<<"Entity-Type">>, TagsMap),
 	AppName = ar_storage:find_value_in_tags(<<"App-Name">>, TagsMap),
 	AppVersion = ar_storage:find_value_in_tags(<<"App-Version">>, TagsMap),
 	AgentName = ar_storage:find_value_in_tags(<<"Agent-Name">>, TagsMap),
+	BundleFormat = ar_storage:find_value_in_tags(<<"Bundle-Format">>, TagsMap),
+	EntityType = case BundleFormat of 
+					"binary" -> 
+						"Bundle";
+					_ -> 
+						EntityTypeItem = ar_storage:find_value_in_tags(<<"Entity-Type">>, TagsMap),
+						case byte_size(EntityTypeItem) > 0 of
+							true ->
+								EntityTypeItem;
+							false ->
+								case byte_size(FileName) > 0 of
+									true ->
+										"File";
+									false ->
+										"Tx"
+								end
+						end
+				end,
 	Bundleid = <<"">>,
 	Item_star = <<"">>,
 	Item_label = <<"">>,

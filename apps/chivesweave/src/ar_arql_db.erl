@@ -7,7 +7,7 @@
 		select_address_range/2, select_address_total/0,
 		select_transaction_range/2, select_transaction_total/0, 
 		select_transaction_range_filter/3, select_transaction_total_filter/1, 
-		select_transaction_range_filter_address/4, select_transaction_total_filter_address/2, 
+		select_transaction_range_filter_address_folder/5, select_transaction_total_filter_address_folder/3, 
 		select_transaction_range_filter_address_filename/5, select_transaction_total_filter_address_filename/3, 
 		select_transaction_range_filter_filename/4, select_transaction_total_filter_filename/2,
 		update_tx_label/3, update_tx_folder/3, update_tx_star/3, update_tx_public/3
@@ -192,20 +192,20 @@ DROP INDEX idx_address_timestamp;
 -define(SELECT_ADDRESS_RANGE_SQL, "SELECT * FROM address order by balance desc LIMIT ? OFFSET ?").
 -define(SELECT_ADDRESS_TOTAL, "SELECT COUNT(*) AS NUM FROM address").
 
--define(SELECT_TRANSACTION_RANGE_SQL, "SELECT * FROM tx where is_encrypt = '' and entity_type = 'file' order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_RANGE_FILTER_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file' order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_RANGE_SQL, "SELECT * FROM tx where is_encrypt = '' order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_RANGE_FILTER_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' order by timestamp desc LIMIT ? OFFSET ?").
 
--define(SELECT_TRANSACTION_TOTAL, "SELECT COUNT(*) AS NUM FROM tx where is_encrypt = '' and entity_type = 'file'").
--define(SELECT_TRANSACTION_TOTAL_FILTER, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file'").
+-define(SELECT_TRANSACTION_TOTAL, "SELECT COUNT(*) AS NUM FROM tx where is_encrypt = '' and (entity_type = 'file' or entity_type = '')").
+-define(SELECT_TRANSACTION_TOTAL_FILTER, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and (entity_type = 'file' or entity_type = '')").
 
--define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file' and from_address = ? order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file' and from_address = ?").
+-define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and (entity_type = 'file' or entity_type = '') and from_address = ? and item_parent = ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and (entity_type = 'file' or entity_type = '') and from_address = ? and item_parent = ?").
 
--define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_FILENAME_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file' and from_address = ? and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file' and from_address = ? and item_name like ?").
+-define(SELECT_TRANSACTION_RANGE_FILTER_ADDRESS_FILENAME_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and (entity_type = 'file' or entity_type = '') and from_address = ? and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and (entity_type = 'file' or entity_type = '') and from_address = ? and item_name like ?").
 
--define(SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file' and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'file' and item_name like ?").
+-define(SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and (entity_type = 'file' or entity_type = '') and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and (entity_type = 'file' or entity_type = '') and item_name like ?").
 
 -define(UPDATE_TX_LABEL_SQL, "update tx set item_label = ? where id = ? and timestamp < ?").
 -define(UPDATE_TX_STAR_SQL, "update tx set item_star = ? where id = ? and timestamp < ?").
@@ -249,11 +249,11 @@ select_transaction_range_filter(CONTENT_TYPE, LIMIT, OFFSET) ->
 select_transaction_total_filter(CONTENT_TYPE) ->
 	gen_server:call(?MODULE, {select_transaction_total_filter, CONTENT_TYPE}, ?SELECT_TIMEOUT).
 
-select_transaction_range_filter_address(CONTENT_TYPE, FROM_ADDRESS, LIMIT, OFFSET) ->
-	gen_server:call(?MODULE, {select_transaction_range_filter_address, CONTENT_TYPE, FROM_ADDRESS, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
+select_transaction_range_filter_address_folder(CONTENT_TYPE, FROM_ADDRESS, ITEM_PARENT, LIMIT, OFFSET) ->
+	gen_server:call(?MODULE, {select_transaction_range_filter_address_folder, CONTENT_TYPE, FROM_ADDRESS, ITEM_PARENT, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
 
-select_transaction_total_filter_address(CONTENT_TYPE, FROM_ADDRESS) ->
-	gen_server:call(?MODULE, {select_transaction_total_filter_address, CONTENT_TYPE, FROM_ADDRESS}, ?SELECT_TIMEOUT).
+select_transaction_total_filter_address_folder(CONTENT_TYPE, FROM_ADDRESS, ITEM_PARENT) ->
+	gen_server:call(?MODULE, {select_transaction_total_filter_address_folder, CONTENT_TYPE, FROM_ADDRESS, ITEM_PARENT}, ?SELECT_TIMEOUT).
 	
 select_transaction_range_filter_address_filename(CONTENT_TYPE, FROM_ADDRESS, FILE_NAME, LIMIT, OFFSET) ->
 	gen_server:call(?MODULE, {select_transaction_range_filter_address_filename, CONTENT_TYPE, FROM_ADDRESS, FILE_NAME, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
@@ -592,26 +592,29 @@ handle_call({select_transaction_total_filter, CONTENT_TYPE}, _, State) ->
 	record_query_time(select_transaction_total_filter, Time),
 	{reply, Reply, State};
 
-handle_call({select_transaction_range_filter_address, CONTENT_TYPE, FROM_ADDRESS, LIMIT, OFFSET}, _, State) ->
+handle_call({select_transaction_range_filter_address_folder, CONTENT_TYPE, FROM_ADDRESS, ITEM_PARENT, LIMIT, OFFSET}, _, State) ->
 	#{ select_transaction_range_filter_address_stmt := Stmt } = State,
 	{Time, Reply} = timer:tc(fun() ->
-		case stmt_fetchall(Stmt, [CONTENT_TYPE, FROM_ADDRESS, LIMIT, OFFSET], ?DRIVER_TIMEOUT) of
+		?LOG_INFO([{cCONTENT_TYPE, CONTENT_TYPE}]),
+		?LOG_INFO([{cFROM_ADDRESS, FROM_ADDRESS}]),
+		?LOG_INFO([{cITEM_PARENT, ITEM_PARENT}]),
+		case stmt_fetchall(Stmt, [CONTENT_TYPE, FROM_ADDRESS, ITEM_PARENT, LIMIT, OFFSET], ?DRIVER_TIMEOUT) of
 			Rows when is_list(Rows) ->
 				lists:map(fun tx_map/1, Rows)
 		end
 	end),
-	record_query_time(select_transaction_range_filter_address, Time),
+	record_query_time(select_transaction_range_filter_address_folder, Time),
 	{reply, Reply, State};
 
-handle_call({select_transaction_total_filter_address, CONTENT_TYPE, FROM_ADDRESS}, _, State) ->
+handle_call({select_transaction_total_filter_address_folder, CONTENT_TYPE, FROM_ADDRESS, ITEM_PARENT}, _, State) ->
 	#{ select_transaction_total_filter_address_stmt := Stmt } = State,
 	{Time, Reply} = timer:tc(fun() ->
-		case stmt_fetchall(Stmt, [CONTENT_TYPE, FROM_ADDRESS], ?DRIVER_TIMEOUT) of
+		case stmt_fetchall(Stmt, [CONTENT_TYPE, FROM_ADDRESS, ITEM_PARENT], ?DRIVER_TIMEOUT) of
 			Rows when is_list(Rows) ->
 				lists:nth(1, lists:nth(1, Rows))
 		end
 	end),
-	record_query_time(select_transaction_total_filter_address, Time),
+	record_query_time(select_transaction_total_filter_address_folder, Time),
 	{reply, Reply, State};
 
 handle_call({select_transaction_range_filter_address_filename, CONTENT_TYPE, FROM_ADDRESS, FILE_NAME, LIMIT, OFFSET}, _, State) ->

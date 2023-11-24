@@ -1422,7 +1422,7 @@ read_block_from_height_by_number(FromHeight, BlockNumber, PageId) ->
 					[]
 			end
 		end, BlockHeightArrayReverse),
-	?LOG_INFO([{read_block_from_height_by_number________BlockListElement, BlockListElement}]),
+	% ?LOG_INFO([{read_block_from_height_by_number________BlockListElement, BlockListElement}]),
 	BlockListElementMap = lists:filter(fun(Element) -> is_map(Element) end, BlockListElement),
 	CurrentBlockHeight = ar_node:get_height(),
 	BlockListElementResult = #{

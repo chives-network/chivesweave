@@ -1417,6 +1417,23 @@ handle(<<"GET">>, [<<"file">>, <<"label">>, Label, Addr, PageId, PageSize], Req,
 
 %% ===========================================================================================================================
 %% Get Files For Wallet Address
+handle(<<"GET">>, [<<"file">>, <<"group">>, <<"label">>, Addr], Req, _Pid) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			{ok, Config} = application:get_env(chivesweave, config),
+			case lists:member(serve_arql, Config#config.enable) of
+				true ->
+					{Status, Headers, Body} = handle_get_transaction_group_label_address(Addr),
+					{Status, Headers, Body, Req};
+				false ->
+					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+			end
+	end;
+
+%% ===========================================================================================================================
+%% Get Files For Wallet Address
 handle(<<"GET">>, [<<"file">>, <<"star">>, Star, Addr, PageId, PageSize], Req, _Pid) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->
@@ -3118,6 +3135,19 @@ handle_get_transaction_records_label_address(Label, Address, PageId, PageSize) -
 			end
 	catch _:_ ->
 		{404, #{}, []}
+	end.
+
+handle_get_transaction_group_label_address(Address) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Address) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			case ar_arql_db:select_transaction_group_label_address(Address) of
+				GroupRes ->
+					{200, #{}, ar_serialize:jsonify(GroupRes)};
+				_ ->
+					{200, #{}, ar_serialize:jsonify([])}
+			end
 	end.
 
 handle_get_transaction_records_star_address(Star, Address, PageId, PageSize) ->

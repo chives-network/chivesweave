@@ -14,6 +14,7 @@
 		select_transaction_range_filter_address_filename/5, select_transaction_total_filter_address_filename/3, 
 		select_transaction_range_filter_filename/4, select_transaction_total_filter_filename/2,
 		select_transaction_group_label_address/1,
+		select_folder_address/1,
 		update_tx_label/3, update_tx_folder/3, update_tx_star/3, update_tx_public/3
 		]).
 
@@ -218,8 +219,8 @@ DROP INDEX idx_address_timestamp;
 -define(UPDATE_TX_FOLDER_SQL, "update tx set item_parent = ? where id = ? and timestamp < ?").
 -define(UPDATE_TX_PUBLIC_SQL, "update tx set is_public = ? where id = ? and timestamp < ?").
 
--define(SELECT_TRANSACTION_RANGE_FOLDER_ADDRESS_SQL, "SELECT * FROM tx where item_parent = ? and is_encrypt = '' and entity_type = 'File' and from_address = ? order by timestamp desc LIMIT ? OFFSET ?").
--define(SELECT_TRANSACTION_TOTAL_FOLDER_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where item_parent = ? and is_encrypt = '' and entity_type = 'File' and from_address = ?").
+-define(SELECT_TRANSACTION_RANGE_FOLDER_ADDRESS_SQL, "SELECT * FROM tx where item_parent = ? and is_encrypt = '' and (entity_type = 'File' or entity_type = 'Folder') and from_address = ? order by entity_type desc, timestamp desc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_FOLDER_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where item_parent = ? and is_encrypt = '' and (entity_type = 'File' or entity_type = 'Folder') and from_address = ?").
 
 -define(SELECT_TRANSACTION_RANGE_LABEL_ADDRESS_SQL, "SELECT * FROM tx where item_label = ? and is_encrypt = '' and entity_type = 'File' and from_address = ? order by timestamp desc LIMIT ? OFFSET ?").
 -define(SELECT_TRANSACTION_TOTAL_LABEL_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where item_label = ? and is_encrypt = '' and entity_type = 'File' and from_address = ?").
@@ -228,6 +229,8 @@ DROP INDEX idx_address_timestamp;
 -define(SELECT_TRANSACTION_TOTAL_STAR_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where item_star = ? and is_encrypt = '' and entity_type = 'File' and from_address = ?").
 
 -define(SELECT_TRANSACTION_GROUP_LABEL_ADDRESS, "SELECT item_label, COUNT(*) AS NUM FROM tx where is_encrypt = '' and entity_type = 'File' and from_address = ? group by item_label").
+
+-define(SELECT_FOLDER_ADDRESS, "SELECT * FROM tx where is_encrypt = '' and entity_type = 'Folder' and from_address = ? order by timestamp desc").
 
 %%%===================================================================
 %%% Public API.
@@ -283,6 +286,9 @@ select_transaction_range_label_address(LABEL, FROM_ADDRESS, LIMIT, OFFSET) ->
 
 select_transaction_group_label_address(FROM_ADDRESS) ->
 	gen_server:call(?MODULE, {select_transaction_group_label_address, FROM_ADDRESS}, ?SELECT_TIMEOUT).
+
+select_folder_address(FROM_ADDRESS) ->
+	gen_server:call(?MODULE, {select_folder_address, FROM_ADDRESS}, ?SELECT_TIMEOUT).
 
 select_transaction_total_label_address(LABEL, FROM_ADDRESS) ->
 	gen_server:call(?MODULE, {select_transaction_total_label_address, LABEL, FROM_ADDRESS}, ?SELECT_TIMEOUT).
@@ -413,6 +419,7 @@ init([]) ->
 	{ok, UpdateTxFolderStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_TX_FOLDER_SQL, ?DRIVER_TIMEOUT),
 	{ok, UpdateTxPublicStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_TX_PUBLIC_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionGroupLabelAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_GROUP_LABEL_ADDRESS, ?DRIVER_TIMEOUT),
+	{ok, SelectFolderAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_FOLDER_ADDRESS, ?DRIVER_TIMEOUT),
 	{ok, #{
 		data_dir => DataDir,
 		conn => Conn,
@@ -445,7 +452,8 @@ init([]) ->
 		update_tx_star_stmt => UpdateTxStarStmt,
 		update_tx_folder_stmt => UpdateTxFolderStmt,
 		update_tx_public_stmt => UpdateTxPublicStmt,
-		select_transaction_group_label_address_stmt => SelectTransactionGroupLabelAddressStmt
+		select_transaction_group_label_address_stmt => SelectTransactionGroupLabelAddressStmt,
+		select_folder_address_stmt => SelectFolderAddressStmt
 	}}.
 
 handle_call({insert_full_block, BlockFields, TxFieldsList, TagFieldsList}, _From, State) ->
@@ -721,6 +729,17 @@ handle_call({select_transaction_group_label_address, FROM_ADDRESS}, _, State) ->
 	record_query_time(select_transaction_group_label_address, Time),
 	{reply, Reply, State};
 
+handle_call({select_folder_address, FROM_ADDRESS}, _, State) ->
+	#{ select_folder_address_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [FROM_ADDRESS], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:map(fun tx_map/1, Rows)
+		end
+	end),
+	record_query_time(select_folder_address, Time),
+	{reply, Reply, State};
+
 handle_call({select_transaction_range_star_address, STAR, FROM_ADDRESS, LIMIT, OFFSET}, _, State) ->
 	#{ select_transaction_range_star_address_stmt := Stmt } = State,
 	{Time, Reply} = timer:tc(fun() ->
@@ -941,7 +960,8 @@ terminate(Reason, State) ->
 		update_tx_star_stmt := UpdateTxStarStmt,
 		update_tx_folder_stmt := UpdateTxFolderStmt,
 		update_tx_public_stmt := UpdateTxPublicStmt,
-		select_transaction_group_label_address_stmt := SelectTransactionGroupLabelAddressStmt
+		select_transaction_group_label_address_stmt := SelectTransactionGroupLabelAddressStmt,
+		select_folder_address_stmt := SelectFolderAddressStmt
 	} = State,
 	?LOG_INFO([{ar_arql_db, terminate}, {reason, Reason}]),
 	ar_sqlite3:finalize(InsertBlockStmt, ?DRIVER_TIMEOUT),
@@ -970,6 +990,7 @@ terminate(Reason, State) ->
 	ar_sqlite3:finalize(UpdateTxFolderStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(UpdateTxPublicStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectTransactionGroupLabelAddressStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectFolderAddressStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:close(Conn, ?DRIVER_TIMEOUT).
 
 %%%===================================================================

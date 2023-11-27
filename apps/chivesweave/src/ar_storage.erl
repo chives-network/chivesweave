@@ -2658,10 +2658,20 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 																	ar_arql_db:update_tx_folder(EntityTarget, FileTxId, BlockTimestamp);
 																<<"Public">> -> 
 																	ar_arql_db:update_tx_public(EntityTarget, FileTxId, BlockTimestamp);
+																<<"RenameFolder">> -> 
+																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
+																	ar_arql_db:update_rename_folder(EntityTarget, FileTxId, BlockTimestamp);
+																<<"DeleteFolder">> -> 
+																	ar_arql_db:update_delete_folder(EntityTarget, FileTxId, BlockTimestamp);
+																<<"Restorefolder">> -> 
+																	ar_arql_db:update_restore_folder(EntityTarget, FileTxId, BlockTimestamp);
 																_ -> ok
 															end;
 														false ->[]
 													end;
+												<<"Folder">> ->
+													% Not Need Do In Here, In insert_tx function
+													ok;
 												_ ->
 													ok
 											end,

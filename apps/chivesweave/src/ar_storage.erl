@@ -2636,45 +2636,6 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 								true ->
 									case maps:is_key(<<"height">>, BlockStructure) of
 										true ->
-											%% Update File Status
-											EntityType = find_value_in_tags(<<"Entity-Type">>, TagsMap),
-											EntityAction = find_value_in_tags(<<"Entity-Action">>, TagsMap),
-											EntityTarget = find_value_in_tags(<<"Entity-Target">>, TagsMap),
-											FileTxId = find_value_in_tags(<<"File-TxId">>, TagsMap),
-											BlockTimestamp = maps:get(<<"timestamp">>, BlockStructure),
-											case EntityType of
-												<<"Action">> ->
-													% Do The Action Operation
-													?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FileTxId, FileTxId}]),
-													case ar_util:safe_decode(FileTxId) of
-														{ok, _} ->
-															case EntityAction of
-																<<"Label">> -> 
-																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
-																	ar_arql_db:update_tx_label(EntityTarget, FileTxId, BlockTimestamp);
-																<<"Star">> -> 
-																	ar_arql_db:update_tx_star(EntityTarget, FileTxId, BlockTimestamp);
-																<<"Folder">> -> 
-																	ar_arql_db:update_tx_folder(EntityTarget, FileTxId, BlockTimestamp);
-																<<"Public">> -> 
-																	ar_arql_db:update_tx_public(EntityTarget, FileTxId, BlockTimestamp);
-																<<"RenameFolder">> -> 
-																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
-																	ar_arql_db:update_rename_folder(EntityTarget, FileTxId, BlockTimestamp);
-																<<"DeleteFolder">> -> 
-																	ar_arql_db:update_delete_folder(EntityTarget, FileTxId, BlockTimestamp);
-																<<"Restorefolder">> -> 
-																	ar_arql_db:update_restore_folder(EntityTarget, FileTxId, BlockTimestamp);
-																_ -> ok
-															end;
-														false ->[]
-													end;
-												<<"Folder">> ->
-													% Not Need Do In Here, In insert_tx function
-													ok;
-												_ ->
-													ok
-											end,
 											%% Insert into Txs & Tags
 											BlockHeight = maps:get(<<"height">>, BlockStructure),
 											BlockHash = maps:get(<<"indep_hash">>, BlockStructure),
@@ -2748,7 +2709,57 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 													end,
 													TagsList),
 											% ?LOG_INFO([{handle_get_tx_unbundle__________________________________________INSERT_ARQL___TagFieldsList, TagFieldsList}]),
-											ar_arql_db:insert_tx(TXFields, TagFieldsList);
+											ar_arql_db:insert_tx(TXFields, TagFieldsList),
+
+											%% Update File Status
+											EntityType = find_value_in_tags(<<"Entity-Type">>, TagsMap),
+											EntityAction = find_value_in_tags(<<"Entity-Action">>, TagsMap),
+											EntityTarget = find_value_in_tags(<<"Entity-Target">>, TagsMap),
+											FileTxId = find_value_in_tags(<<"File-TxId">>, TagsMap),
+											BlockTimestamp = maps:get(<<"timestamp">>, BlockStructure),
+											case EntityType of
+												<<"Action">> ->
+													% Do The Action Operation
+													?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FileTxId, FileTxId}]),
+													case ar_util:safe_decode(FileTxId) of
+														{ok, _} ->
+															case EntityAction of
+																<<"Label">> -> 
+																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
+																	ar_arql_db:update_tx_label(EntityTarget, FileTxId, BlockTimestamp);
+																<<"Star">> -> 
+																	ar_arql_db:update_tx_star(EntityTarget, FileTxId, BlockTimestamp);
+																<<"Folder">> -> 
+																	ar_arql_db:update_tx_folder(EntityTarget, FileTxId, BlockTimestamp);
+																<<"Public">> -> 
+																	ar_arql_db:update_tx_public(EntityTarget, FileTxId, BlockTimestamp);
+																<<"RenameFolder">> -> 
+																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
+																	ar_arql_db:update_rename_folder(EntityTarget, FileTxId, BlockTimestamp);
+																<<"DeleteFolder">> -> 
+																	ar_arql_db:update_delete_folder(EntityTarget, FileTxId, BlockTimestamp);
+																<<"Restorefolder">> -> 
+																	ar_arql_db:update_restore_folder(EntityTarget, FileTxId, BlockTimestamp);
+																<<"Profile">> -> 
+																	ar_arql_db:update_address_profile(DataItemId, FromAddress, BlockTimestamp);
+																<<"IsBroker">> -> 
+																	ar_arql_db:update_address_isbroker(<<"1">>, FromAddress, BlockTimestamp);
+																<<"Referee">> -> 
+																	RefereeAddress = find_value_in_tags(<<"Referee-Address">>, TagsMap),
+																	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(RefereeAddress) of
+																		{ok, RefereeAddressOK} ->
+																			ar_arql_db:update_address_referee(RefereeAddressOK, FromAddress, BlockTimestamp)
+																	end;																	
+																_ -> ok
+															end;
+														false ->[]
+													end;
+												<<"Folder">> ->
+													% Not Need Do In Here, In insert_tx function
+													ok;
+												_ ->
+													ok
+											end;
 										false ->
 											ok
 									end;

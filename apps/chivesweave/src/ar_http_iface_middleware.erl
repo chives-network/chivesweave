@@ -1276,8 +1276,44 @@ handle(<<"GET">>, [<<"address">>, PageId, PageSize], Req, _Pid) ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
 
+%% Return address records by from and size.
+%% GET request to endpoint /address/referee/{Addresss}/{PageId}/{PageSize}.
+handle(<<"GET">>, [<<"address">>, <<"referee">>, Addresss, PageId, PageSize], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_arql, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_address_referee_records(Addresss, PageId, PageSize),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+%% Return address records by from and size.
+%% GET request to endpoint /address/isbroker/{PageId}/{PageSize}.
+handle(<<"GET">>, [<<"address">>, <<"isbroker">>, PageId, PageSize], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_arql, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_address_isbroker_records(PageId, PageSize),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+%% Return address records by from and size.
+%% GET request to endpoint /profile/{Addresss}.
+handle(<<"GET">>, [<<"profile">>, Addresss], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_arql, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_my_profile(Addresss),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
 %% Return transaction records by from and size.
-%% GET request to endpoint /address/{PageId}/{PageSize}.
+%% GET request to endpoint /transaction/{PageId}/{PageSize}.
 handle(<<"GET">>, [<<"transaction">>, PageId, PageSize], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
@@ -2953,6 +2989,98 @@ handle_get_address_records(PageId, PageSize) ->
 		{404, #{}, []}
 	end.
 
+handle_get_address_referee_records(RefereeAddress, PageId, PageSize) ->
+	try binary_to_integer(PageSize) of
+		PageSizeInt ->				
+			PageSizeNew = if
+				PageSizeInt < 0 -> 5;
+				PageSizeInt > 100 -> 100;
+				true -> PageSizeInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						true -> PageIdInt
+					end,
+					AddressTotal  = case ar_arql_db:select_address_referee_total() of
+						TotalRes ->
+							TotalRes;
+						_ -> 
+							0							
+					end,
+					case ar_arql_db:select_address_referee_range(RefereeAddress, PageSizeNew, PageIdNew * PageSizeNew) of
+						not_found ->
+							{404, #{}, []};
+						Res ->
+							% ?LOG_INFO([{handle_get_blocklist_data, Res}]),
+							AddressResult = #{
+									<<"data">> => Res,
+									<<"total">> => AddressTotal,
+									<<"from">> => PageIdNew * PageSizeNew,
+									<<"pageid">> => PageIdNew,
+									<<"pagesize">> => PageSize,
+									<<"allpages">> => ceil(AddressTotal / PageSizeNew) div 1
+								},
+							{200, #{}, ar_serialize:jsonify(AddressResult)}
+					end
+			catch _:_ ->
+				{404, #{}, []}
+			end
+	catch _:_ ->
+		{404, #{}, []}
+	end.
+
+handle_get_address_isbroker_records(PageId, PageSize) ->
+	try binary_to_integer(PageSize) of
+		PageSizeInt ->				
+			PageSizeNew = if
+				PageSizeInt < 0 -> 5;
+				PageSizeInt > 100 -> 100;
+				true -> PageSizeInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						true -> PageIdInt
+					end,
+					AddressTotal  = case ar_arql_db:select_address_isbroker_total() of
+						TotalRes ->
+							TotalRes;
+						_ -> 
+							0							
+					end,
+					case ar_arql_db:select_address_isbroker_range(PageSizeNew, PageIdNew * PageSizeNew) of
+						not_found ->
+							{404, #{}, []};
+						Res ->
+							% ?LOG_INFO([{handle_get_blocklist_data, Res}]),
+							AddressResult = #{
+									<<"data">> => Res,
+									<<"total">> => AddressTotal,
+									<<"from">> => PageIdNew * PageSizeNew,
+									<<"pageid">> => PageIdNew,
+									<<"pagesize">> => PageSize,
+									<<"allpages">> => ceil(AddressTotal / PageSizeNew) div 1
+								},
+							{200, #{}, ar_serialize:jsonify(AddressResult)}
+					end
+			catch _:_ ->
+				{404, #{}, []}
+			end
+	catch _:_ ->
+		{404, #{}, []}
+	end.
+
+handle_get_my_profile(Address) ->
+	case ar_arql_db:select_address_profile_my(Address) of
+		not_found ->
+			{404, #{}, []};
+		Res ->
+			% ?LOG_INFO([{handle_get_blocklist_data, Res}]),
+			{200, #{}, ar_serialize:jsonify(Res)}
+	end.
 
 handle_get_transaction_records(PageId, PageSize) ->
 	try binary_to_integer(PageSize) of

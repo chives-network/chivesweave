@@ -5,6 +5,9 @@
 		select_tags_by_tx_id/1, eval_legacy_arql/1, insert_full_block/1, insert_full_block/2,
 		insert_block/1, insert_tx/4, insert_tx/5, insert_tx/2,
 		select_address_range/2, select_address_total/0,
+		select_address_referee_range/3, select_address_referee_total/1,
+		select_address_isbroker_range/2, select_address_isbroker_total/0,
+		select_address_profile_range/2, select_address_profile_total/0, select_address_profile_my/1,
 		select_transaction_range/2, select_transaction_total/0, 
 		select_transaction_range_filter/3, select_transaction_total_filter/1, 
 		select_transaction_range_filetype_address/4, select_transaction_total_filetype_address/2, 
@@ -15,7 +18,8 @@
 		select_transaction_range_filter_filename/4, select_transaction_total_filter_filename/2,
 		select_transaction_group_label_address/1,
 		select_folder_address/1,
-		update_tx_label/3, update_tx_folder/3, update_tx_star/3, update_tx_public/3
+		update_tx_label/3, update_tx_folder/3, update_tx_star/3, update_tx_public/3,
+		update_address_referee/3, update_address_isbroker/3, update_address_profile/3
 		]).
 
 -export([init/1, handle_call/3, handle_cast/2, terminate/2]).
@@ -56,8 +60,20 @@ CREATE TABLE address (
 	txs INTEGER,
 	sent INTEGER,
 	received INTEGER,
+
 	lastblock INTEGER,
-	timestamp INTEGER
+	timestamp INTEGER,
+	profile TEXT,
+	chivesDrive INTEGER,
+	chivesEmail INTEGER,
+	
+	chivesBlog INTEGER,
+	chivesMessage INTEGER,
+	chivesForum INTEGER,
+	chivesDb INTEGER,
+	isBroker INTEGER,
+
+	referee TEXT
 );
 
 CREATE TABLE block (
@@ -149,6 +165,15 @@ CREATE INDEX idx_tag_name_value ON tag (name, value);
 
 CREATE INDEX idx_address_lastblock ON address (lastblock);
 CREATE INDEX idx_address_timestamp ON address (timestamp);
+CREATE INDEX idx_address_profile ON address (profile);
+CREATE INDEX idx_address_chivesDrive ON address (chivesDrive);
+CREATE INDEX idx_address_chivesEmail ON address (chivesEmail);
+CREATE INDEX idx_address_chivesBlog ON address (chivesBlog);
+CREATE INDEX idx_address_chivesMessage ON address (chivesMessage);
+CREATE INDEX idx_address_chivesForum ON address (chivesForum);
+CREATE INDEX idx_address_chivesDb ON address (chivesDb);
+CREATE INDEX idx_address_isBroker ON address (isBroker);
+CREATE INDEX idx_address_referee ON address (referee);
 ").
 
 -define(DROP_INDEXES_SQL, "
@@ -180,10 +205,20 @@ DROP INDEX idx_tag_name_value;
 
 DROP INDEX idx_address_lastblock;
 DROP INDEX idx_address_timestamp;
+DROP INDEX idx_address_profile;
+DROP INDEX idx_address_chivesDrive;
+DROP INDEX idx_address_chivesEmail;
+DROP INDEX idx_address_chivesBlog;
+DROP INDEX idx_address_chivesMessage;
+DROP INDEX idx_address_chivesForum;
+DROP INDEX idx_address_chivesDb;
+DROP INDEX idx_address_isBroker;
+DROP INDEX idx_address_referee;
+
 ").
 
 -define(INSERT_BLOCK_SQL, "INSERT OR REPLACE INTO block VALUES (?, ?, ?, ?)").
--define(INSERT_TX_SQL, "INSERT OR REPLACE INTO tx VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").
+-define(INSERT_TX_SQL, "INSERT OR REPLACE INTO tx VALUES (?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?)").
 -define(INSERT_TAG_SQL, "INSERT OR REPLACE INTO tag VALUES (?, ?, ?)").
 -define(SELECT_TX_BY_ID_SQL, "SELECT * FROM tx WHERE id = ?").
 
@@ -195,9 +230,21 @@ DROP INDEX idx_address_timestamp;
 
 -define(SELECT_TAGS_BY_TX_ID_SQL, "SELECT * FROM tag WHERE tx_id = ?").
 
--define(INSERT_ADDRESS_SQL, "INSERT OR REPLACE INTO address VALUES (?, ?, ?, ?, ?, ?, ?)").
+-define(INSERT_ADDRESS_SQL, "INSERT OR REPLACE INTO address (address, balance, lastblock, timestamp) VALUES (?, ?, ?, ?)").
 -define(SELECT_ADDRESS_RANGE_SQL, "SELECT * FROM address order by balance desc LIMIT ? OFFSET ?").
 -define(SELECT_ADDRESS_TOTAL, "SELECT COUNT(*) AS NUM FROM address").
+
+-define(SELECT_ADDRESS_REFEREE_RANGE_SQL, "SELECT * FROM address where referee = ? order by balance desc LIMIT ? OFFSET ?").
+-define(SELECT_ADDRESS_REFEREE_TOTAL, "SELECT COUNT(*) AS NUM FROM address where referee = ? ").
+-define(UPDATE_ADDRESS_REFEREE_SQL, "update address set referee = ? where address = ? and timestamp < ?").
+-define(SELECT_ADDRESS_ISBROKER_RANGE_SQL, "SELECT * FROM address where IsBroker = '1' order by balance desc LIMIT ? OFFSET ?").
+-define(SELECT_ADDRESS_ISBROKER_TOTAL, "SELECT COUNT(*) AS NUM FROM address where IsBroker = '1' ").
+-define(UPDATE_ADDRESS_ISBROKER_SQL, "update address set IsBroker = ?, timestamp = ? where address = ? and timestamp < ?").
+
+-define(SELECT_ADDRESS_PROFILE_MY_SQL, "SELECT * FROM address where address = ?").
+-define(SELECT_ADDRESS_PROFILE_RANGE_SQL, "SELECT * FROM address where profile != null and profile != '' order by balance desc LIMIT ? OFFSET ?").
+-define(SELECT_ADDRESS_PROFILE_TOTAL, "SELECT COUNT(*) AS NUM FROM address where profile != null and profile != '' ").
+-define(UPDATE_ADDRESS_PROFILE_SQL, "update address set profile = ?, timestamp = ? where address = ? and timestamp < ?").
 
 -define(SELECT_TRANSACTION_RANGE_SQL, "SELECT * FROM tx where is_encrypt = '' order by timestamp desc LIMIT ? OFFSET ?").
 -define(SELECT_TRANSACTION_RANGE_FILTER_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' order by timestamp desc LIMIT ? OFFSET ?").
@@ -256,6 +303,27 @@ select_address_range(LIMIT, OFFSET) ->
 
 select_address_total() ->
 	gen_server:call(?MODULE, {select_address_total}, ?SELECT_TIMEOUT).
+
+select_address_referee_range(ADDRESS, LIMIT, OFFSET) ->
+	gen_server:call(?MODULE, {select_address_referee_range, ADDRESS, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
+
+select_address_referee_total(ADDRESS) ->
+	gen_server:call(?MODULE, {select_address_referee_total, ADDRESS}, ?SELECT_TIMEOUT).
+
+select_address_isbroker_range(LIMIT, OFFSET) ->
+	gen_server:call(?MODULE, {select_address_isbroker_range, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
+
+select_address_isbroker_total() ->
+	gen_server:call(?MODULE, {select_address_isbroker_total}, ?SELECT_TIMEOUT).
+
+select_address_profile_range(LIMIT, OFFSET) ->
+	gen_server:call(?MODULE, {select_address_profile_range, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
+
+select_address_profile_my(ADDRESS) ->
+	gen_server:call(?MODULE, {select_address_profile_my, ADDRESS}, ?SELECT_TIMEOUT).
+
+select_address_profile_total() ->
+	gen_server:call(?MODULE, {select_address_profile_total}, ?SELECT_TIMEOUT).
 
 select_transaction_range(LIMIT, OFFSET) ->
 	gen_server:call(?MODULE, {select_transaction_range, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
@@ -330,6 +398,18 @@ update_tx_public(IS_PUBLIC, TXID, TIMESTAMP) ->
 	gen_server:cast(?MODULE, {update_tx_public, IS_PUBLIC, TXID, TIMESTAMP}),
 	ok.
 
+update_address_referee(REFEREE, ADDRESS, TIMESTAMP) ->
+	gen_server:cast(?MODULE, {update_address_referee, REFEREE, ADDRESS, TIMESTAMP}),
+	ok.
+
+update_address_isbroker(ISBROKER, ADDRESS, TIMESTAMP) ->
+	gen_server:cast(?MODULE, {update_address_isbroker, ISBROKER, ADDRESS, TIMESTAMP}),
+	ok.
+
+update_address_profile(PROFILE, ADDRESS, TIMESTAMP) ->
+	gen_server:cast(?MODULE, {update_address_profile, PROFILE, ADDRESS, TIMESTAMP}),
+	ok.
+
 insert_full_block(FullBlock) ->
 	insert_full_block(FullBlock, store_tags).
 
@@ -398,6 +478,13 @@ init([]) ->
 	{ok, InsertAddressStmt} = ar_sqlite3:prepare(Conn, ?INSERT_ADDRESS_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectAddressRangeStmt} = ar_sqlite3:prepare(Conn, ?SELECT_ADDRESS_RANGE_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectAddressTotalStmt} = ar_sqlite3:prepare(Conn, ?SELECT_ADDRESS_TOTAL, ?DRIVER_TIMEOUT),
+	{ok, SelectAddressRefereeRangeStmt} = ar_sqlite3:prepare(Conn, ?SELECT_ADDRESS_REFEREE_RANGE_SQL, ?DRIVER_TIMEOUT),
+	{ok, SelectAddressRefereeTotalStmt} = ar_sqlite3:prepare(Conn, ?SELECT_ADDRESS_REFEREE_TOTAL, ?DRIVER_TIMEOUT),
+	{ok, SelectAddressIsBrokerRangeStmt} = ar_sqlite3:prepare(Conn, ?SELECT_ADDRESS_ISBROKER_RANGE_SQL, ?DRIVER_TIMEOUT),
+	{ok, SelectAddressIsBrokerTotalStmt} = ar_sqlite3:prepare(Conn, ?SELECT_ADDRESS_ISBROKER_TOTAL, ?DRIVER_TIMEOUT),
+	{ok, SelectAddressProfileRangeStmt} = ar_sqlite3:prepare(Conn, ?SELECT_ADDRESS_PROFILE_RANGE_SQL, ?DRIVER_TIMEOUT),
+	{ok, SelectAddressProfileMyStmt} = ar_sqlite3:prepare(Conn, ?SELECT_ADDRESS_PROFILE_MY_SQL, ?DRIVER_TIMEOUT),
+	{ok, SelectAddressProfileTotalStmt} = ar_sqlite3:prepare(Conn, ?SELECT_ADDRESS_PROFILE_TOTAL, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionRangeStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionTotalStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionRangeFilterStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_FILTER_SQL, ?DRIVER_TIMEOUT),
@@ -418,6 +505,9 @@ init([]) ->
 	{ok, UpdateTxStarStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_TX_STAR_SQL, ?DRIVER_TIMEOUT),
 	{ok, UpdateTxFolderStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_TX_FOLDER_SQL, ?DRIVER_TIMEOUT),
 	{ok, UpdateTxPublicStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_TX_PUBLIC_SQL, ?DRIVER_TIMEOUT),
+	{ok, UpdateAddressRefereeStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_ADDRESS_REFEREE_SQL, ?DRIVER_TIMEOUT),
+	{ok, UpdateAddressIsBrokerStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_ADDRESS_ISBROKER_SQL, ?DRIVER_TIMEOUT),
+	{ok, UpdateAddressProfileStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_ADDRESS_PROFILE_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionGroupLabelAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_GROUP_LABEL_ADDRESS, ?DRIVER_TIMEOUT),
 	{ok, SelectFolderAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_FOLDER_ADDRESS, ?DRIVER_TIMEOUT),
 	{ok, #{
@@ -432,6 +522,13 @@ init([]) ->
 		insert_address_stmt => InsertAddressStmt,
 		select_address_range_stmt => SelectAddressRangeStmt,
 		select_address_total_stmt => SelectAddressTotalStmt,
+		select_address_referee_range_stmt => SelectAddressRefereeRangeStmt,
+		select_address_referee_total_stmt => SelectAddressRefereeTotalStmt,
+		select_address_isbroker_range_stmt => SelectAddressIsBrokerRangeStmt,
+		select_address_isbroker_total_stmt => SelectAddressIsBrokerTotalStmt,
+		select_address_profile_range_stmt => SelectAddressProfileRangeStmt,
+		select_address_profile_my_stmt => SelectAddressProfileMyStmt,
+		select_address_profile_total_stmt => SelectAddressProfileTotalStmt,
 		select_transaction_range_stmt => SelectTransactionRangeStmt,
 		select_transaction_total_stmt => SelectTransactionTotalStmt,
 		select_transaction_range_filter_stmt => SelectTransactionRangeFilterStmt,
@@ -452,6 +549,9 @@ init([]) ->
 		update_tx_star_stmt => UpdateTxStarStmt,
 		update_tx_folder_stmt => UpdateTxFolderStmt,
 		update_tx_public_stmt => UpdateTxPublicStmt,
+		update_address_referee_stmt => UpdateAddressRefereeStmt,
+		update_address_isbroker_stmt => UpdateAddressIsBrokerStmt,
+		update_address_profile_stmt => UpdateAddressProfileStmt,
 		select_transaction_group_label_address_stmt => SelectTransactionGroupLabelAddressStmt,
 		select_folder_address_stmt => SelectFolderAddressStmt
 	}}.
@@ -484,7 +584,7 @@ handle_call({insert_full_block, BlockFields, TxFieldsList, TagFieldsList}, _From
 							node_unavailable ->
 								ok;
 							FromAddressBalance ->
-								FromAddressFields = [FromAddress, integer_to_binary(FromAddressBalance div 100000000), 0, 0, 0, lists:nth(3, BlockFields), lists:nth(4, BlockFields)],
+								FromAddressFields = [FromAddress, integer_to_binary(FromAddressBalance div 100000000), lists:nth(3, BlockFields), lists:nth(4, BlockFields)],
 								% ?LOG_INFO([{fromAddressFields___________________________________________________________________, FromAddressFields}]),
 								ok = ar_sqlite3:bind(InsertAddressStmt, FromAddressFields, ?INSERT_STEP_TIMEOUT),
 								done = ar_sqlite3:step(InsertAddressStmt, ?INSERT_STEP_TIMEOUT),
@@ -504,7 +604,7 @@ handle_call({insert_full_block, BlockFields, TxFieldsList, TagFieldsList}, _From
 									node_unavailable ->
 										ok;
 									TargetAddressBalance ->
-										TargetAddressFields = [TargetAddress, integer_to_binary(TargetAddressBalance div 100000000), 0, 0, 0, lists:nth(3, BlockFields), lists:nth(4, BlockFields)],
+										TargetAddressFields = [TargetAddress, integer_to_binary(TargetAddressBalance div 100000000), lists:nth(3, BlockFields), lists:nth(4, BlockFields)],
 										% ?LOG_INFO([{targetAddressFields___________________________________________________________________, TargetAddressFields}]),
 										ok = ar_sqlite3:bind(InsertAddressStmt, TargetAddressFields, ?INSERT_STEP_TIMEOUT),
 										done = ar_sqlite3:step(InsertAddressStmt, ?INSERT_STEP_TIMEOUT),
@@ -606,6 +706,83 @@ handle_call({select_address_total}, _, State) ->
 		end
 	end),
 	record_query_time(select_address_total, Time),
+	{reply, Reply, State};
+
+handle_call({select_address_referee_range, ADDRESS, LIMIT, OFFSET}, _, State) ->
+	#{ select_address_referee_range_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [ADDRESS, LIMIT, OFFSET], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:map(fun address_map/1, Rows)
+		end
+	end),
+	record_query_time(select_address_referee_range, Time),
+	{reply, Reply, State};
+
+handle_call({select_address_referee_total, ADDRESS}, _, State) ->
+	#{ select_address_referee_total_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [ADDRESS], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:nth(1, lists:nth(1, Rows))
+		end
+	end),
+	record_query_time(select_address_referee_total, Time),
+	{reply, Reply, State};
+
+handle_call({select_address_isbroker_range, LIMIT, OFFSET}, _, State) ->
+	#{ select_address_isbroker_range_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [LIMIT, OFFSET], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:map(fun address_map/1, Rows)
+		end
+	end),
+	record_query_time(select_address_isbroker_range, Time),
+	{reply, Reply, State};
+
+handle_call({select_address_isbroker_total}, _, State) ->
+	#{ select_address_isbroker_total_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:nth(1, lists:nth(1, Rows))
+		end
+	end),
+	record_query_time(select_address_isbroker_total, Time),
+	{reply, Reply, State};
+
+handle_call({select_address_profile_my, ADDRESS}, _, State) ->
+	#{ select_address_profile_my_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [ADDRESS], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:map(fun address_map/1, Rows)
+		end
+	end),
+	record_query_time(select_address_profile_my, Time),
+	{reply, Reply, State};
+
+handle_call({select_address_profile_range, LIMIT, OFFSET}, _, State) ->
+	#{ select_address_profile_range_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [LIMIT, OFFSET], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:map(fun address_map/1, Rows)
+		end
+	end),
+	record_query_time(select_address_profile_range, Time),
+	{reply, Reply, State};
+
+handle_call({select_address_profile_total}, _, State) ->
+	#{ select_address_profile_total_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:nth(1, lists:nth(1, Rows))
+		end
+	end),
+	record_query_time(select_address_profile_total, Time),
 	{reply, Reply, State};
 
 handle_call({select_transaction_range, LIMIT, OFFSET}, _, State) ->
@@ -907,6 +1084,51 @@ handle_cast({update_tx_public, IS_PUBLIC, TXID, TIMESTAMP}, State) ->
 	record_query_time(update_tx_public, Time),
 	{noreply, State};
 
+handle_cast({update_address_referee, REFEREE, ADDRESS, TIMESTAMP}, State) ->
+	#{ conn := Conn, update_address_referee_stmt := Stmt } = State,
+	{Time, ok} = timer:tc(fun() ->
+		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
+
+		ok = ar_sqlite3:bind(Stmt, [REFEREE, ADDRESS, TIMESTAMP], ?INSERT_STEP_TIMEOUT),
+		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
+		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
+
+		ok = ar_sqlite3:exec(Conn, "COMMIT TRANSACTION", ?INSERT_STEP_TIMEOUT),
+		ok
+	end),
+	record_query_time(update_address_referee, Time),
+	{noreply, State};
+
+handle_cast({update_address_isbroker, ISBROKER, ADDRESS, TIMESTAMP}, State) ->
+	#{ conn := Conn, update_address_isbroker_stmt := Stmt } = State,
+	{Time, ok} = timer:tc(fun() ->
+		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
+
+		ok = ar_sqlite3:bind(Stmt, [ISBROKER, TIMESTAMP, ADDRESS, TIMESTAMP], ?INSERT_STEP_TIMEOUT),
+		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
+		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
+
+		ok = ar_sqlite3:exec(Conn, "COMMIT TRANSACTION", ?INSERT_STEP_TIMEOUT),
+		ok
+	end),
+	record_query_time(update_address_isbroker, Time),
+	{noreply, State};
+
+handle_cast({update_address_profile, PROFILE, ADDRESS, TIMESTAMP}, State) ->
+	#{ conn := Conn, update_address_profile_stmt := Stmt } = State,
+	{Time, ok} = timer:tc(fun() ->
+		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
+
+		ok = ar_sqlite3:bind(Stmt, [PROFILE, TIMESTAMP, ADDRESS, TIMESTAMP], ?INSERT_STEP_TIMEOUT),
+		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
+		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
+
+		ok = ar_sqlite3:exec(Conn, "COMMIT TRANSACTION", ?INSERT_STEP_TIMEOUT),
+		ok
+	end),
+	record_query_time(update_address_profile, Time),
+	{noreply, State};
+
 handle_cast({insert_tx, TXFields, TagFieldsList}, State) ->
 	#{
 		conn := Conn,
@@ -944,6 +1166,13 @@ terminate(Reason, State) ->
 		insert_address_stmt := InsertAddressStmt,
 		select_address_range_stmt := SelectAddressRangeStmt,
 		select_address_total_stmt := SelectAddressTotalStmt,
+		select_address_referee_range_stmt := SelectAddressRefereeRangeStmt,
+		select_address_referee_total_stmt := SelectAddressRefereeTotalStmt,
+		select_address_isbroker_range_stmt := SelectAddressIsBrokerRangeStmt,
+		select_address_isbroker_total_stmt := SelectAddressIsBrokerTotalStmt,
+		select_address_profile_range_stmt := SelectAddressProfileRangeStmt,
+		select_address_profile_my_stmt := SelectAddressProfileMyStmt,
+		select_address_profile_total_stmt := SelectAddressProfileTotalStmt,
 		select_transaction_range_stmt := SelectTransactionRangeStmt,
 		select_transaction_total_stmt := SelectTransactionTotalStmt,
 		select_transaction_range_filter_stmt := SelectTransactionRangeFilterStmt,
@@ -973,6 +1202,13 @@ terminate(Reason, State) ->
 	ar_sqlite3:finalize(InsertAddressStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectAddressRangeStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectAddressTotalStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectAddressRefereeRangeStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectAddressRefereeTotalStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectAddressIsBrokerRangeStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectAddressIsBrokerTotalStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectAddressProfileRangeStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectAddressProfileMyStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(SelectAddressProfileTotalStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectTransactionRangeStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectTransactionTotalStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectTransactionRangeFilterStmt, ?DRIVER_TIMEOUT),
@@ -1134,7 +1370,16 @@ address_map([
 	Sent,
 	Received,
 	Lastblock,
-	Timestamp
+	Timestamp,
+	Profile,
+	ChivesDrive,
+	ChivesEmail,
+	ChivesBlog,
+	ChivesMessage,
+	ChivesForum,
+	ChivesDb,
+	IsBroker,
+	referee
 ]) -> #{
 	id => Address,
 	balance => Balance,
@@ -1142,7 +1387,16 @@ address_map([
 	sent => Sent,
 	received => Received,
 	lastblock => Lastblock,
-	timestamp => Timestamp
+	timestamp => Timestamp,
+	profile => Profile,
+	chivesDrive => ChivesDrive,
+	chivesEmail => ChivesEmail,
+	chivesBlog => ChivesBlog,
+	chivesMessage => ChivesMessage,
+	chivesForum => ChivesForum,
+	chivesDb => ChivesDb,
+	isBroker => IsBroker,
+	referee => referee
 }.
 
 item_label_group_map([Item_label, Number]) -> #{

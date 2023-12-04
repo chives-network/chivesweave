@@ -3003,7 +3003,7 @@ handle_get_address_referee_records(RefereeAddress, PageId, PageSize) ->
 						PageIdInt < 0 -> 0;
 						true -> PageIdInt
 					end,
-					AddressTotal  = case ar_arql_db:select_address_referee_total() of
+					AddressTotal  = case ar_arql_db:select_address_referee_total(RefereeAddress) of
 						TotalRes ->
 							TotalRes;
 						_ -> 

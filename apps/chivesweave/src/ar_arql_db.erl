@@ -1379,7 +1379,7 @@ address_map([
 	ChivesForum,
 	ChivesDb,
 	IsBroker,
-	referee
+	Referee
 ]) -> #{
 	id => Address,
 	balance => Balance,
@@ -1396,7 +1396,7 @@ address_map([
 	chivesForum => ChivesForum,
 	chivesDb => ChivesDb,
 	isBroker => IsBroker,
-	referee => referee
+	referee => Referee
 }.
 
 item_label_group_map([Item_label, Number]) -> #{

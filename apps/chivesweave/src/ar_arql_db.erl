@@ -236,15 +236,15 @@ DROP INDEX idx_address_referee;
 
 -define(SELECT_ADDRESS_REFEREE_RANGE_SQL, "SELECT * FROM address where referee = ? order by balance desc LIMIT ? OFFSET ?").
 -define(SELECT_ADDRESS_REFEREE_TOTAL, "SELECT COUNT(*) AS NUM FROM address where referee = ? ").
--define(UPDATE_ADDRESS_REFEREE_SQL, "update address set referee = ? where address = ? and timestamp < ?").
+-define(UPDATE_ADDRESS_REFEREE_SQL, "update address set referee = ? where address = ? and timestamp <= ?").
 -define(SELECT_ADDRESS_ISBROKER_RANGE_SQL, "SELECT * FROM address where IsBroker = '1' order by balance desc LIMIT ? OFFSET ?").
 -define(SELECT_ADDRESS_ISBROKER_TOTAL, "SELECT COUNT(*) AS NUM FROM address where IsBroker = '1' ").
--define(UPDATE_ADDRESS_ISBROKER_SQL, "update address set IsBroker = ?, timestamp = ? where address = ? and timestamp < ?").
+-define(UPDATE_ADDRESS_ISBROKER_SQL, "update address set IsBroker = ?, timestamp = ? where address = ? and timestamp <= ?").
 
 -define(SELECT_ADDRESS_PROFILE_MY_SQL, "SELECT * FROM address where address = ?").
 -define(SELECT_ADDRESS_PROFILE_RANGE_SQL, "SELECT * FROM address where profile != null and profile != '' order by balance desc LIMIT ? OFFSET ?").
 -define(SELECT_ADDRESS_PROFILE_TOTAL, "SELECT COUNT(*) AS NUM FROM address where profile != null and profile != '' ").
--define(UPDATE_ADDRESS_PROFILE_SQL, "update address set profile = ?, timestamp = ? where address = ? and timestamp < ?").
+-define(UPDATE_ADDRESS_PROFILE_SQL, "update address set profile = ?, timestamp = ? where address = ? and timestamp <= ?").
 
 -define(SELECT_TRANSACTION_RANGE_SQL, "SELECT * FROM tx where is_encrypt = '' order by timestamp desc LIMIT ? OFFSET ?").
 -define(SELECT_TRANSACTION_RANGE_FILTER_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' order by timestamp desc LIMIT ? OFFSET ?").

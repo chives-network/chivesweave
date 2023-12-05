@@ -1306,8 +1306,8 @@ handle(<<"GET">>, [<<"profile">>, Addresss], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
-			{Status, Headers, Body} = handle_get_my_profile(Addresss),
-			{Status, Headers, Body, Req};
+			{Status, Headers, Body, Req2} = handle_get_my_profile(Addresss, Req),
+			{Status, Headers, Body, Req2};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
@@ -3073,13 +3073,49 @@ handle_get_address_isbroker_records(PageId, PageSize) ->
 		{404, #{}, []}
 	end.
 
-handle_get_my_profile(Address) ->
+handle_get_my_profile(Address, Req) ->
 	case ar_arql_db:select_address_profile_my(Address) of
 		not_found ->
-			{404, #{}, []};
+			{404, #{}, [], Req};
 		Res ->
-			% ?LOG_INFO([{handle_get_blocklist_data, Res}]),
-			{200, #{}, ar_serialize:jsonify(Res)}
+			try
+				?LOG_INFO([{handle_get_my_profile_______Res, Res}]),
+				[#{profile := Profile} | _] = Res,
+				?LOG_INFO([{handle_get_my_profile_______Profile, Profile}]),
+				case ar_util:safe_decode(Profile) of
+					{error, invalid} ->
+						{400, #{}, <<"Invalid hash.">>, Req};
+					{ok, ID} ->
+						case ar_storage:read_tx(ID) of
+							unavailable ->
+								{ok, Config} = application:get_env(chivesweave, config),
+								DataDir = Config#config.data_dir,							
+								case ar_kv:get(xwe_storage_txid_in_bundle, ar_util:encode(ID))  of
+									not_found ->
+										{404, #{}, sendfile("data/not_found.html"), Req};
+									{ok, BundleTxBinary} ->
+										BundleTx = binary_to_term(BundleTxBinary),	
+										% ?LOG_INFO([{handle_get_tx_unbundle_____________BundleTx, BundleTx}]),
+										ContentType = maps:get(<<"type">>, maps:get(<<"data">>, BundleTx, undefined), undefined),
+										Address = maps:get(<<"address">>, maps:get(<<"owner">>, BundleTx, undefined), undefined),
+										FileName = binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, Address, ar_util:encode(ID) ])),
+										% ?LOG_INFO([{image_thumbnail_compress_to_storage_____________FileName, FileName}]),
+										case file:read_file(FileName) of
+											{ok, Content} ->
+												{200, #{ <<"content-type">> => ContentType }, Content, Req};
+											_ ->
+												{404, #{}, sendfile("data/not_found.html"), Req}
+										end
+								end;
+							#tx{} = TX ->
+								serve_tx_html_data(Req, TX)
+						end
+				end
+			catch
+				Error ->
+					?LOG_INFO([{handle_get_my_profile, Error}]),
+					{404, #{}, [], Req}
+			end
 	end.
 
 handle_get_transaction_records(PageId, PageSize) ->

@@ -2741,6 +2741,9 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 																<<"Restorefolder">> -> 
 																	ar_arql_db:update_restore_folder(EntityTarget, FileTxId, BlockTimestamp);
 																<<"Profile">> -> 
+																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________Profile, DataItemId}]),
+																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FromAddress, FromAddress}]),
+																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________BlockTimestamp, BlockTimestamp}]),
 																	ar_arql_db:update_address_profile(DataItemId, FromAddress, BlockTimestamp);
 																<<"IsBroker">> -> 
 																	ar_arql_db:update_address_isbroker(<<"1">>, FromAddress, BlockTimestamp);

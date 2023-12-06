@@ -2746,7 +2746,7 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________BlockTimestamp, BlockTimestamp}]),
 																	ar_arql_db:update_address_profile(DataItemId, FromAddress, BlockTimestamp);
 																<<"IsBroker">> -> 
-																	ar_arql_db:update_address_isbroker(<<"1">>, FromAddress, BlockTimestamp);
+																	ar_arql_db:update_address_isbroker(EntityTarget, FromAddress, BlockTimestamp);
 																<<"Referee">> -> 
 																	RefereeAddress = find_value_in_tags(<<"Referee-Address">>, TagsMap),
 																	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(RefereeAddress) of

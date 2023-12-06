@@ -2809,6 +2809,7 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 				end,
 				GetNumbersList
 			),
+			ar_arql_db:update_tx_bundletxparse(<<"1">>, ar_util:encode(TX#tx.id)),
 			% ?LOG_INFO([{handle_get_tx_unbundle________IS_Bundle_____GetDataItems, GetDataItems}]),
 			case IsReturn of
 				true ->

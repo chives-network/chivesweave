@@ -16,9 +16,10 @@
 		select_transaction_range_star_address/4, select_transaction_total_star_address/2, 
 		select_transaction_range_filter_address_filename/5, select_transaction_total_filter_address_filename/3, 
 		select_transaction_range_filter_filename/4, select_transaction_total_filter_filename/2,
+		select_transaction_range_bundletxparse/3, select_transaction_total_bundletxparse/1,
 		select_transaction_group_label_address/1,
 		select_folder_address/1,
-		update_tx_label/3, update_tx_folder/3, update_tx_star/3, update_tx_public/3,
+		update_tx_label/3, update_tx_folder/3, update_tx_star/3, update_tx_public/3, update_tx_bundletxparse/2,
 		update_address_referee/3, update_address_isbroker/3, update_address_profile/3
 		]).
 
@@ -64,14 +65,14 @@ CREATE TABLE address (
 	lastblock INTEGER,
 	timestamp INTEGER,
 	profile TEXT,
-	chivesDrive INTEGER,
-	chivesEmail INTEGER,
+	chivesDrive INTEGER DEFAULT 0,
+	chivesEmail INTEGER DEFAULT 0,
 	
-	chivesBlog INTEGER,
-	chivesMessage INTEGER,
-	chivesForum INTEGER,
-	chivesDb INTEGER,
-	isBroker INTEGER,
+	chivesBlog INTEGER DEFAULT 0,
+	chivesMessage INTEGER DEFAULT 0,
+	chivesForum INTEGER DEFAULT 0,
+	chivesDb INTEGER DEFAULT 0,
+	isBroker INTEGER DEFAULT 0,
 
 	referee TEXT
 );
@@ -118,7 +119,8 @@ CREATE TABLE tx (
 	item_node_group TEXT,
 	item_node_star TEXT,
 	item_node_hot TEXT,
-	item_node_delete TEXT
+	item_node_delete TEXT,
+	bundleTxParse INTEGER DEFAULT 0
 );
 
 CREATE TABLE tag (
@@ -158,6 +160,7 @@ CREATE INDEX idx_tx_item_node_group ON tx (item_node_group);
 CREATE INDEX idx_tx_item_node_star ON tx (item_node_star);
 CREATE INDEX idx_tx_item_node_hot ON tx (item_node_hot);
 CREATE INDEX idx_tx_item_node_delete ON tx (item_node_delete);
+CREATE INDEX idx_tx_bundleTxParse ON tx (bundleTxParse);
 
 CREATE INDEX idx_tag_tx_id ON tag (tx_id);
 CREATE INDEX idx_tag_name ON tag (name);
@@ -198,6 +201,7 @@ DROP INDEX idx_tx_item_node_group;
 DROP INDEX idx_tx_item_node_star;
 DROP INDEX idx_tx_item_node_hot;
 DROP INDEX idx_tx_item_node_delete;
+DROP INDEX idx_tx_bundleTxParse;
 
 DROP INDEX idx_tag_tx_id;
 DROP INDEX idx_tag_name;
@@ -218,7 +222,7 @@ DROP INDEX idx_address_referee;
 ").
 
 -define(INSERT_BLOCK_SQL, "INSERT OR REPLACE INTO block VALUES (?, ?, ?, ?)").
--define(INSERT_TX_SQL, "INSERT OR REPLACE INTO tx VALUES (?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?)").
+-define(INSERT_TX_SQL, "INSERT OR REPLACE INTO tx VALUES (?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?)").
 -define(INSERT_TAG_SQL, "INSERT OR REPLACE INTO tag VALUES (?, ?, ?)").
 -define(SELECT_TX_BY_ID_SQL, "SELECT * FROM tx WHERE id = ?").
 
@@ -261,10 +265,14 @@ DROP INDEX idx_address_referee;
 -define(SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'File' and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
 -define(SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'File' and item_name like ?").
 
+-define(SELECT_TRANSACTION_RANGE_BUNDLETXPARSE_SQL, "SELECT * FROM tx where bundletxparse = ? and entity_type = 'Bundle' order by timestamp asc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_TOTAL_BUNDLETXPARSE, "SELECT COUNT(*) AS NUM FROM tx where bundletxparse = ? and entity_type = 'Bundle'").
+
 -define(UPDATE_TX_LABEL_SQL, "update tx set item_label = ? where id = ? and timestamp < ?").
 -define(UPDATE_TX_STAR_SQL, "update tx set item_star = ? where id = ? and timestamp < ?").
 -define(UPDATE_TX_FOLDER_SQL, "update tx set item_parent = ? where id = ? and timestamp < ?").
 -define(UPDATE_TX_PUBLIC_SQL, "update tx set is_public = ? where id = ? and timestamp < ?").
+-define(UPDATE_TX_BUNDLETXPARSE_SQL, "update tx set bundleTxParse = ? where id = ?").
 
 -define(SELECT_TRANSACTION_RANGE_FOLDER_ADDRESS_SQL, "SELECT * FROM tx where item_parent = ? and is_encrypt = '' and (entity_type = 'File' or entity_type = 'Folder') and from_address = ? order by entity_type desc, timestamp desc LIMIT ? OFFSET ?").
 -define(SELECT_TRANSACTION_TOTAL_FOLDER_ADDRESS, "SELECT COUNT(*) AS NUM FROM tx where item_parent = ? and is_encrypt = '' and (entity_type = 'File' or entity_type = 'Folder') and from_address = ?").
@@ -379,6 +387,12 @@ select_transaction_range_filter_filename(CONTENT_TYPE, FILE_NAME, LIMIT, OFFSET)
 select_transaction_total_filter_filename(CONTENT_TYPE, FILE_NAME) ->
 	gen_server:call(?MODULE, {select_transaction_total_filter_filename, CONTENT_TYPE, FILE_NAME}, ?SELECT_TIMEOUT).
 
+select_transaction_range_bundletxparse(BUNDLETXPARSE, LIMIT, OFFSET) ->
+	gen_server:call(?MODULE, {select_transaction_range_bundletxparse, BUNDLETXPARSE, LIMIT, OFFSET}, ?SELECT_TIMEOUT).
+
+select_transaction_total_bundletxparse(BUNDLETXPARSE) ->
+	gen_server:call(?MODULE, {select_transaction_total_bundletxparse, BUNDLETXPARSE}, ?SELECT_TIMEOUT).
+
 eval_legacy_arql(Query) ->
 	gen_server:call(?MODULE, {eval_legacy_arql, Query}, ?SELECT_TIMEOUT).
 
@@ -396,6 +410,10 @@ update_tx_folder(ITEM_PARENT, TXID, TIMESTAMP) ->
 
 update_tx_public(IS_PUBLIC, TXID, TIMESTAMP) ->
 	gen_server:cast(?MODULE, {update_tx_public, IS_PUBLIC, TXID, TIMESTAMP}),
+	ok.
+
+update_tx_bundletxparse(BundleTxParse, TXID) ->
+	gen_server:cast(?MODULE, {update_tx_bundletxparse, BundleTxParse, TXID}),
 	ok.
 
 update_address_referee(REFEREE, ADDRESS, TIMESTAMP) ->
@@ -501,10 +519,13 @@ init([]) ->
 	{ok, SelectTransactionTotalFilterAddressFileNameStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_FILTER_ADDRESS_FILENAME, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionRangeFilterFileNameStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionTotalFilterFileNameStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, ?DRIVER_TIMEOUT),
+	{ok, SelectTransactionRangeBundleTxParseStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_RANGE_BUNDLETXPARSE_SQL, ?DRIVER_TIMEOUT),
+	{ok, SelectTransactionTotalBundleTxParseStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_TOTAL_BUNDLETXPARSE, ?DRIVER_TIMEOUT),
 	{ok, UpdateTxLabelStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_TX_LABEL_SQL, ?DRIVER_TIMEOUT),
 	{ok, UpdateTxStarStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_TX_STAR_SQL, ?DRIVER_TIMEOUT),
 	{ok, UpdateTxFolderStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_TX_FOLDER_SQL, ?DRIVER_TIMEOUT),
 	{ok, UpdateTxPublicStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_TX_PUBLIC_SQL, ?DRIVER_TIMEOUT),
+	{ok, UpdateTxBundleTxParseStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_TX_BUNDLETXPARSE_SQL, ?DRIVER_TIMEOUT),
 	{ok, UpdateAddressRefereeStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_ADDRESS_REFEREE_SQL, ?DRIVER_TIMEOUT),
 	{ok, UpdateAddressIsBrokerStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_ADDRESS_ISBROKER_SQL, ?DRIVER_TIMEOUT),
 	{ok, UpdateAddressProfileStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_ADDRESS_PROFILE_SQL, ?DRIVER_TIMEOUT),
@@ -545,10 +566,13 @@ init([]) ->
 		select_transaction_total_filter_address_filename_stmt => SelectTransactionTotalFilterAddressFileNameStmt,
 		select_transaction_range_filter_filename_stmt => SelectTransactionRangeFilterFileNameStmt,
 		select_transaction_total_filter_filename_stmt => SelectTransactionTotalFilterFileNameStmt,
+		select_transaction_range_bundletxparse_stmt => SelectTransactionRangeBundleTxParseStmt,
+		select_transaction_total_bundletxparse_stmt => SelectTransactionTotalBundleTxParseStmt,
 		update_tx_label_stmt => UpdateTxLabelStmt,
 		update_tx_star_stmt => UpdateTxStarStmt,
 		update_tx_folder_stmt => UpdateTxFolderStmt,
 		update_tx_public_stmt => UpdateTxPublicStmt,
+		update_tx_bundletxparse_stmt => UpdateTxBundleTxParseStmt,
 		update_address_referee_stmt => UpdateAddressRefereeStmt,
 		update_address_isbroker_stmt => UpdateAddressIsBrokerStmt,
 		update_address_profile_stmt => UpdateAddressProfileStmt,
@@ -964,10 +988,6 @@ handle_call({select_transaction_total_filter_address_filename, CONTENT_TYPE, FRO
 handle_call({select_transaction_range_filter_filename, CONTENT_TYPE, FILE_NAME, LIMIT, OFFSET}, _, State) ->
 	#{ select_transaction_range_filter_filename_stmt := Stmt } = State,
 	{Time, Reply} = timer:tc(fun() ->
-		% ?LOG_INFO([{ar_arql_db_CONTENT_TYPE, CONTENT_TYPE}]),
-		% ?LOG_INFO([{ar_arql_db_FILE_NAME, FILE_NAME}]),
-		% ?LOG_INFO([{ar_arql_db_LIMIT, LIMIT}]),
-		% ?LOG_INFO([{ar_arql_db_OFFSET, OFFSET}]),
 		case stmt_fetchall(Stmt, [CONTENT_TYPE, FILE_NAME, LIMIT, OFFSET], ?DRIVER_TIMEOUT) of
 			Rows when is_list(Rows) ->
 				lists:map(fun tx_map/1, Rows)
@@ -985,6 +1005,28 @@ handle_call({select_transaction_total_filter_filename, CONTENT_TYPE, FILE_NAME},
 		end
 	end),
 	record_query_time(select_transaction_total_filter_filename, Time),
+	{reply, Reply, State};
+
+handle_call({select_transaction_range_bundletxparse, BUNDLETXPARSE, LIMIT, OFFSET}, _, State) ->
+	#{ select_transaction_range_bundletxparse_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [BUNDLETXPARSE, LIMIT, OFFSET], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:map(fun tx_map/1, Rows)
+		end
+	end),
+	record_query_time(select_transaction_range_bundletxparse, Time),
+	{reply, Reply, State};
+
+handle_call({select_transaction_total_bundletxparse, BUNDLETXPARSE}, _, State) ->
+	#{ select_transaction_total_bundletxparse_stmt := Stmt } = State,
+	{Time, Reply} = timer:tc(fun() ->
+		case stmt_fetchall(Stmt, [BUNDLETXPARSE], ?DRIVER_TIMEOUT) of
+			Rows when is_list(Rows) ->
+				lists:nth(1, lists:nth(1, Rows))
+		end
+	end),
+	record_query_time(select_transaction_total_bundletxparse, Time),
 	{reply, Reply, State};
 
 handle_call({eval_legacy_arql, Query}, _, #{ conn := Conn } = State) ->
@@ -1082,6 +1124,21 @@ handle_cast({update_tx_public, IS_PUBLIC, TXID, TIMESTAMP}, State) ->
 		ok
 	end),
 	record_query_time(update_tx_public, Time),
+	{noreply, State};
+
+handle_cast({update_tx_bundletxparse, BUNDLETXPARSE, TXID}, State) ->
+	#{ conn := Conn, update_tx_bundletxparse_stmt := Stmt } = State,
+	{Time, ok} = timer:tc(fun() ->
+		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
+
+		ok = ar_sqlite3:bind(Stmt, [BUNDLETXPARSE, TXID], ?INSERT_STEP_TIMEOUT),
+		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
+		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
+
+		ok = ar_sqlite3:exec(Conn, "COMMIT TRANSACTION", ?INSERT_STEP_TIMEOUT),
+		ok
+	end),
+	record_query_time(update_tx_bundletxparse, Time),
 	{noreply, State};
 
 handle_cast({update_address_referee, REFEREE, ADDRESS, TIMESTAMP}, State) ->
@@ -1189,6 +1246,7 @@ terminate(Reason, State) ->
 		update_tx_star_stmt := UpdateTxStarStmt,
 		update_tx_folder_stmt := UpdateTxFolderStmt,
 		update_tx_public_stmt := UpdateTxPublicStmt,
+		update_tx_bundletxparse_stmt := UpdateTxBundleTxParseStmt,
 		select_transaction_group_label_address_stmt := SelectTransactionGroupLabelAddressStmt,
 		select_folder_address_stmt := SelectFolderAddressStmt
 	} = State,
@@ -1225,6 +1283,7 @@ terminate(Reason, State) ->
 	ar_sqlite3:finalize(UpdateTxStarStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(UpdateTxFolderStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(UpdateTxPublicStmt, ?DRIVER_TIMEOUT),
+	ar_sqlite3:finalize(UpdateTxBundleTxParseStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectTransactionGroupLabelAddressStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:finalize(SelectFolderAddressStmt, ?DRIVER_TIMEOUT),
 	ar_sqlite3:close(Conn, ?DRIVER_TIMEOUT).
@@ -1439,7 +1498,8 @@ tx_map([
 	Item_node_group,
 	Item_node_star,
 	Item_node_hot,
-	Item_node_delete
+	Item_node_delete,
+	BundleTxParse
 ]) -> #{
 	id => Id,
 	block_indep_hash => BlockIndepHash,
@@ -1475,7 +1535,8 @@ tx_map([
 	item_node_group => Item_node_group,
 	item_node_star => Item_node_star,
 	item_node_hot => Item_node_hot,
-	item_node_delete => Item_node_delete
+	item_node_delete => Item_node_delete,
+	bundleTxParse => BundleTxParse
 }.
 
 block_map([
@@ -1595,6 +1656,7 @@ full_block_to_fields(FullBlock) ->
 			Item_node_star = <<"">>,
 			Item_node_hot = <<"">>,
 			Item_node_delete = <<"">>,
+			BundleTxParse = <<"">>,
 			[
 				ar_util:encode(TX#tx.id),
 				BlockIndepHash,
@@ -1630,7 +1692,8 @@ full_block_to_fields(FullBlock) ->
 				Item_node_group,
 				Item_node_star,
 				Item_node_hot,
-				Item_node_delete
+				Item_node_delete,
+				BundleTxParse
 			]
 		end,
 		FullBlock#block.txs
@@ -1702,6 +1765,7 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 	Item_node_star = <<"">>,
 	Item_node_hot = <<"">>,
 	Item_node_delete = <<"">>,
+	BundleTxParse = <<"">>,
 	[
 		ar_util:encode(TX#tx.id),
 		ar_util:encode(BH),
@@ -1737,7 +1801,8 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 		Item_node_group,
 		Item_node_star,
 		Item_node_hot,
-		Item_node_delete
+		Item_node_delete,
+		BundleTxParse
 	].
 
 tx_to_tag_fields_list(TX) ->

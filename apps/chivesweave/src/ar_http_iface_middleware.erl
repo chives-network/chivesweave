@@ -1309,6 +1309,18 @@ handle(<<"GET">>, [<<"profile">>, Addresss], Req, _Pid) ->
 			{Status, Headers, Body, Req2} = handle_get_my_profile(Addresss, Req),
 			{Status, Headers, Body, Req2};
 		false ->
+			{200, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
+%% Return transaction records by from and size.
+%% GET request to endpoint /transaction/{PageId}/{PageSize}.
+handle(<<"GET">>, [<<"bundletx">>, PageId, PageSize], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_arql, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_transaction_bundletx(PageId, PageSize),
+			{Status, Headers, Body, Req};
+		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
 
@@ -3075,8 +3087,6 @@ handle_get_address_isbroker_records(PageId, PageSize) ->
 
 handle_get_my_profile(Address, Req) ->
 	case ar_arql_db:select_address_profile_my(Address) of
-		not_found ->
-			{404, #{}, [], Req};
 		Res ->
 			try
 				?LOG_INFO([{handle_get_my_profile_______Res, Res}]),
@@ -3084,7 +3094,7 @@ handle_get_my_profile(Address, Req) ->
 				?LOG_INFO([{handle_get_my_profile_______Profile, Profile}]),
 				case ar_util:safe_decode(Profile) of
 					{error, invalid} ->
-						{400, #{}, <<"Invalid hash.">>, Req};
+						{200, #{}, ar_serialize:jsonify(Res), Req};
 					{ok, ID} ->
 						case ar_storage:read_tx(ID) of
 							unavailable ->
@@ -3092,7 +3102,7 @@ handle_get_my_profile(Address, Req) ->
 								DataDir = Config#config.data_dir,							
 								case ar_kv:get(xwe_storage_txid_in_bundle, ar_util:encode(ID))  of
 									not_found ->
-										{404, #{}, sendfile("data/not_found.html"), Req};
+										{200, #{}, sendfile("data/not_found.html"), Req};
 									{ok, BundleTxBinary} ->
 										BundleTx = binary_to_term(BundleTxBinary),	
 										% ?LOG_INFO([{handle_get_tx_unbundle_____________BundleTx, BundleTx}]),
@@ -3104,18 +3114,72 @@ handle_get_my_profile(Address, Req) ->
 											{ok, Content} ->
 												{200, #{ <<"content-type">> => ContentType }, Content, Req};
 											_ ->
-												{404, #{}, sendfile("data/not_found.html"), Req}
+												{200, #{}, sendfile("data/not_found.html"), Req}
 										end
 								end;
 							#tx{} = TX ->
-								serve_tx_html_data(Req, TX)
+								{_, Headers, Body, Req2} = serve_tx_html_data(Req, TX),
+								{200, Headers, Body, Req2}
 						end
 				end
 			catch
 				Error ->
 					?LOG_INFO([{handle_get_my_profile, Error}]),
-					{404, #{}, [], Req}
+					{200, #{}, [], Req}
+			end;
+		_ ->
+			?LOG_INFO([{handle_get_my_profile_______Address, Address}]),
+			{200, #{}, [], Req}
+	end.
+
+handle_get_transaction_bundletx(PageId, PageSize) ->
+	try binary_to_integer(PageSize) of
+		PageSizeInt ->				
+			PageSizeNew = if
+				PageSizeInt < 0 -> 5;
+				PageSizeInt > 100 -> 100;
+				true -> PageSizeInt
+			end,
+			try binary_to_integer(PageId) of
+				PageIdInt ->
+					PageIdNew = if
+						PageIdInt < 0 -> 0;
+						true -> PageIdInt
+					end,
+					TransactionsTotal  = case ar_arql_db:select_transaction_total_bundletxparse(<<"0">>) of
+						TotalRes ->
+							TotalRes;
+						_ -> 
+							0
+					end,
+					case ar_arql_db:select_transaction_range_bundletxparse(<<"0">>, PageSizeNew, PageIdNew * PageSizeNew) of
+						not_found ->
+							{404, #{}, []};
+						Res ->
+							% ?LOG_INFO([{handle_get_blocklist_data, Res}]),
+							TxsResult = lists:map(
+								fun(TxResult) ->
+									maps:get(id, TxResult)
+								end,
+								Res
+							),
+							TxRecordFunction = ar_storage:read_txsrecord_function(TxsResult),
+							TransactionResult = #{
+									<<"table">> => Res,
+									<<"data">> => TxRecordFunction,
+									<<"total">> => TransactionsTotal,
+									<<"from">> => PageIdNew * PageSizeNew,
+									<<"pageid">> => PageIdNew,
+									<<"pagesize">> => PageSize,
+									<<"allpages">> => ceil(TransactionsTotal / PageSizeNew) div 1
+								},
+							{200, #{}, ar_serialize:jsonify(TransactionResult)}
+					end
+			catch _:_ ->
+				{404, #{}, []}
 			end
+	catch _:_ ->
+		{404, #{}, []}
 	end.
 
 handle_get_transaction_records(PageId, PageSize) ->

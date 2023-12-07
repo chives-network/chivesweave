@@ -2720,9 +2720,10 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 											case EntityType of
 												<<"Action">> ->
 													% Do The Action Operation
-													?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FileTxId, FileTxId}]),
+													?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FileTxId1, FileTxId}]),
 													case ar_util:safe_decode(FileTxId) of
 														{ok, _} ->
+															?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FileTxId2, FileTxId}]),
 															case EntityAction of
 																<<"Label">> -> 
 																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
@@ -2739,20 +2740,24 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 																<<"DeleteFolder">> -> 
 																	ar_arql_db:update_delete_folder(EntityTarget, FileTxId, BlockTimestamp);
 																<<"Restorefolder">> -> 
-																	ar_arql_db:update_restore_folder(EntityTarget, FileTxId, BlockTimestamp);
+																	ar_arql_db:update_restore_folder(EntityTarget, FileTxId, BlockTimestamp);	
 																<<"Profile">> -> 
 																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________Profile, DataItemId}]),
 																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FromAddress, FromAddress}]),
 																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________BlockTimestamp, BlockTimestamp}]),
 																	ar_arql_db:update_address_profile(DataItemId, FromAddress, BlockTimestamp);
-																<<"IsBroker">> -> 
-																	ar_arql_db:update_address_isbroker(EntityTarget, FromAddress, BlockTimestamp);
-																<<"Referee">> -> 
-																	RefereeAddress = find_value_in_tags(<<"Referee-Address">>, TagsMap),
+																<<"Agent">> -> 
+																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________Agent, EntityTarget}]),
+																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FromAddress, FromAddress}]),
+																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________BlockTimestamp, BlockTimestamp}]),
+																	ar_arql_db:update_address_agent(EntityTarget, FromAddress, BlockTimestamp);
+																<<"Referee">> -> 			
+																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________Referee, EntityTarget}]),
+																	RefereeAddress = find_value_in_tags(<<"Referee-Address">>, TagsMap),												
 																	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(RefereeAddress) of
 																		{ok, RefereeAddressOK} ->
 																			ar_arql_db:update_address_referee(RefereeAddressOK, FromAddress, BlockTimestamp)
-																	end;																	
+																	end;																
 																_ -> ok
 															end;
 														false ->[]

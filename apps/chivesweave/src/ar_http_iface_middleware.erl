@@ -688,11 +688,8 @@ handle(<<"GET">>, [<<"peersinfo">>], Req, _Pid) ->
         end,
 		IpList
 	),
-	?LOG_INFO([{ipInfoList, IpInfoList}]),
 
-	{200, #{},
-		ar_serialize:jsonify(IpInfoList),
-	Req};
+	{200, #{}, ar_serialize:jsonify(IpInfoList), Req};
 
 %% Return the inflation reward emitted at the given block.
 %% GET request to endpoint /price/{height}.

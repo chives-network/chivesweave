@@ -1286,12 +1286,12 @@ handle(<<"GET">>, [<<"address">>, <<"referee">>, Addresss, PageId, PageSize], Re
 	end;
 
 %% Return address records by from and size.
-%% GET request to endpoint /address/isbroker/{PageId}/{PageSize}.
-handle(<<"GET">>, [<<"address">>, <<"isbroker">>, PageId, PageSize], Req, _Pid) ->
+%% GET request to endpoint /address/agent/{PageId}/{PageSize}.
+handle(<<"GET">>, [<<"address">>, <<"agent">>, PageId, PageSize], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
 		true ->
-			{Status, Headers, Body} = handle_get_address_isbroker_records(PageId, PageSize),
+			{Status, Headers, Body} = handle_get_address_agent_records(PageId, PageSize),
 			{Status, Headers, Body, Req};
 		false ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -3040,7 +3040,7 @@ handle_get_address_referee_records(RefereeAddress, PageId, PageSize) ->
 		{404, #{}, []}
 	end.
 
-handle_get_address_isbroker_records(PageId, PageSize) ->
+handle_get_address_agent_records(PageId, PageSize) ->
 	try binary_to_integer(PageSize) of
 		PageSizeInt ->				
 			PageSizeNew = if
@@ -3054,25 +3054,74 @@ handle_get_address_isbroker_records(PageId, PageSize) ->
 						PageIdInt < 0 -> 0;
 						true -> PageIdInt
 					end,
-					AddressTotal  = case ar_arql_db:select_address_isbroker_total() of
+					AddressTotal  = case ar_arql_db:select_address_agent_total() of
 						TotalRes ->
 							TotalRes;
 						_ -> 
 							0							
 					end,
-					case ar_arql_db:select_address_isbroker_range(PageSizeNew, PageIdNew * PageSizeNew) of
+					case ar_arql_db:select_address_agent_range(PageSizeNew, PageIdNew * PageSizeNew) of
 						not_found ->
 							{404, #{}, []};
 						Res ->
 							% ?LOG_INFO([{handle_get_blocklist_data, Res}]),
+							AgentProfileList = lists:map(
+								fun(AgentResult) ->
+									#{profile := Profile} = AgentResult,
+									#{agent := Agent} = AgentResult,
+									#{balance := Balance} = AgentResult,
+									AgentResultMap = 	case ar_util:safe_decode(Profile) of
+															{error, invalid} ->
+																{};
+															{ok, ID} ->
+																case ar_storage:read_tx(ID) of
+																	unavailable ->
+																		{ok, Config} = application:get_env(chivesweave, config),
+																		DataDir = Config#config.data_dir,							
+																		case ar_kv:get(xwe_storage_txid_in_bundle, ar_util:encode(ID))  of
+																			not_found ->
+																				{};
+																			{ok, BundleTxBinary} ->
+																				BundleTx = binary_to_term(BundleTxBinary),	
+																				Address = maps:get(<<"address">>, maps:get(<<"owner">>, BundleTx, undefined), undefined),
+																				Block = maps:get(<<"block">>, BundleTx, undefined),
+																				BundleId = maps:get(<<"bundleid">>, BundleTx, undefined),
+																				FileName = binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, Address, ar_util:encode(ID) ])),
+																				case file:read_file(FileName) of
+																					{ok, Content} ->
+																						ProfileContent = ar_serialize:dejsonify(Content),
+																						AddressResult = #{
+																								<<"Profile">> => ProfileContent,
+																								<<"Address">> => Address,
+																								<<"TxId">> => ar_util:encode(ID),
+																								<<"BundleId">> => BundleId,
+																								<<"Block">> => Block,
+																								<<"AgentLevel">> => Agent,
+																								<<"Balance">> => Balance
+																						},
+																						AddressResult;
+																					_ ->
+																						{}
+																				end
+																		end;
+																	#tx{} = TX ->
+																		{_, _, Body, _} = serve_tx_html_data(ID, TX),
+																		Body
+																end
+														end,
+									AgentResultMap
+								end,
+								Res
+							),
 							AddressResult = #{
-									<<"data">> => Res,
+									<<"data">> => AgentProfileList,
+									<<"table">> => Res,
 									<<"total">> => AddressTotal,
 									<<"from">> => PageIdNew * PageSizeNew,
 									<<"pageid">> => PageIdNew,
 									<<"pagesize">> => PageSize,
 									<<"allpages">> => ceil(AddressTotal / PageSizeNew) div 1
-								},
+							},
 							{200, #{}, ar_serialize:jsonify(AddressResult)}
 					end
 			catch _:_ ->
@@ -3088,6 +3137,8 @@ handle_get_my_profile(Address, Req) ->
 			try
 				?LOG_INFO([{handle_get_my_profile_______Res, Res}]),
 				[#{profile := Profile} | _] = Res,
+				[#{agent := Agent} | _] = Res,
+				[#{balance := Balance} | _] = Res,
 				?LOG_INFO([{handle_get_my_profile_______Profile, Profile}]),
 				case ar_util:safe_decode(Profile) of
 					{error, invalid} ->
@@ -3105,11 +3156,23 @@ handle_get_my_profile(Address, Req) ->
 										% ?LOG_INFO([{handle_get_tx_unbundle_____________BundleTx, BundleTx}]),
 										ContentType = maps:get(<<"type">>, maps:get(<<"data">>, BundleTx, undefined), undefined),
 										Address = maps:get(<<"address">>, maps:get(<<"owner">>, BundleTx, undefined), undefined),
+										Block = maps:get(<<"block">>, BundleTx, undefined),
+										BundleId = maps:get(<<"bundleid">>, BundleTx, undefined),
 										FileName = binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, Address, ar_util:encode(ID) ])),
 										% ?LOG_INFO([{image_thumbnail_compress_to_storage_____________FileName, FileName}]),
 										case file:read_file(FileName) of
 											{ok, Content} ->
-												{200, #{ <<"content-type">> => ContentType }, Content, Req};
+												ProfileContent = ar_serialize:dejsonify(Content),
+												AddressResult = #{
+														<<"Profile">> => ProfileContent,
+														<<"Address">> => Address,
+														<<"TxId">> => ar_util:encode(ID),
+														<<"BundleId">> => BundleId,
+														<<"Block">> => Block,
+														<<"AgentLevel">> => Agent,
+														<<"Balance">> => Balance
+												},
+												{200, #{ <<"content-type">> => ContentType }, ar_serialize:jsonify(AddressResult), Req};
 											_ ->
 												{200, #{}, sendfile("data/not_found.html"), Req}
 										end

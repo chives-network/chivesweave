@@ -242,8 +242,8 @@ DROP INDEX idx_address_referee;
 -define(SELECT_ADDRESS_REFEREE_TOTAL, "SELECT COUNT(*) AS NUM FROM address where referee = ? ").
 -define(UPDATE_ADDRESS_REFEREE_SQL, "update address set referee = ? where address = ? and timestamp <= ?").
 
--define(SELECT_ADDRESS_AGENT_RANGE_SQL, "SELECT * FROM address where Agent = '1' order by balance desc LIMIT ? OFFSET ?").
--define(SELECT_ADDRESS_AGENT_TOTAL, "SELECT COUNT(*) AS NUM FROM address where Agent = '1' ").
+-define(SELECT_ADDRESS_AGENT_RANGE_SQL, "SELECT * FROM address where Agent != '0' order by balance desc LIMIT ? OFFSET ?").
+-define(SELECT_ADDRESS_AGENT_TOTAL, "SELECT COUNT(*) AS NUM FROM address where Agent != '0' ").
 -define(update_address_agent_SQL, "update address set Agent = ?, timestamp = ? where address = ? and timestamp <= ?").
 
 -define(SELECT_ADDRESS_PROFILE_MY_SQL, "SELECT * FROM address where address = ?").

@@ -2753,10 +2753,9 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 																	ar_arql_db:update_address_agent(EntityTarget, FromAddress, BlockTimestamp);
 																<<"Referee">> -> 			
 																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________Referee, EntityTarget}]),
-																	RefereeAddress = find_value_in_tags(<<"Referee-Address">>, TagsMap),												
-																	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(RefereeAddress) of
+																	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(EntityTarget) of
 																		{ok, RefereeAddressOK} ->
-																			ar_arql_db:update_address_referee(RefereeAddressOK, FromAddress, BlockTimestamp)
+																			ar_arql_db:update_address_referee(ar_util:encode(RefereeAddressOK), FromAddress, BlockTimestamp)
 																	end;																
 																_ -> ok
 															end;

@@ -3070,6 +3070,7 @@ handle_get_address_agent_records(PageId, PageSize) ->
 									#{profile := Profile} = AgentResult,
 									#{agent := Agent} = AgentResult,
 									#{balance := Balance} = AgentResult,
+									#{referee := Referee} = AgentResult,
 									AgentResultMap = 	case ar_util:safe_decode(Profile) of
 															{error, invalid} ->
 																{};
@@ -3097,7 +3098,8 @@ handle_get_address_agent_records(PageId, PageSize) ->
 																								<<"BundleId">> => BundleId,
 																								<<"Block">> => Block,
 																								<<"AgentLevel">> => Agent,
-																								<<"Balance">> => Balance
+																								<<"Balance">> => Balance,
+																								<<"Referee">> => Referee
 																						},
 																						AddressResult;
 																					_ ->
@@ -3139,6 +3141,7 @@ handle_get_my_profile(Address, Req) ->
 				[#{profile := Profile} | _] = Res,
 				[#{agent := Agent} | _] = Res,
 				[#{balance := Balance} | _] = Res,
+				[#{referee := Referee} | _] = Res,
 				?LOG_INFO([{handle_get_my_profile_______Profile, Profile}]),
 				case ar_util:safe_decode(Profile) of
 					{error, invalid} ->
@@ -3170,7 +3173,8 @@ handle_get_my_profile(Address, Req) ->
 														<<"BundleId">> => BundleId,
 														<<"Block">> => Block,
 														<<"AgentLevel">> => Agent,
-														<<"Balance">> => Balance
+														<<"Balance">> => Balance,
+														<<"Referee">> => Referee
 												},
 												{200, #{ <<"content-type">> => ContentType }, ar_serialize:jsonify(AddressResult), Req};
 											_ ->

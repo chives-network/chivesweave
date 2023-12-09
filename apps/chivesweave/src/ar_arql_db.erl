@@ -19,8 +19,9 @@
 		select_transaction_range_bundletxparse/3, select_transaction_total_bundletxparse/1,
 		select_transaction_group_label_address/1,
 		select_folder_address/1,
-		update_tx_label/3, update_tx_folder/3, update_tx_star/3, update_tx_public/3, update_tx_bundletxparse/2,
-		update_address_referee/3, update_address_agent/3, update_address_profile/3, update_address_blockinfo/4
+		update_tx_label/4, update_tx_folder/4, update_tx_star/4, update_tx_public/4, update_tx_bundletxparse/2,
+		update_address_referee/3, update_address_agent/3, update_address_profile/3, 
+		update_address_blockinfo/4
 		]).
 
 -export([init/1, handle_call/3, handle_cast/2, terminate/2]).
@@ -74,7 +75,8 @@ CREATE TABLE address (
 	chivesDb INTEGER DEFAULT 0,
 	agent INTEGER DEFAULT 0,
 
-	referee TEXT
+	referee TEXT,
+	last_tx_action TEXT
 );
 
 CREATE TABLE block (
@@ -120,7 +122,8 @@ CREATE TABLE tx (
 	item_node_star TEXT,
 	item_node_hot TEXT,
 	item_node_delete TEXT,
-	bundleTxParse INTEGER DEFAULT 0
+	last_tx_action TEXT,
+	bundleTxParse INTEGER
 );
 
 CREATE TABLE tag (
@@ -161,6 +164,7 @@ CREATE INDEX idx_tx_item_node_star ON tx (item_node_star);
 CREATE INDEX idx_tx_item_node_hot ON tx (item_node_hot);
 CREATE INDEX idx_tx_item_node_delete ON tx (item_node_delete);
 CREATE INDEX idx_tx_bundleTxParse ON tx (bundleTxParse);
+CREATE INDEX idx_tx_last_tx_action ON tx (last_tx_action);
 
 CREATE INDEX idx_tag_tx_id ON tag (tx_id);
 CREATE INDEX idx_tag_name ON tag (name);
@@ -177,6 +181,7 @@ CREATE INDEX idx_address_chivesForum ON address (chivesForum);
 CREATE INDEX idx_address_chivesDb ON address (chivesDb);
 CREATE INDEX idx_address_agent ON address (agent);
 CREATE INDEX idx_address_referee ON address (referee);
+CREATE INDEX idx_address_last_tx_action ON address (last_tx_action);
 ").
 
 -define(DROP_INDEXES_SQL, "
@@ -202,6 +207,7 @@ DROP INDEX idx_tx_item_node_star;
 DROP INDEX idx_tx_item_node_hot;
 DROP INDEX idx_tx_item_node_delete;
 DROP INDEX idx_tx_bundleTxParse;
+DROP INDEX idx_tx_last_tx_action;
 
 DROP INDEX idx_tag_tx_id;
 DROP INDEX idx_tag_name;
@@ -218,11 +224,12 @@ DROP INDEX idx_address_chivesForum;
 DROP INDEX idx_address_chivesDb;
 DROP INDEX idx_address_agent;
 DROP INDEX idx_address_referee;
+DROP INDEX idx_address_last_tx_action;
 
 ").
 
 -define(INSERT_BLOCK_SQL, "INSERT OR REPLACE INTO block VALUES (?, ?, ?, ?)").
--define(INSERT_TX_SQL, "INSERT OR REPLACE INTO tx VALUES (?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?)").
+-define(INSERT_TX_SQL, "INSERT OR IGNORE INTO tx VALUES (?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?, ?, ?, ?,  ?, ?)").
 -define(INSERT_TAG_SQL, "INSERT OR REPLACE INTO tag VALUES (?, ?, ?)").
 -define(SELECT_TX_BY_ID_SQL, "SELECT * FROM tx WHERE id = ?").
 
@@ -244,7 +251,7 @@ DROP INDEX idx_address_referee;
 
 -define(SELECT_ADDRESS_AGENT_RANGE_SQL, "SELECT * FROM address where Agent != '0' order by balance desc LIMIT ? OFFSET ?").
 -define(SELECT_ADDRESS_AGENT_TOTAL, "SELECT COUNT(*) AS NUM FROM address where Agent != '0' ").
--define(update_address_agent_SQL, "update address set Agent = ?, timestamp = ? where address = ? and timestamp <= ?").
+-define(UPDATE_ADDRESS_AGENT_SQL, "update address set Agent = ?, timestamp = ? where address = ? and timestamp <= ?").
 
 -define(SELECT_ADDRESS_PROFILE_MY_SQL, "SELECT * FROM address where address = ?").
 -define(SELECT_ADDRESS_PROFILE_RANGE_SQL, "SELECT * FROM address where profile != null and profile != '' order by balance desc LIMIT ? OFFSET ?").
@@ -271,10 +278,10 @@ DROP INDEX idx_address_referee;
 -define(SELECT_TRANSACTION_RANGE_BUNDLETXPARSE_SQL, "SELECT * FROM tx where bundletxparse = ? and entity_type = 'Bundle' order by timestamp asc LIMIT ? OFFSET ?").
 -define(SELECT_TRANSACTION_TOTAL_BUNDLETXPARSE, "SELECT COUNT(*) AS NUM FROM tx where bundletxparse = ? and entity_type = 'Bundle'").
 
--define(UPDATE_TX_LABEL_SQL, "update tx set item_label = ? where id = ? and timestamp < ?").
--define(UPDATE_TX_STAR_SQL, "update tx set item_star = ? where id = ? and timestamp < ?").
--define(UPDATE_TX_FOLDER_SQL, "update tx set item_parent = ? where id = ? and timestamp < ?").
--define(UPDATE_TX_PUBLIC_SQL, "update tx set is_public = ? where id = ? and timestamp < ?").
+-define(UPDATE_TX_LABEL_SQL, "update tx set item_label = ?, timestamp = ? where id = ? and last_tx_action = ?").
+-define(UPDATE_TX_STAR_SQL, "update tx set item_star = ?, timestamp = ? where id = ? and last_tx_action = ?").
+-define(UPDATE_TX_FOLDER_SQL, "update tx set item_parent = ?, timestamp = ? where id = ? and last_tx_action = ?").
+-define(UPDATE_TX_PUBLIC_SQL, "update tx set is_public = ?, timestamp = ? where id = ? and last_tx_action = ?").
 -define(UPDATE_TX_BUNDLETXPARSE_SQL, "update tx set bundleTxParse = ? where id = ?").
 
 -define(SELECT_TRANSACTION_RANGE_FOLDER_ADDRESS_SQL, "SELECT * FROM tx where item_parent = ? and is_encrypt = '' and (entity_type = 'File' or entity_type = 'Folder') and from_address = ? order by entity_type desc, timestamp desc LIMIT ? OFFSET ?").
@@ -399,20 +406,20 @@ select_transaction_total_bundletxparse(BUNDLETXPARSE) ->
 eval_legacy_arql(Query) ->
 	gen_server:call(?MODULE, {eval_legacy_arql, Query}, ?SELECT_TIMEOUT).
 
-update_tx_label(ITEM_LABEL, TXID, TIMESTAMP) ->
-	gen_server:cast(?MODULE, {update_tx_label, ITEM_LABEL, TXID, TIMESTAMP}),
+update_tx_label(ITEM_LABEL, TIMESTAMP, TXID, LAST_TX_ACTION) ->
+	gen_server:cast(?MODULE, {update_tx_label, ITEM_LABEL, TIMESTAMP, TXID, LAST_TX_ACTION}),
 	ok.
 
-update_tx_star(ITEM_STAR, TXID, TIMESTAMP) ->
-	gen_server:cast(?MODULE, {update_tx_star, ITEM_STAR, TXID, TIMESTAMP}),
+update_tx_star(ITEM_STAR, TIMESTAMP, TXID, LAST_TX_ACTION) ->
+	gen_server:cast(?MODULE, {update_tx_star, ITEM_STAR, TIMESTAMP, TXID, LAST_TX_ACTION}),
 	ok.
 
-update_tx_folder(ITEM_PARENT, TXID, TIMESTAMP) ->
-	gen_server:cast(?MODULE, {update_tx_folder, ITEM_PARENT, TXID, TIMESTAMP}),
+update_tx_folder(ITEM_PARENT, TIMESTAMP, TXID, LAST_TX_ACTION) ->
+	gen_server:cast(?MODULE, {update_tx_folder, ITEM_PARENT, TIMESTAMP, TXID, LAST_TX_ACTION}),
 	ok.
 
-update_tx_public(IS_PUBLIC, TXID, TIMESTAMP) ->
-	gen_server:cast(?MODULE, {update_tx_public, IS_PUBLIC, TXID, TIMESTAMP}),
+update_tx_public(IS_PUBLIC, TIMESTAMP, TXID, LAST_TX_ACTION) ->
+	gen_server:cast(?MODULE, {update_tx_public, IS_PUBLIC, TIMESTAMP, TXID, LAST_TX_ACTION}),
 	ok.
 
 update_tx_bundletxparse(BundleTxParse, TXID) ->
@@ -534,7 +541,7 @@ init([]) ->
 	{ok, UpdateTxPublicStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_TX_PUBLIC_SQL, ?DRIVER_TIMEOUT),
 	{ok, UpdateTxBundleTxParseStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_TX_BUNDLETXPARSE_SQL, ?DRIVER_TIMEOUT),
 	{ok, UpdateAddressRefereeStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_ADDRESS_REFEREE_SQL, ?DRIVER_TIMEOUT),
-	{ok, UpdateAddressAgentStmt} = ar_sqlite3:prepare(Conn, ?update_address_agent_SQL, ?DRIVER_TIMEOUT),
+	{ok, UpdateAddressAgentStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_ADDRESS_AGENT_SQL, ?DRIVER_TIMEOUT),
 	{ok, UpdateAddressProfileStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_ADDRESS_PROFILE_SQL, ?DRIVER_TIMEOUT),
 	{ok, UpdateAddressBlockinfoStmt} = ar_sqlite3:prepare(Conn, ?UPDATE_ADDRESS_BLOCKINFO_SQL, ?DRIVER_TIMEOUT),
 	{ok, SelectTransactionGroupLabelAddressStmt} = ar_sqlite3:prepare(Conn, ?SELECT_TRANSACTION_GROUP_LABEL_ADDRESS, ?DRIVER_TIMEOUT),
@@ -1080,12 +1087,12 @@ handle_cast({insert_block, BlockFields}, State) ->
 	record_query_time(insert_block, Time),
 	{noreply, State};
 
-handle_cast({update_tx_label, ITEM_LABEL, TXID, TIMESTAMP}, State) ->
+handle_cast({update_tx_label, ITEM_LABEL, TIMESTAMP, TXID, LAST_TX_ACTION}, State) ->
 	#{ conn := Conn, update_tx_label_stmt := Stmt } = State,
 	{Time, ok} = timer:tc(fun() ->
 		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
 
-		ok = ar_sqlite3:bind(Stmt, [ITEM_LABEL, TXID, TIMESTAMP], ?INSERT_STEP_TIMEOUT),
+		ok = ar_sqlite3:bind(Stmt, [ITEM_LABEL, TIMESTAMP, TXID, LAST_TX_ACTION], ?INSERT_STEP_TIMEOUT),
 		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
 		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
 
@@ -1095,12 +1102,12 @@ handle_cast({update_tx_label, ITEM_LABEL, TXID, TIMESTAMP}, State) ->
 	record_query_time(update_tx_label, Time),
 	{noreply, State};
 
-handle_cast({update_tx_star, ITEM_STAR, TXID, TIMESTAMP}, State) ->
+handle_cast({update_tx_star, ITEM_STAR, TIMESTAMP, TXID, LAST_TX_ACTION}, State) ->
 	#{ conn := Conn, update_tx_star_stmt := Stmt } = State,
 	{Time, ok} = timer:tc(fun() ->
 		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
 
-		ok = ar_sqlite3:bind(Stmt, [ITEM_STAR, TXID, TIMESTAMP], ?INSERT_STEP_TIMEOUT),
+		ok = ar_sqlite3:bind(Stmt, [ITEM_STAR, TIMESTAMP, TXID, LAST_TX_ACTION], ?INSERT_STEP_TIMEOUT),
 		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
 		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
 
@@ -1110,12 +1117,12 @@ handle_cast({update_tx_star, ITEM_STAR, TXID, TIMESTAMP}, State) ->
 	record_query_time(update_tx_star, Time),
 	{noreply, State};
 
-handle_cast({update_tx_folder, ITEM_PARENT, TXID, TIMESTAMP}, State) ->
+handle_cast({update_tx_folder, ITEM_PARENT, TIMESTAMP, TXID, LAST_TX_ACTION}, State) ->
 	#{ conn := Conn, update_tx_folder_stmt := Stmt } = State,
 	{Time, ok} = timer:tc(fun() ->
 		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
 
-		ok = ar_sqlite3:bind(Stmt, [ITEM_PARENT, TXID, TIMESTAMP], ?INSERT_STEP_TIMEOUT),
+		ok = ar_sqlite3:bind(Stmt, [ITEM_PARENT, TIMESTAMP, TXID, LAST_TX_ACTION], ?INSERT_STEP_TIMEOUT),
 		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
 		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
 
@@ -1125,12 +1132,12 @@ handle_cast({update_tx_folder, ITEM_PARENT, TXID, TIMESTAMP}, State) ->
 	record_query_time(update_tx_folder, Time),
 	{noreply, State};
 
-handle_cast({update_tx_public, IS_PUBLIC, TXID, TIMESTAMP}, State) ->
+handle_cast({update_tx_public, IS_PUBLIC, TIMESTAMP, TXID, LAST_TX_ACTION}, State) ->
 	#{ conn := Conn, update_tx_public_stmt := Stmt } = State,
 	{Time, ok} = timer:tc(fun() ->
 		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
 
-		ok = ar_sqlite3:bind(Stmt, [IS_PUBLIC, TXID, TIMESTAMP], ?INSERT_STEP_TIMEOUT),
+		ok = ar_sqlite3:bind(Stmt, [IS_PUBLIC, TIMESTAMP, TXID, LAST_TX_ACTION], ?INSERT_STEP_TIMEOUT),
 		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
 		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
 
@@ -1528,6 +1535,7 @@ tx_map([
 	Item_node_star,
 	Item_node_hot,
 	Item_node_delete,
+	Last_tx_action,
 	BundleTxParse
 ]) -> #{
 	id => Id,
@@ -1565,6 +1573,7 @@ tx_map([
 	item_node_star => Item_node_star,
 	item_node_hot => Item_node_hot,
 	item_node_delete => Item_node_delete,
+	last_tx_action => Last_tx_action,
 	bundleTxParse => BundleTxParse
 }.
 
@@ -1685,6 +1694,7 @@ full_block_to_fields(FullBlock) ->
 			Item_node_star = <<"">>,
 			Item_node_hot = <<"">>,
 			Item_node_delete = <<"">>,
+			Last_tx_action = ar_util:encode(TX#tx.id),
 			BundleTxParse = <<"">>,
 			[
 				ar_util:encode(TX#tx.id),
@@ -1722,6 +1732,7 @@ full_block_to_fields(FullBlock) ->
 				Item_node_star,
 				Item_node_hot,
 				Item_node_delete,
+				Last_tx_action
 				BundleTxParse
 			]
 		end,
@@ -1794,6 +1805,7 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 	Item_node_star = <<"">>,
 	Item_node_hot = <<"">>,
 	Item_node_delete = <<"">>,
+	Last_tx_action = ar_util:encode(TX#tx.id),
 	BundleTxParse = <<"">>,
 	[
 		ar_util:encode(TX#tx.id),
@@ -1831,6 +1843,7 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 		Item_node_star,
 		Item_node_hot,
 		Item_node_delete,
+		Last_tx_action,
 		BundleTxParse
 	].
 

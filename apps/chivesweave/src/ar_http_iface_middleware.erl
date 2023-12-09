@@ -1344,6 +1344,17 @@ handle(<<"GET">>, [<<"file">>, <<"video">>, PageId, PageSize], Req, _Pid) ->
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
 
+%% Get Files For All
+handle(<<"GET">>, [<<"file">>, <<"audio">>, PageId, PageSize], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_arql, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_transaction_records_filter(<<"audio">>, PageId, PageSize),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
 handle(<<"GET">>, [<<"file">>, <<"image">>, PageId, PageSize], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
@@ -1528,6 +1539,21 @@ handle(<<"GET">>, [<<"file">>, <<"video">>, Addr, PageId, PageSize], Req, _Pid) 
 			end
 	end;
 
+handle(<<"GET">>, [<<"file">>, <<"audio">>, Addr, PageId, PageSize], Req, _Pid) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			{ok, Config} = application:get_env(chivesweave, config),
+			case lists:member(serve_arql, Config#config.enable) of
+				true ->
+					{Status, Headers, Body} = handle_get_transaction_records_filetype_address(<<"audio">>, Addr, PageId, PageSize),
+					{Status, Headers, Body, Req};
+				false ->
+					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+			end
+	end;
+
 handle(<<"GET">>, [<<"file">>, <<"image">>, Addr, PageId, PageSize], Req, _Pid) ->
 	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
 		{error, invalid} ->
@@ -1661,6 +1687,16 @@ handle(<<"GET">>, [<<"search">>, <<"video">>, PageId, PageSize, SearchValue], Re
 			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
 	end;
 
+handle(<<"GET">>, [<<"search">>, <<"audio">>, PageId, PageSize, SearchValue], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_arql, Config#config.enable) of
+		true ->
+			{Status, Headers, Body} = handle_get_transaction_records_filter_filename(<<"audio">>, PageId, PageSize, SearchValue),
+			{Status, Headers, Body, Req};
+		false ->
+			{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+	end;
+
 handle(<<"GET">>, [<<"search">>, <<"image">>, PageId, PageSize, SearchValue], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
 	case lists:member(serve_arql, Config#config.enable) of
@@ -1752,6 +1788,21 @@ handle(<<"GET">>, [<<"search">>, <<"video">>, Addr, PageId, PageSize, SearchValu
 			case lists:member(serve_arql, Config#config.enable) of
 				true ->
 					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"video">>, Addr, PageId, PageSize, SearchValue),
+					{Status, Headers, Body, Req};
+				false ->
+					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
+			end
+	end;
+
+handle(<<"GET">>, [<<"search">>, <<"audio">>, Addr, PageId, PageSize, SearchValue], Req, _Pid) ->
+	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Addr) of
+		{error, invalid} ->
+			{400, #{}, <<"Invalid address.">>};
+		{ok, _} ->
+			{ok, Config} = application:get_env(chivesweave, config),
+			case lists:member(serve_arql, Config#config.enable) of
+				true ->
+					{Status, Headers, Body} = handle_get_transaction_records_filter_address_filename(<<"audio">>, Addr, PageId, PageSize, SearchValue),
 					{Status, Headers, Body, Req};
 				false ->
 					{421, #{}, jiffy:encode(#{ error => endpoint_not_enabled }), Req}
@@ -2221,6 +2272,69 @@ handle(<<"GET">>, [<<Hash:43/binary>>, <<"thumbnail">>], Req, _Pid) ->
 													case file:read_file(OriginalFilePath) of
 														{ok, FileContent} ->
 															{ContentTypeNew, NewFileData} = ar_storage:file_to_thumbnail_data(ContentType, ar_util:encode(ID), Address, FileContent),
+															{200, #{ <<"content-type">> => ContentTypeNew,  <<"Cache-Control">> => <<"max-age=604800">> }, NewFileData, Req};
+														{error, _Reason} ->
+															{404, #{}, sendfile("data/not_found.html"), Req}
+													end;
+												{error, _} ->
+													{404, #{}, sendfile("data/not_found.html"), Req}
+											end
+									end										
+							end;
+						#tx{} = TX ->
+							serve_tx_html_data_thumbnail(Req, TX)
+					end
+			end
+	end;
+
+%% If the data is a image, and will get a compressed version, if not, will get the original data.
+%% This function will can the "convert" external command. Need run "sudo apt install imagemagick-6.q16"
+handle(<<"GET">>, [<<Hash:43/binary>>, <<"pdf">>], Req, _Pid) ->
+	{ok, Config} = application:get_env(chivesweave, config),
+	case lists:member(serve_html_data, Config#config.disable) of
+		true ->
+			{421, #{}, <<"Serving HTML data is disabled on this node.">>, Req};
+		_ ->
+			case ar_util:safe_decode(Hash) of
+				{error, invalid} ->
+					{400, #{}, <<"Invalid hash.">>, Req};
+				{ok, ID} ->
+					case ar_storage:read_tx(ID) of
+						unavailable ->
+							case ar_kv:get(xwe_storage_txid_in_bundle, ar_util:encode(ID))  of
+								not_found ->
+									{404, #{}, sendfile("data/not_found.html"), Req};
+								{ok, BundleTxBinary} ->
+									BundleTx = binary_to_term(BundleTxBinary),	
+									% ?LOG_INFO([{handle_get_tx_unbundle_____________BundleTx, BundleTx}]),
+									ContentType = maps:get(<<"type">>, maps:get(<<"data">>, BundleTx, undefined), undefined),
+									Address = maps:get(<<"address">>, maps:get(<<"owner">>, BundleTx, undefined), undefined),
+									% ?LOG_INFO([{handle_get_tx_unbundle_____________Address, Address}]),
+									DataDir = Config#config.data_dir,
+									NewFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(ar_util:encode(ID)) ++ ".pdf"])),
+									?LOG_INFO([{handle_get_tx_unbundle_____________NewFilePath, NewFilePath}]),
+									% Return the result
+									case file:read_file_info(NewFilePath) of
+										{ok, FileInfo} ->
+											case file:read_file(NewFilePath) of
+												{ok, FileContent} ->
+													{200, #{ <<"content-type">> => <<"application/pdf">>,  <<"Cache-Control">> => <<"max-age=604800">> }, FileContent, Req};
+												{error, _Reason} ->
+													{404, #{}, sendfile("data/not_found.html"), Req}
+											end;
+										{error, _} ->
+											OriginalFilePath = binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, Address, ar_util:encode(ID) ])),
+											% ?LOG_INFO([{handle_get_tx_unbundle_____________OriginalFilePath, OriginalFilePath}]),
+											% ?LOG_INFO([{handle_get_tx_unbundle_____________NewFilePath, NewFilePath}]),
+											% ?LOG_INFO([{handle_get_tx_unbundle_____________NewFilePath, ar_util:encode(ID)}]),
+											% ?LOG_INFO([{handle_get_tx_unbundle_____________NewFilePath, ID}]),
+											% ?LOG_INFO([{handle_get_tx_unbundle_____________Address, Address}]),
+											% Make the thumbnail png and return this png
+											case file:read_file_info(OriginalFilePath) of
+												{ok, FileInfo} ->
+													case file:read_file(OriginalFilePath) of
+														{ok, FileContent} ->
+															{ContentTypeNew, NewFileData} = ar_storage:file_to_pdf_data(ContentType, ar_util:encode(ID), Address, FileContent),
 															{200, #{ <<"content-type">> => ContentTypeNew,  <<"Cache-Control">> => <<"max-age=604800">> }, NewFileData, Req};
 														{error, _Reason} ->
 															{404, #{}, sendfile("data/not_found.html"), Req}
@@ -2998,6 +3112,60 @@ handle_get_address_records(PageId, PageSize) ->
 		{404, #{}, []}
 	end.
 
+get_address_detail_by_record(AddressRecords) ->
+	AgentProfileList = lists:map(
+		fun(AgentResult) ->
+			#{profile := Profile} = AgentResult,
+			#{agent := Agent} = AgentResult,
+			#{balance := Balance} = AgentResult,
+			#{referee := Referee} = AgentResult,
+			AgentResultMap = 	case ar_util:safe_decode(Profile) of
+									{error, invalid} ->
+										[];
+									{ok, ID} ->
+										case ar_storage:read_tx(ID) of
+											unavailable ->
+												{ok, Config} = application:get_env(chivesweave, config),
+												DataDir = Config#config.data_dir,							
+												case ar_kv:get(xwe_storage_txid_in_bundle, ar_util:encode(ID))  of
+													not_found ->
+														[];
+													{ok, BundleTxBinary} ->
+														BundleTx = binary_to_term(BundleTxBinary),	
+														Address = maps:get(<<"address">>, maps:get(<<"owner">>, BundleTx, undefined), undefined),
+														Block = maps:get(<<"block">>, BundleTx, undefined),
+														BundleId = maps:get(<<"bundleid">>, BundleTx, undefined),
+														FileName = binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, Address, ar_util:encode(ID) ])),
+														case file:read_file(FileName) of
+															{ok, Content} ->
+																ProfileContent = ar_serialize:dejsonify(Content),
+																AddressResult = #{
+																		<<"id">> => Address,
+																		<<"Profile">> => ProfileContent,
+																		<<"Address">> => Address,
+																		<<"TxId">> => ar_util:encode(ID),
+																		<<"BundleId">> => BundleId,
+																		<<"Block">> => Block,
+																		<<"AgentLevel">> => Agent,
+																		<<"Balance">> => Balance,
+																		<<"Referee">> => Referee
+																},
+																AddressResult;
+															_ ->
+																[]
+														end
+												end;
+											#tx{} = TX ->
+												{_, _, Body, _} = serve_tx_html_data(ID, TX),
+												Body
+										end
+								end,
+			AgentResultMap
+		end,
+		AddressRecords
+	),
+	AgentProfileList.
+
 handle_get_address_referee_records(RefereeAddress, PageId, PageSize) ->
 	try binary_to_integer(PageSize) of
 		PageSizeInt ->				
@@ -3021,16 +3189,18 @@ handle_get_address_referee_records(RefereeAddress, PageId, PageSize) ->
 					case ar_arql_db:select_address_referee_range(RefereeAddress, PageSizeNew, PageIdNew * PageSizeNew) of
 						not_found ->
 							{404, #{}, []};
-						Res ->
+						AddressRecords ->
 							% ?LOG_INFO([{handle_get_blocklist_data, Res}]),
+							AgentProfileList = get_address_detail_by_record(AddressRecords),
 							AddressResult = #{
-									<<"data">> => Res,
+									<<"data">> => AgentProfileList,
+									<<"table">> => AddressRecords,
 									<<"total">> => AddressTotal,
 									<<"from">> => PageIdNew * PageSizeNew,
 									<<"pageid">> => PageIdNew,
 									<<"pagesize">> => PageSize,
 									<<"allpages">> => ceil(AddressTotal / PageSizeNew) div 1
-								},
+							},
 							{200, #{}, ar_serialize:jsonify(AddressResult)}
 					end
 			catch _:_ ->
@@ -3063,61 +3233,12 @@ handle_get_address_agent_records(PageId, PageSize) ->
 					case ar_arql_db:select_address_agent_range(PageSizeNew, PageIdNew * PageSizeNew) of
 						not_found ->
 							{404, #{}, []};
-						Res ->
+						AddressRecords ->
 							% ?LOG_INFO([{handle_get_blocklist_data, Res}]),
-							AgentProfileList = lists:map(
-								fun(AgentResult) ->
-									#{profile := Profile} = AgentResult,
-									#{agent := Agent} = AgentResult,
-									#{balance := Balance} = AgentResult,
-									#{referee := Referee} = AgentResult,
-									AgentResultMap = 	case ar_util:safe_decode(Profile) of
-															{error, invalid} ->
-																{};
-															{ok, ID} ->
-																case ar_storage:read_tx(ID) of
-																	unavailable ->
-																		{ok, Config} = application:get_env(chivesweave, config),
-																		DataDir = Config#config.data_dir,							
-																		case ar_kv:get(xwe_storage_txid_in_bundle, ar_util:encode(ID))  of
-																			not_found ->
-																				{};
-																			{ok, BundleTxBinary} ->
-																				BundleTx = binary_to_term(BundleTxBinary),	
-																				Address = maps:get(<<"address">>, maps:get(<<"owner">>, BundleTx, undefined), undefined),
-																				Block = maps:get(<<"block">>, BundleTx, undefined),
-																				BundleId = maps:get(<<"bundleid">>, BundleTx, undefined),
-																				FileName = binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, Address, ar_util:encode(ID) ])),
-																				case file:read_file(FileName) of
-																					{ok, Content} ->
-																						ProfileContent = ar_serialize:dejsonify(Content),
-																						AddressResult = #{
-																								<<"Profile">> => ProfileContent,
-																								<<"Address">> => Address,
-																								<<"TxId">> => ar_util:encode(ID),
-																								<<"BundleId">> => BundleId,
-																								<<"Block">> => Block,
-																								<<"AgentLevel">> => Agent,
-																								<<"Balance">> => Balance,
-																								<<"Referee">> => Referee
-																						},
-																						AddressResult;
-																					_ ->
-																						{}
-																				end
-																		end;
-																	#tx{} = TX ->
-																		{_, _, Body, _} = serve_tx_html_data(ID, TX),
-																		Body
-																end
-														end,
-									AgentResultMap
-								end,
-								Res
-							),
+							AgentProfileList = get_address_detail_by_record(AddressRecords),
 							AddressResult = #{
 									<<"data">> => AgentProfileList,
-									<<"table">> => Res,
+									<<"table">> => AddressRecords,
 									<<"total">> => AddressTotal,
 									<<"from">> => PageIdNew * PageSizeNew,
 									<<"pageid">> => PageIdNew,
@@ -3135,64 +3256,15 @@ handle_get_address_agent_records(PageId, PageSize) ->
 
 handle_get_my_profile(Address, Req) ->
 	case ar_arql_db:select_address_profile_my(Address) of
-		Res ->
-			try
-				?LOG_INFO([{handle_get_my_profile_______Res, Res}]),
-				[#{profile := Profile} | _] = Res,
-				[#{agent := Agent} | _] = Res,
-				[#{balance := Balance} | _] = Res,
-				[#{referee := Referee} | _] = Res,
-				?LOG_INFO([{handle_get_my_profile_______Profile, Profile}]),
-				case ar_util:safe_decode(Profile) of
-					{error, invalid} ->
-						{200, #{}, ar_serialize:jsonify(Res), Req};
-					{ok, ID} ->
-						case ar_storage:read_tx(ID) of
-							unavailable ->
-								{ok, Config} = application:get_env(chivesweave, config),
-								DataDir = Config#config.data_dir,							
-								case ar_kv:get(xwe_storage_txid_in_bundle, ar_util:encode(ID))  of
-									not_found ->
-										{200, #{}, sendfile("data/not_found.html"), Req};
-									{ok, BundleTxBinary} ->
-										BundleTx = binary_to_term(BundleTxBinary),	
-										% ?LOG_INFO([{handle_get_tx_unbundle_____________BundleTx, BundleTx}]),
-										ContentType = maps:get(<<"type">>, maps:get(<<"data">>, BundleTx, undefined), undefined),
-										Address = maps:get(<<"address">>, maps:get(<<"owner">>, BundleTx, undefined), undefined),
-										Block = maps:get(<<"block">>, BundleTx, undefined),
-										BundleId = maps:get(<<"bundleid">>, BundleTx, undefined),
-										FileName = binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, Address, ar_util:encode(ID) ])),
-										% ?LOG_INFO([{image_thumbnail_compress_to_storage_____________FileName, FileName}]),
-										case file:read_file(FileName) of
-											{ok, Content} ->
-												ProfileContent = ar_serialize:dejsonify(Content),
-												AddressResult = #{
-														<<"Profile">> => ProfileContent,
-														<<"Address">> => Address,
-														<<"TxId">> => ar_util:encode(ID),
-														<<"BundleId">> => BundleId,
-														<<"Block">> => Block,
-														<<"AgentLevel">> => Agent,
-														<<"Balance">> => Balance,
-														<<"Referee">> => Referee
-												},
-												{200, #{ <<"content-type">> => ContentType }, ar_serialize:jsonify(AddressResult), Req};
-											_ ->
-												{200, #{}, sendfile("data/not_found.html"), Req}
-										end
-								end;
-							#tx{} = TX ->
-								{_, Headers, Body, Req2} = serve_tx_html_data(Req, TX),
-								{200, Headers, Body, Req2}
-						end
-				end
-			catch
-				Error ->
-					?LOG_INFO([{handle_get_my_profile, Error}]),
+		AddressRecords ->
+			AgentProfileList = get_address_detail_by_record(AddressRecords),
+			case length(AgentProfileList) of
+				1 ->
+					{200, #{}, ar_serialize:jsonify(lists:nth(1, AgentProfileList)), Req};
+				_ ->
 					{200, #{}, [], Req}
 			end;
 		_ ->
-			?LOG_INFO([{handle_get_my_profile_______Address, Address}]),
 			{200, #{}, [], Req}
 	end.
 

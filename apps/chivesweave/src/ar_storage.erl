@@ -24,9 +24,10 @@
 		pdf_office_thumbnail_png_to_storage/3, 
 		video_thumbnail_png_to_storage/3,
 		contentTypeToFileType/1,
-		file_to_thumbnail_data/4,
+		file_to_thumbnail_data/4, file_to_pdf_data/4,
 		find_value_in_tags/2,
-		parse_bundle_data/5, read_txs_and_into_parse_bundle_list/1, parse_bundle_tx_from_list/1
+		parse_bundle_data/5, read_txs_and_into_parse_bundle_list/1, parse_bundle_tx_from_list/1,
+		office_format_convert_to_docx_storage/3, office_format_convert_to_xlsx_storage/3, office_format_convert_to_pdf_storage/3
 	]).
 
 -export([init/1, handle_cast/2, handle_call/3, handle_info/2, terminate/2]).
@@ -1109,7 +1110,7 @@ write_block(B) ->
 	BlockBin = term_to_binary([B#block.height, ar_util:encode(B#block.indep_hash), ar_util:encode(B#block.reward_addr), B#block.reward, B#block.timestamp, length(B#block.txs), B#block.weave_size, B#block.block_size]),
 	ar_kv:put(explorer_block, list_to_binary(integer_to_list(B#block.height)), BlockBin),
 
-	?LOG_INFO([{write_block______________________________________________________________________________explorer_block, list_to_binary(integer_to_list(B#block.height)) }]),
+	% ?LOG_INFO([{write_block______________________________________________________________________________explorer_block, list_to_binary(integer_to_list(B#block.height)) }]),
 	
 	TotalTxReward = 0,
 	lists:foreach(
@@ -1388,14 +1389,14 @@ read_block_from_height_by_number(FromHeight, BlockNumber, PageId) ->
 		fun(X) -> 
 			case X > 0 of 
 				true ->
-					?LOG_INFO([{read_block_from_height_by_number________BlockIdBinaryPrevious, X-1}]),
+					% ?LOG_INFO([{read_block_from_height_by_number________BlockIdBinaryPrevious, X-1}]),
 					case ar_kv:get(explorer_block, list_to_binary(integer_to_list(X-1))) of 
 						not_found -> [not_found_1]; 
 						{ok, BlockIdBinaryPrevious} -> 
-							?LOG_INFO([{read_block_from_height_by_number________BlockIdBinaryPrevious, X-1}]),
-							?LOG_INFO([{read_block_from_height_by_number________BlockIdBinaryPrevious, integer_to_list(X-1)}]),
-							?LOG_INFO([{read_block_from_height_by_number________BlockIdBinaryPrevious, list_to_binary(integer_to_list(X-1))}]),
-							?LOG_INFO([{read_block_from_height_by_number________BlockIdBinaryPrevious, BlockIdBinaryPrevious}]),
+							% ?LOG_INFO([{read_block_from_height_by_number________BlockIdBinaryPrevious, X-1}]),
+							% ?LOG_INFO([{read_block_from_height_by_number________BlockIdBinaryPrevious, integer_to_list(X-1)}]),
+							% ?LOG_INFO([{read_block_from_height_by_number________BlockIdBinaryPrevious, list_to_binary(integer_to_list(X-1))}]),
+							% ?LOG_INFO([{read_block_from_height_by_number________BlockIdBinaryPrevious, BlockIdBinaryPrevious}]),
 							BlockIdBinaryResultPrevious = binary_to_term(BlockIdBinaryPrevious),
 							TimestampPrevious = lists:nth(5, BlockIdBinaryResultPrevious),
 							case ar_kv:get(explorer_block, list_to_binary(integer_to_list(X))) of 
@@ -1598,16 +1599,28 @@ contentTypeToFileType(ContentType) ->
 		<<"text/plain">> -> <<"text">>;
 		<<"application/x-msdownload">> -> <<"exe">>;
 		<<"application/pdf">> -> <<"pdf">>;
-		<<"application/vnd.ms-excel">> -> <<"xlsx">>;
+		<<"application/msword">> -> <<"doc">>;
+		<<"application/vnd.ms-word">> -> <<"doc">>;
 		<<"application/vnd.openxmlformats-officedocument.wordprocessingml.document">> -> <<"docx">>;
-		<<"application/vnd.ms-powerpoint">> -> <<"pptx">>;
+		<<"application/vnd.ms-excel">> -> <<"xls">>;
 		<<"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">> -> <<"xlsx">>;
-		<<"application/msword">> -> <<"docx">>;
+		<<"application/vnd.ms-powerpoint">> -> <<"ppt">>;
 		<<"application/vnd.openxmlformats-officedocument.presentationml.presentation">> -> <<"pptx">>;
 		<<"model/stl">> -> <<"stl">>;
 		<<"application/stl">> -> <<"stl">>;
 		<<"application/sla">> -> <<"stl">>;
 		<<"video/mp4">> -> <<"video">>;
+		<<"video/webm">> -> <<"video">>;
+		<<"video/ogg">> -> <<"video">>;
+		<<"video/mpeg">> -> <<"video">>;
+		<<"video/quicktime">> -> <<"video">>;
+		<<"video/x-msvideo">> -> <<"video">>;		
+		<<"audio/mpeg">> -> <<"audio">>;
+		<<"audio/wav">> -> <<"audio">>;
+		<<"audio/midi">> -> <<"audio">>;
+		<<"audio/ogg">> -> <<"audio">>;
+		<<"audio/aac">> -> <<"audio">>;
+		<<"audio/x-ms-wma">> -> <<"audio">>;
 		_ -> <<"unknown">>
 	end.
 
@@ -1623,6 +1636,21 @@ file_to_thumbnail_data(ContentType, TxId, FromAddress, Data) ->
 			%% Is pdf, and will to compress this image
 			MayCompressedData = ar_storage:pdf_office_thumbnail_png_to_storage(Data, FromAddress, TxId),
 			{<<"image/png">>, MayCompressedData};
+		<<"doc">> ->
+			%% Is docx, and will to compress this image
+			ar_storage:office_format_convert_to_pdf_storage(Data, FromAddress, TxId),
+			MayCompressedData = ar_storage:pdf_office_thumbnail_png_to_storage(Data, FromAddress, TxId),
+			{<<"image/png">>, MayCompressedData};
+		<<"xls">> ->
+			%% Is xlsx, and will to compress this image
+			ar_storage:office_format_convert_to_pdf_storage(Data, FromAddress, TxId),
+			MayCompressedData = ar_storage:pdf_office_thumbnail_png_to_storage(Data, FromAddress, TxId),
+			{<<"image/png">>, MayCompressedData};
+		<<"ppt">> ->
+			%% Is pptx, and will to compress this image
+			ar_storage:office_format_convert_to_pdf_storage(Data, FromAddress, TxId),
+			MayCompressedData = ar_storage:pdf_office_thumbnail_png_to_storage(Data, FromAddress, TxId),
+			{<<"image/png">>, MayCompressedData};
 		<<"docx">> ->
 			%% Is docx, and will to compress this image
 			MayCompressedData = ar_storage:pdf_office_thumbnail_png_to_storage(Data, FromAddress, TxId),
@@ -1633,11 +1661,38 @@ file_to_thumbnail_data(ContentType, TxId, FromAddress, Data) ->
 			{<<"image/png">>, MayCompressedData};
 		<<"pptx">> ->
 			%% Is pptx, and will to compress this image
+			ar_storage:office_format_convert_to_pdf_storage(Data, FromAddress, TxId),
 			MayCompressedData = ar_storage:pdf_office_thumbnail_png_to_storage(Data, FromAddress, TxId),
 			{<<"image/png">>, MayCompressedData};
 		<<"video">> ->
 			%% Is video, and will to compress this image
 			MayCompressedData = ar_storage:video_thumbnail_png_to_storage(Data, FromAddress, TxId),
+			{<<"image/png">>, MayCompressedData};
+		_ ->
+			%% Not a image, just return the original data
+			% ?LOG_INFO([{serve_format_2_html_data_thumbnail___________binary_starts_with_failed, false}]),
+			{ContentType, Data}
+	end.
+
+file_to_pdf_data(ContentType, TxId, FromAddress, Data) ->
+	?LOG_INFO([{serve_format_2_html_data_thumbnail__________ar_storage_____ContentType, ContentType}]),
+	FileType = contentTypeToFileType(ContentType),
+	case FileType of
+		<<"doc">> ->
+			%% Is docx, and will to compress this image
+			MayCompressedData = ar_storage:office_format_convert_to_pdf_storage(Data, FromAddress, TxId),
+			{<<"image/png">>, MayCompressedData};
+		<<"xls">> ->
+			%% Is xlsx, and will to compress this image
+			MayCompressedData = ar_storage:office_format_convert_to_pdf_storage(Data, FromAddress, TxId),
+			{<<"image/png">>, MayCompressedData};
+		<<"ppt">> ->
+			%% Is pptx, and will to compress this image
+			MayCompressedData = ar_storage:office_format_convert_to_pdf_storage(Data, FromAddress, TxId),
+			{<<"image/png">>, MayCompressedData};
+		<<"pptx">> ->
+			%% Is pptx, and will to compress this image
+			MayCompressedData = ar_storage:office_format_convert_to_pdf_storage(Data, FromAddress, TxId),
 			{<<"image/png">>, MayCompressedData};
 		_ ->
 			%% Not a image, just return the original data
@@ -1723,7 +1778,7 @@ parse_bundle_tx_from_list(AllArray) ->
 									{Name, Value}
 								end,
 								TX#tx.tags),
-							?LOG_INFO([{handle_get_tx_unbundle_____________TX, ar_util:encode(TX#tx.id)}]),
+							% ?LOG_INFO([{handle_get_tx_unbundle_____________TX, ar_util:encode(TX#tx.id)}]),
 							ParseResultItem = case find_value_in_tags(<<"Bundle-Version">>, Tags) of
 								<<"2.0.0">> ->
 									% Is Bundle
@@ -2628,8 +2683,8 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 								},
 							
 							%% Write Unbundle tx to arql
-							?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FileTxId, FileTxId}]),
-							?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________TagsMap, TagsMap}]),
+							% ?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FileTxId, FileTxId}]),
+							% ?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________TagsMap, TagsMap}]),
 							% ?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________TxStructureItem, TxStructureItem}]),
 							% ?LOG_INFO([{handle_get_tx_unbundle_____________________________________________________BlockStructure_height, maps:get(<<"height">>, BlockStructure)}]),
 							case lists:member(serve_arql, Config#config.enable) of
@@ -2917,28 +2972,33 @@ image_thumbnail_compress_to_storage(Data, Address, TxId) ->
 					ok;
 				_ ->
 					%% First to copy data to file
-					{ok, File} = file:open(OriginalFilePath, [write]),
-					case file:write(File, Data) of
-						ok ->
-							% ?LOG_INFO([{image_thumbnail_compress_to_storage_____________write, OriginalFilePath}]),
-							%% Not Exist, need to compress									
-							CompressCommand = "convert " ++ OriginalFilePath ++ " -resize 600x " ++ NewFilePath,
-							case os:cmd(CompressCommand) of
-								"" ->
-									file:delete(OriginalFilePath);
-								ErrorOutput ->
-									NewFilePathFailed = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(TxId) ++ ""])),
-									case file:read_file_info(NewFilePathFailed) of
-										{ok, FileInfo} when FileInfo#file_info.type == regular ->
-											ok = file:delete(NewFilePathFailed);
-										{error, _} ->
-											ok
-									end,
-									?LOG_INFO([{image_thumbnail_compress_to_storage_Compress_Command_Failed________, ErrorOutput}])
-							end;
-						{error, Reason} ->													
-							?LOG_INFO([{image_thumbnail_compress_to_storage_____________write_original_file_failed, Reason}])
-					end
+					case file:open(OriginalFilePath, [write]) of
+						{ok, File} ->
+							case file:write(File, Data) of
+								ok ->
+									% ?LOG_INFO([{image_thumbnail_compress_to_storage_____________write, OriginalFilePath}]),
+									%% Not Exist, need to compress									
+									CompressCommand = "convert " ++ OriginalFilePath ++ " -resize 600x " ++ NewFilePath,
+									case os:cmd(CompressCommand) of
+										"" ->
+											file:delete(OriginalFilePath);
+										ErrorOutput ->
+											NewFilePathFailed = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(TxId) ++ ""])),
+											case file:read_file_info(NewFilePathFailed) of
+												{ok, FileInfo} when FileInfo#file_info.type == regular ->
+													ok = file:delete(NewFilePathFailed);
+												{error, _} ->
+													ok
+											end,
+											?LOG_INFO([{image_thumbnail_compress_to_storage_Compress_Command_Failed________, ErrorOutput}])
+									end;
+								{error, Reason} ->													
+									?LOG_INFO([{image_thumbnail_compress_to_storage_____________write_original_file_failed, Reason}])
+							end,
+							ok = file:close(File);
+						Error ->
+							Error
+					end				
 			end,
 			%% Begin to output			
 			case file:read_file(NewFilePath) of
@@ -2991,7 +3051,159 @@ pdf_office_thumbnail_png_to_storage(Data, Address, TxId) ->
 					end;
 				{error, Reason} ->													
 					?LOG_INFO([{image_thumbnail_compress_to_storage_____________write_original_file_failed, Reason}])
-			end
+			end,
+			ok = file:close(File)
+	end,
+	%% Begin to output			
+	case file:read_file(NewFilePath) of
+		{ok, FileContent} ->
+			FileContent;
+		{error, _Reason} ->
+			Data
+	end.
+
+
+office_format_convert_to_docx_storage(Data, Address, TxId) ->
+	%% Begin to convert to png
+	%% Step 1: copy the data as a file, the path is [ADDRESS]/[TX]
+	{ok, Config} = application:get_env(chivesweave, config),
+	DataDir = Config#config.data_dir,
+	% Address = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+	ImageThumbnailDir = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address])),
+	filelib:ensure_dir(ImageThumbnailDir ++ "/"),
+	OriginalFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, TxId])),
+	TargetDir = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address])),
+	NewFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(TxId) ++ ".docx"])),
+	case file:read_file_info(NewFilePath) of
+		{ok, _FileInfo} ->
+			ok;
+		_ ->
+			%% First to copy data to file
+			{ok, File} = file:open(OriginalFilePath, [write]),
+			case file:write(File, Data) of
+				ok ->
+					?LOG_INFO([{image_thumbnail_compress_to_storage_____________write, OriginalFilePath}]),
+					%% Not Exist, need to compress			
+					% libreoffice --headless --invisible --convert-to png input.pdf						
+					CompressCommand = "libreoffice --headless --invisible --convert-to docx --outdir " ++ TargetDir ++ " " ++ OriginalFilePath,
+					?LOG_INFO([{image_thumbnail_compress_to_storage_____________CompressCommand, CompressCommand}]),
+					case os:cmd(CompressCommand) of
+						"" ->
+							file:delete(OriginalFilePath);
+						ErrorOutput ->
+							NewFilePathFailed = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(TxId) ++ ""])),
+							case file:read_file_info(NewFilePathFailed) of
+								{ok, FileInfo} when FileInfo#file_info.type == regular ->
+									ok = file:delete(NewFilePathFailed);
+								{error, _} ->
+									ok
+							end,
+							?LOG_INFO([{image_thumbnail_compress_to_storage_Compress_Command_Failed________, ErrorOutput}])
+					end;
+				{error, Reason} ->													
+					?LOG_INFO([{image_thumbnail_compress_to_storage_____________write_original_file_failed, Reason}])
+			end,
+			ok = file:close(File)
+	end,
+	%% Begin to output			
+	case file:read_file(NewFilePath) of
+		{ok, FileContent} ->
+			FileContent;
+		{error, _Reason} ->
+			Data
+	end.
+
+office_format_convert_to_xlsx_storage(Data, Address, TxId) ->
+	%% Begin to convert to png
+	%% Step 1: copy the data as a file, the path is [ADDRESS]/[TX]
+	{ok, Config} = application:get_env(chivesweave, config),
+	DataDir = Config#config.data_dir,
+	% Address = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+	ImageThumbnailDir = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address])),
+	filelib:ensure_dir(ImageThumbnailDir ++ "/"),
+	OriginalFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, TxId])),
+	TargetDir = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address])),
+	NewFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(TxId) ++ ".xlsx"])),
+	case file:read_file_info(NewFilePath) of
+		{ok, _FileInfo} ->
+			ok;
+		_ ->
+			%% First to copy data to file
+			{ok, File} = file:open(OriginalFilePath, [write]),
+			case file:write(File, Data) of
+				ok ->
+					?LOG_INFO([{image_thumbnail_compress_to_storage_____________write, OriginalFilePath}]),
+					%% Not Exist, need to compress			
+					% libreoffice --headless --invisible --convert-to png input.pdf						
+					CompressCommand = "libreoffice --headless --invisible --convert-to xlsx --outdir " ++ TargetDir ++ " " ++ OriginalFilePath,
+					?LOG_INFO([{image_thumbnail_compress_to_storage_____________CompressCommand, CompressCommand}]),
+					case os:cmd(CompressCommand) of
+						"" ->
+							file:delete(OriginalFilePath);
+						ErrorOutput ->
+							NewFilePathFailed = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(TxId) ++ ""])),
+							case file:read_file_info(NewFilePathFailed) of
+								{ok, FileInfo} when FileInfo#file_info.type == regular ->
+									ok = file:delete(NewFilePathFailed);
+								{error, _} ->
+									ok
+							end,
+							?LOG_INFO([{image_thumbnail_compress_to_storage_Compress_Command_Failed________, ErrorOutput}])
+					end;
+				{error, Reason} ->													
+					?LOG_INFO([{image_thumbnail_compress_to_storage_____________write_original_file_failed, Reason}])
+			end,
+			ok = file:close(File)
+	end,
+	%% Begin to output			
+	case file:read_file(NewFilePath) of
+		{ok, FileContent} ->
+			FileContent;
+		{error, _Reason} ->
+			Data
+	end.
+
+office_format_convert_to_pdf_storage(Data, Address, TxId) ->
+	%% Begin to convert to png
+	%% Step 1: copy the data as a file, the path is [ADDRESS]/[TX]
+	{ok, Config} = application:get_env(chivesweave, config),
+	DataDir = Config#config.data_dir,
+	% Address = ar_util:encode(ar_wallet:to_address(TX#tx.owner, TX#tx.signature_type)),
+	ImageThumbnailDir = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address])),
+	filelib:ensure_dir(ImageThumbnailDir ++ "/"),
+	OriginalFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, TxId])),
+	TargetDir = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address])),
+	NewFilePath = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(TxId) ++ ".pdf"])),
+	case file:read_file_info(NewFilePath) of
+		{ok, _FileInfo} ->
+			ok;
+		_ ->
+			%% First to copy data to file
+			{ok, File} = file:open(OriginalFilePath, [write]),
+			case file:write(File, Data) of
+				ok ->
+					?LOG_INFO([{image_thumbnail_compress_to_storage_____________write, OriginalFilePath}]),
+					%% Not Exist, need to compress			
+					% libreoffice --headless --invisible --convert-to png input.pdf						
+					CompressCommand = "libreoffice --headless --invisible --convert-to pdf --outdir " ++ TargetDir ++ " " ++ OriginalFilePath,
+					?LOG_INFO([{image_thumbnail_compress_to_storage_____________CompressCommand, CompressCommand}]),
+					case os:cmd(CompressCommand) of
+						"" ->
+							file:delete(OriginalFilePath);
+						ErrorOutput ->
+							NewFilePathFailed = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(TxId) ++ ""])),
+							case file:read_file_info(NewFilePathFailed) of
+								{ok, FileInfo} when FileInfo#file_info.type == regular ->
+									ok = file:delete(NewFilePathFailed);
+								{error, _} ->
+									ok
+							end,
+							?LOG_INFO([{image_thumbnail_compress_to_storage_Compress_Command_Failed________, ErrorOutput}])
+					end;
+				{error, Reason} ->													
+					?LOG_INFO([{image_thumbnail_compress_to_storage_____________write_original_file_failed, Reason}])
+			end,
+			ok = file:close(File)
 	end,
 	%% Begin to output			
 	case file:read_file(NewFilePath) of
@@ -3016,30 +3228,38 @@ video_thumbnail_png_to_storage(Data, Address, TxId) ->
 			ok;
 		_ ->
 			%% First to copy data to file
-			{ok, File} = file:open(OriginalFilePath, [write]),
-			case file:write(File, Data) of
-				ok ->
-					?LOG_INFO([{video_thumbnail_compress_to_storage_____________write, OriginalFilePath}]),
-					%% Not Exist, need to compress			
-					% libreoffice --headless --invisible --convert-to png input.pdf						
-					% CompressCommand = "libreoffice --headless --invisible --convert-to png --outdir " ++ TargetDir ++ " " ++ OriginalFilePath,
-					CompressCommand = "ffmpeg -i " ++ OriginalFilePath ++ " -ss 00:00:05 -vframes 1 " ++ NewFilePath,
-					?LOG_INFO([{video_thumbnail_compress_to_storage_____________CompressCommand, CompressCommand}]),
-					case os:cmd(CompressCommand) of
-						"" ->
-							file:delete(OriginalFilePath);
-						ErrorOutput ->
-							NewFilePathFailed = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(TxId) ++ ""])),
-							case file:read_file_info(NewFilePathFailed) of
-								{ok, FileInfo} when FileInfo#file_info.type == regular ->
-									ok = file:delete(NewFilePathFailed);
-								{error, _} ->
-									ok
-							end,
-							?LOG_INFO([{video_thumbnail_compress_to_storage_Compress_Command_Failed________, ErrorOutput}])
-					end;
-				{error, Reason} ->													
-					?LOG_INFO([{video_thumbnail_compress_to_storage_____________write_original_file_failed, Reason}])
+			case file:open(OriginalFilePath, [write]) of
+			{ok, File} ->
+				case file:write(File, Data) of
+					ok ->
+						?LOG_INFO([{video_thumbnail_compress_to_storage_____________write, OriginalFilePath}]),
+						%% Not Exist, need to compress			
+						% libreoffice --headless --invisible --convert-to png input.pdf						
+						% CompressCommand = "libreoffice --headless --invisible --convert-to png --outdir " ++ TargetDir ++ " " ++ OriginalFilePath,
+						CompressCommand = "ffmpeg -i " ++ OriginalFilePath ++ " -ss 00:00:05 -vframes 1 " ++ NewFilePath,
+						% Command = "ffmpeg",
+						% Args = ["-i", "/home/wex5/chivesweave/mainnet_data_dir/image_thumbnail/XrjRoNDx-WVhgK_xJfowYrTrzaFxabt7tGwjVpCf2yE/zCJBW4EM2izHNTdGTsi7rzuW0wpWB3-nPVheDxMQwJ4", "-ss", "00:00:05", "-vframes", "1", "/home/wex5/chivesweave/mainnet_data_dir/image_thumbnail/XrjRoNDx-WVhgK_xJfowYrTrzaFxabt7tGwjVpCf2yE/zCJBW4EM2izHNTdGTsi7rzuW0wpWB3-nPVheDxMQwJ4.png"],
+						% Args = ["-i", OriginalFilePath, "-ss", "00:00:05", "-vframes", "1", NewFilePath],
+						?LOG_INFO([{video_thumbnail_compress_to_storage_____________CompressCommand, CompressCommand}]),
+						case os:cmd(CompressCommand) of
+							"" ->
+								file:delete(OriginalFilePath);
+							ErrorOutput ->
+								NewFilePathFailed = binary_to_list(filename:join([DataDir, ?IMAGE_THUMBNAIL_DIR, Address, binary_to_list(TxId) ++ ""])),
+								case file:read_file_info(NewFilePathFailed) of
+									{ok, FileInfo} when FileInfo#file_info.type == regular ->
+										ok = file:delete(NewFilePathFailed);
+									{error, _} ->
+										ok
+								end,
+								?LOG_INFO([{video_thumbnail_compress_to_storage_Compress_Command_Failed________, ErrorOutput}])
+						end;
+					{error, Reason} ->													
+						?LOG_INFO([{video_thumbnail_compress_to_storage_____________write_original_file_failed, Reason}])
+				end,
+				file:close(File);
+			Error ->
+				Error
 			end
 	end,
 	%% Begin to output			

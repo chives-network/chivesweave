@@ -3282,13 +3282,13 @@ handle_get_transaction_bundletx(PageId, PageSize) ->
 						PageIdInt < 0 -> 0;
 						true -> PageIdInt
 					end,
-					TransactionsTotal  = case ar_arql_db:select_transaction_total_bundletxparse(<<"0">>) of
+					TransactionsTotal  = case ar_arql_db:select_transaction_total_bundletxparse(<<"">>) of
 						TotalRes ->
 							TotalRes;
 						_ -> 
 							0
 					end,
-					case ar_arql_db:select_transaction_range_bundletxparse(<<"0">>, PageSizeNew, PageIdNew * PageSizeNew) of
+					case ar_arql_db:select_transaction_range_bundletxparse(<<"">>, PageSizeNew, PageIdNew * PageSizeNew) of
 						not_found ->
 							{404, #{}, []};
 						Res ->

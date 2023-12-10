@@ -2718,7 +2718,7 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 											Item_node_star = <<"">>,
 											Item_node_hot = <<"">>,
 											Item_node_delete = <<"">>,											
-											Last_tx_action = ar_util:encode(TX#tx.id),
+											Last_tx_action = DataItemId,
 											BundleTxParse = <<"">>,
 											TXFields = [
 												DataItemId,
@@ -2787,20 +2787,26 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 															case EntityAction of
 																<<"Label">> -> 
 																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
-																	ar_arql_db:update_tx_label(EntityTarget, FileTxId, BlockTimestamp, LastTxChange);
+																	ar_arql_db:update_tx_label(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);
 																<<"Star">> -> 
-																	ar_arql_db:update_tx_star(EntityTarget, FileTxId, BlockTimestamp, LastTxChange);
+																	% [ITEM_STAR, TIMESTAMP, CURRENT_TXID, FILE_TXID, FILE_TXID, LAST_TX_ACTION]
+																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityTarget, EntityTarget}]),
+																	ar_arql_db:update_tx_star(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);
 																<<"Folder">> -> 
-																	ar_arql_db:update_tx_folder(EntityTarget, FileTxId, BlockTimestamp, LastTxChange);
+																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
+																	ar_arql_db:update_tx_folder(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);
 																<<"Public">> -> 
-																	ar_arql_db:update_tx_public(EntityTarget, FileTxId, BlockTimestamp, LastTxChange);
+																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
+																	ar_arql_db:update_tx_public(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);
 																<<"RenameFolder">> -> 
 																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
-																	ar_arql_db:update_rename_folder(EntityTarget, FileTxId, BlockTimestamp, LastTxChange);
+																	ar_arql_db:update_rename_folder(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);
 																<<"DeleteFolder">> -> 
-																	ar_arql_db:update_delete_folder(EntityTarget, FileTxId, BlockTimestamp, LastTxChange);
+																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
+																	ar_arql_db:update_delete_folder(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);
 																<<"Restorefolder">> -> 
-																	ar_arql_db:update_restore_folder(EntityTarget, FileTxId, BlockTimestamp, LastTxChange);	
+																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
+																	ar_arql_db:update_restore_folder(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);	
 																<<"Profile">> -> 
 																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________Profile, DataItemId}]),
 																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FromAddress, FromAddress}]),
@@ -2811,7 +2817,7 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FromAddress, FromAddress}]),
 																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________BlockTimestamp, BlockTimestamp}]),
 																	ar_arql_db:update_address_agent(EntityTarget, FromAddress, BlockTimestamp);
-																<<"Referee">> -> 			
+																<<"Referee">> ->
 																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________Referee, EntityTarget}]),
 																	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(EntityTarget) of
 																		{ok, RefereeAddressOK} ->

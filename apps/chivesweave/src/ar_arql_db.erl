@@ -19,7 +19,7 @@
 		select_transaction_range_bundletxparse/3, select_transaction_total_bundletxparse/1,
 		select_transaction_group_label_address/1,
 		select_folder_address/1,
-		update_tx_label/4, update_tx_folder/4, update_tx_star/4, update_tx_public/4, update_tx_bundletxparse/2,
+		update_tx_label/5, update_tx_folder/5, update_tx_star/5, update_tx_public/5, update_tx_bundletxparse/2,
 		update_address_referee/3, update_address_agent/3, update_address_profile/3, 
 		update_address_blockinfo/4
 		]).
@@ -278,10 +278,14 @@ DROP INDEX idx_address_last_tx_action;
 -define(SELECT_TRANSACTION_RANGE_BUNDLETXPARSE_SQL, "SELECT * FROM tx where bundletxparse = ? and entity_type = 'Bundle' order by timestamp asc LIMIT ? OFFSET ?").
 -define(SELECT_TRANSACTION_TOTAL_BUNDLETXPARSE, "SELECT COUNT(*) AS NUM FROM tx where bundletxparse = ? and entity_type = 'Bundle'").
 
--define(UPDATE_TX_LABEL_SQL, "update tx set item_label = ?, timestamp = ? where id = ? and last_tx_action = ?").
--define(UPDATE_TX_STAR_SQL, "update tx set item_star = ?, timestamp = ? where id = ? and last_tx_action = ?").
--define(UPDATE_TX_FOLDER_SQL, "update tx set item_parent = ?, timestamp = ? where id = ? and last_tx_action = ?").
--define(UPDATE_TX_PUBLIC_SQL, "update tx set is_public = ?, timestamp = ? where id = ? and last_tx_action = ?").
+%% Explain: where (id = last_tx_action and id = ?) or (id != last_tx_action and id = ? and last_tx_action = ?)
+%% Case 1: Frist File Create
+%% Case 2: Tx By Tx, make a change log chain
+%% Case 3: In one block, have multi operations on one file
+-define(UPDATE_TX_LABEL_SQL, "update tx set item_label = ?, timestamp = ?, last_tx_action = ? where (id = last_tx_action and id = ?) or (id != last_tx_action and id = ? and last_tx_action = ?) or (id != last_tx_action and id = ? and last_tx_action = ?)").
+-define(UPDATE_TX_STAR_SQL, "update tx set item_star = ?, timestamp = ?, last_tx_action = ? where (id = last_tx_action and id = ?) or (id != last_tx_action and id = ? and last_tx_action = ?) or (id != last_tx_action and id = ? and last_tx_action = ?)").
+-define(UPDATE_TX_FOLDER_SQL, "update tx set item_parent = ?, timestamp = ?, last_tx_action = ? where (id = last_tx_action and id = ?) or (id != last_tx_action and id = ? and last_tx_action = ?) or (id != last_tx_action and id = ? and last_tx_action = ?)").
+-define(UPDATE_TX_PUBLIC_SQL, "update tx set is_public = ?, timestamp = ?, last_tx_action = ? where (id = last_tx_action and id = ?) or (id != last_tx_action and id = ? and last_tx_action = ?) or (id != last_tx_action and id = ? and last_tx_action = ?)").
 -define(UPDATE_TX_BUNDLETXPARSE_SQL, "update tx set bundleTxParse = ? where id = ?").
 
 -define(SELECT_TRANSACTION_RANGE_FOLDER_ADDRESS_SQL, "SELECT * FROM tx where item_parent = ? and is_encrypt = '' and (entity_type = 'File' or entity_type = 'Folder') and from_address = ? order by entity_type desc, timestamp desc LIMIT ? OFFSET ?").
@@ -406,20 +410,20 @@ select_transaction_total_bundletxparse(BUNDLETXPARSE) ->
 eval_legacy_arql(Query) ->
 	gen_server:call(?MODULE, {eval_legacy_arql, Query}, ?SELECT_TIMEOUT).
 
-update_tx_label(ITEM_LABEL, TIMESTAMP, TXID, LAST_TX_ACTION) ->
-	gen_server:cast(?MODULE, {update_tx_label, ITEM_LABEL, TIMESTAMP, TXID, LAST_TX_ACTION}),
+update_tx_label(ITEM_LABEL, TIMESTAMP, CURRENT_BLOCK_HEIGHT, FILE_TXID, LAST_TX_ACTION) ->
+	gen_server:cast(?MODULE, {update_tx_label, ITEM_LABEL, TIMESTAMP, CURRENT_BLOCK_HEIGHT, FILE_TXID, LAST_TX_ACTION}),
 	ok.
 
-update_tx_star(ITEM_STAR, TIMESTAMP, TXID, LAST_TX_ACTION) ->
-	gen_server:cast(?MODULE, {update_tx_star, ITEM_STAR, TIMESTAMP, TXID, LAST_TX_ACTION}),
+update_tx_star(ITEM_STAR, TIMESTAMP, CURRENT_BLOCK_HEIGHT, FILE_TXID, LAST_TX_ACTION) ->
+	gen_server:cast(?MODULE, {update_tx_star, ITEM_STAR, TIMESTAMP, CURRENT_BLOCK_HEIGHT, FILE_TXID, LAST_TX_ACTION}),
 	ok.
 
-update_tx_folder(ITEM_PARENT, TIMESTAMP, TXID, LAST_TX_ACTION) ->
-	gen_server:cast(?MODULE, {update_tx_folder, ITEM_PARENT, TIMESTAMP, TXID, LAST_TX_ACTION}),
+update_tx_folder(ITEM_PARENT, TIMESTAMP, CURRENT_BLOCK_HEIGHT, FILE_TXID, LAST_TX_ACTION) ->
+	gen_server:cast(?MODULE, {update_tx_folder, ITEM_PARENT, TIMESTAMP, CURRENT_BLOCK_HEIGHT, FILE_TXID, LAST_TX_ACTION}),
 	ok.
 
-update_tx_public(IS_PUBLIC, TIMESTAMP, TXID, LAST_TX_ACTION) ->
-	gen_server:cast(?MODULE, {update_tx_public, IS_PUBLIC, TIMESTAMP, TXID, LAST_TX_ACTION}),
+update_tx_public(IS_PUBLIC, TIMESTAMP, CURRENT_BLOCK_HEIGHT, FILE_TXID, LAST_TX_ACTION) ->
+	gen_server:cast(?MODULE, {update_tx_public, IS_PUBLIC, TIMESTAMP, CURRENT_BLOCK_HEIGHT, FILE_TXID, LAST_TX_ACTION}),
 	ok.
 
 update_tx_bundletxparse(BundleTxParse, TXID) ->
@@ -1087,12 +1091,12 @@ handle_cast({insert_block, BlockFields}, State) ->
 	record_query_time(insert_block, Time),
 	{noreply, State};
 
-handle_cast({update_tx_label, ITEM_LABEL, TIMESTAMP, TXID, LAST_TX_ACTION}, State) ->
+handle_cast({update_tx_label, ITEM_LABEL, TIMESTAMP, CURRENT_BLOCK_HEIGHT, FILE_TXID, LAST_TX_ACTION}, State) ->
 	#{ conn := Conn, update_tx_label_stmt := Stmt } = State,
 	{Time, ok} = timer:tc(fun() ->
 		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
 
-		ok = ar_sqlite3:bind(Stmt, [ITEM_LABEL, TIMESTAMP, TXID, LAST_TX_ACTION], ?INSERT_STEP_TIMEOUT),
+		ok = ar_sqlite3:bind(Stmt, [ITEM_LABEL, TIMESTAMP, CURRENT_BLOCK_HEIGHT, FILE_TXID, FILE_TXID, LAST_TX_ACTION, FILE_TXID, CURRENT_BLOCK_HEIGHT], ?INSERT_STEP_TIMEOUT),
 		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
 		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
 
@@ -1102,12 +1106,17 @@ handle_cast({update_tx_label, ITEM_LABEL, TIMESTAMP, TXID, LAST_TX_ACTION}, Stat
 	record_query_time(update_tx_label, Time),
 	{noreply, State};
 
-handle_cast({update_tx_star, ITEM_STAR, TIMESTAMP, TXID, LAST_TX_ACTION}, State) ->
+handle_cast({update_tx_star, ITEM_STAR, TIMESTAMP, CURRENT_BLOCK_HEIGHT, FILE_TXID, LAST_TX_ACTION}, State) ->
 	#{ conn := Conn, update_tx_star_stmt := Stmt } = State,
 	{Time, ok} = timer:tc(fun() ->
 		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
+		?LOG_INFO([{update_tx_star______________________ITEM_STAR, ITEM_STAR}]),
+		?LOG_INFO([{update_tx_star______________________TIMESTAMP, TIMESTAMP}]),
+		?LOG_INFO([{update_tx_star______________________CURRENT_TXID, CURRENT_BLOCK_HEIGHT}]),
+		?LOG_INFO([{update_tx_star______________________FILE_TXID, FILE_TXID}]),
+		?LOG_INFO([{update_tx_star______________________LAST_TX_ACTION, LAST_TX_ACTION}]),
 
-		ok = ar_sqlite3:bind(Stmt, [ITEM_STAR, TIMESTAMP, TXID, LAST_TX_ACTION], ?INSERT_STEP_TIMEOUT),
+		ok = ar_sqlite3:bind(Stmt, [ITEM_STAR, TIMESTAMP, CURRENT_BLOCK_HEIGHT, FILE_TXID, FILE_TXID, LAST_TX_ACTION, FILE_TXID, CURRENT_BLOCK_HEIGHT], ?INSERT_STEP_TIMEOUT),
 		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
 		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
 
@@ -1117,12 +1126,12 @@ handle_cast({update_tx_star, ITEM_STAR, TIMESTAMP, TXID, LAST_TX_ACTION}, State)
 	record_query_time(update_tx_star, Time),
 	{noreply, State};
 
-handle_cast({update_tx_folder, ITEM_PARENT, TIMESTAMP, TXID, LAST_TX_ACTION}, State) ->
+handle_cast({update_tx_folder, ITEM_PARENT, TIMESTAMP, CURRENT_BLOCK_HEIGHT, FILE_TXID, LAST_TX_ACTION}, State) ->
 	#{ conn := Conn, update_tx_folder_stmt := Stmt } = State,
 	{Time, ok} = timer:tc(fun() ->
 		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
 
-		ok = ar_sqlite3:bind(Stmt, [ITEM_PARENT, TIMESTAMP, TXID, LAST_TX_ACTION], ?INSERT_STEP_TIMEOUT),
+		ok = ar_sqlite3:bind(Stmt, [ITEM_PARENT, TIMESTAMP, CURRENT_BLOCK_HEIGHT, FILE_TXID, FILE_TXID, LAST_TX_ACTION, FILE_TXID, CURRENT_BLOCK_HEIGHT], ?INSERT_STEP_TIMEOUT),
 		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
 		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
 
@@ -1132,12 +1141,12 @@ handle_cast({update_tx_folder, ITEM_PARENT, TIMESTAMP, TXID, LAST_TX_ACTION}, St
 	record_query_time(update_tx_folder, Time),
 	{noreply, State};
 
-handle_cast({update_tx_public, IS_PUBLIC, TIMESTAMP, TXID, LAST_TX_ACTION}, State) ->
+handle_cast({update_tx_public, IS_PUBLIC, TIMESTAMP, CURRENT_BLOCK_HEIGHT, FILE_TXID, LAST_TX_ACTION}, State) ->
 	#{ conn := Conn, update_tx_public_stmt := Stmt } = State,
 	{Time, ok} = timer:tc(fun() ->
 		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
 
-		ok = ar_sqlite3:bind(Stmt, [IS_PUBLIC, TIMESTAMP, TXID, LAST_TX_ACTION], ?INSERT_STEP_TIMEOUT),
+		ok = ar_sqlite3:bind(Stmt, [IS_PUBLIC, TIMESTAMP, CURRENT_BLOCK_HEIGHT, FILE_TXID, FILE_TXID, LAST_TX_ACTION, FILE_TXID, CURRENT_BLOCK_HEIGHT], ?INSERT_STEP_TIMEOUT),
 		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
 		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
 
@@ -1474,7 +1483,8 @@ address_map([
 	ChivesForum,
 	ChivesDb,
 	Agent,
-	Referee
+	Referee,
+	Last_tx_action
 ]) -> #{
 	id => Address,
 	balance => Balance,
@@ -1491,7 +1501,8 @@ address_map([
 	chivesForum => ChivesForum,
 	chivesDb => ChivesDb,
 	agent => Agent,
-	referee => Referee
+	referee => Referee,
+	last_tx_action => Last_tx_action
 }.
 
 item_label_group_map([Item_label, Number]) -> #{
@@ -1694,7 +1705,7 @@ full_block_to_fields(FullBlock) ->
 			Item_node_star = <<"">>,
 			Item_node_hot = <<"">>,
 			Item_node_delete = <<"">>,
-			Last_tx_action = ar_util:encode(TX#tx.id),
+			Last_tx_action = integer_to_binary(lists:nth(3, BlockFields)),
 			BundleTxParse = <<"">>,
 			[
 				ar_util:encode(TX#tx.id),
@@ -1732,7 +1743,7 @@ full_block_to_fields(FullBlock) ->
 				Item_node_star,
 				Item_node_hot,
 				Item_node_delete,
-				Last_tx_action
+				Last_tx_action,
 				BundleTxParse
 			]
 		end,
@@ -1805,7 +1816,7 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 	Item_node_star = <<"">>,
 	Item_node_hot = <<"">>,
 	Item_node_delete = <<"">>,
-	Last_tx_action = ar_util:encode(TX#tx.id),
+	Last_tx_action = Height,
 	BundleTxParse = <<"">>,
 	[
 		ar_util:encode(TX#tx.id),

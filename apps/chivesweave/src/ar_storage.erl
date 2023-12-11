@@ -2683,9 +2683,9 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 								},
 							
 							%% Write Unbundle tx to arql
-							% ?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FileTxId, FileTxId}]),
-							% ?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________TagsMap, TagsMap}]),
-							% ?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________TxStructureItem, TxStructureItem}]),
+							% ?LOG_INFO([{handle_get_tx_unbundle______________________________FileTxId, FileTxId}]),
+							% ?LOG_INFO([{handle_get_tx_unbundle______________________________TagsMap, TagsMap}]),
+							% ?LOG_INFO([{handle_get_tx_unbundle______________________________TxStructureItem, TxStructureItem}]),
 							% ?LOG_INFO([{handle_get_tx_unbundle_____________________________________________________BlockStructure_height, maps:get(<<"height">>, BlockStructure)}]),
 							case lists:member(serve_arql, Config#config.enable) of
 								true ->
@@ -2780,45 +2780,45 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 											case EntityType of
 												<<"Action">> ->
 													% Do The Action Operation
-													?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FileTxId1, FileTxId}]),
+													?LOG_INFO([{handle_get_tx_unbundle______________________________FileTxId1, FileTxId}]),
 													case ar_util:safe_decode(FileTxId) of
 														{ok, _} ->
-															?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FileTxId2, FileTxId}]),
+															?LOG_INFO([{handle_get_tx_unbundle______________________________FileTxId2, FileTxId}]),
 															case EntityAction of
 																<<"Label">> -> 
-																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
+																	?LOG_INFO([{handle_get_tx_unbundle______________________________EntityAction, EntityTarget}]),
 																	ar_arql_db:update_tx_label(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);
 																<<"Star">> -> 
 																	% [ITEM_STAR, TIMESTAMP, CURRENT_TXID, FILE_TXID, FILE_TXID, LAST_TX_ACTION]
-																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityTarget, EntityTarget}]),
+																	?LOG_INFO([{handle_get_tx_unbundle______________________________EntityTarget, EntityTarget}]),
 																	ar_arql_db:update_tx_star(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);
 																<<"Folder">> -> 
-																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
+																	?LOG_INFO([{handle_get_tx_unbundle______________________________EntityAction, EntityTarget}]),
 																	ar_arql_db:update_tx_folder(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);
 																<<"Public">> -> 
-																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
+																	?LOG_INFO([{handle_get_tx_unbundle______________________________EntityAction, EntityTarget}]),
 																	ar_arql_db:update_tx_public(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);
 																<<"RenameFolder">> -> 
-																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
+																	?LOG_INFO([{handle_get_tx_unbundle______________________________EntityAction, EntityTarget}]),
 																	ar_arql_db:update_rename_folder(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);
 																<<"DeleteFolder">> -> 
-																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
+																	?LOG_INFO([{handle_get_tx_unbundle______________________________EntityAction, EntityTarget}]),
 																	ar_arql_db:update_delete_folder(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);
 																<<"Restorefolder">> -> 
-																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________EntityAction, EntityTarget}]),
+																	?LOG_INFO([{handle_get_tx_unbundle______________________________EntityAction, EntityTarget}]),
 																	ar_arql_db:update_restore_folder(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);	
 																<<"Profile">> -> 
-																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________Profile, DataItemId}]),
-																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FromAddress, FromAddress}]),
-																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________BlockTimestamp, BlockTimestamp}]),
-																	ar_arql_db:update_address_profile(DataItemId, FromAddress, BlockTimestamp);
+																	?LOG_INFO([{handle_get_tx_unbundle______________________________Profile, DataItemId}]),
+																	% ?LOG_INFO([{handle_get_tx_unbundle______________________________BlockTimestamp, BlockTimestamp}]),
+																	% ?LOG_INFO([{handle_get_tx_unbundle______________________________FromAddress, FromAddress}]),
+																	ar_arql_db:update_address_profile(DataItemId, BlockTimestamp, BlockHeight, FromAddress, LastTxChange);
 																<<"Agent">> -> 
-																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________Agent, EntityTarget}]),
-																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________FromAddress, FromAddress}]),
-																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________BlockTimestamp, BlockTimestamp}]),
+																	?LOG_INFO([{handle_get_tx_unbundle______________________________Agent, EntityTarget}]),
+																	% ?LOG_INFO([{handle_get_tx_unbundle______________________________FromAddress, FromAddress}]),
+																	% ?LOG_INFO([{handle_get_tx_unbundle______________________________BlockTimestamp, BlockTimestamp}]),
 																	ar_arql_db:update_address_agent(EntityTarget, FromAddress, BlockTimestamp);
 																<<"Referee">> ->
-																	?LOG_INFO([{handle_get_tx_unbundle_______________________________________________________Referee, EntityTarget}]),
+																	?LOG_INFO([{handle_get_tx_unbundle______________________________Referee, EntityTarget}]),
 																	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(EntityTarget) of
 																		{ok, RefereeAddressOK} ->
 																			ar_arql_db:update_address_referee(ar_util:encode(RefereeAddressOK), FromAddress, BlockTimestamp)

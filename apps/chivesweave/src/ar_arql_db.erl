@@ -20,7 +20,7 @@
 		select_transaction_group_label_address/1,
 		select_folder_address/1,
 		update_tx_label/5, update_tx_folder/5, update_tx_star/5, update_tx_public/5, update_tx_bundletxparse/2,
-		update_address_referee/3, update_address_agent/3, update_address_profile/3, 
+		update_address_referee/3, update_address_agent/3, update_address_profile/5, 
 		update_address_blockinfo/4
 		]).
 
@@ -247,16 +247,16 @@ DROP INDEX idx_address_last_tx_action;
 
 -define(SELECT_ADDRESS_REFEREE_RANGE_SQL, "SELECT * FROM address where referee = ? order by balance desc LIMIT ? OFFSET ?").
 -define(SELECT_ADDRESS_REFEREE_TOTAL, "SELECT COUNT(*) AS NUM FROM address where referee = ? ").
--define(UPDATE_ADDRESS_REFEREE_SQL, "update address set referee = ? where address = ? and timestamp <= ? and referee is null").
+-define(UPDATE_ADDRESS_REFEREE_SQL, "update address set referee = ? where address = ? and referee is null").
 
 -define(SELECT_ADDRESS_AGENT_RANGE_SQL, "SELECT * FROM address where Agent != '0' order by balance desc LIMIT ? OFFSET ?").
 -define(SELECT_ADDRESS_AGENT_TOTAL, "SELECT COUNT(*) AS NUM FROM address where Agent != '0' ").
--define(UPDATE_ADDRESS_AGENT_SQL, "update address set Agent = ?, timestamp = ? where address = ? and timestamp <= ?").
+-define(UPDATE_ADDRESS_AGENT_SQL, "update address set Agent = ?, timestamp = ? where address = ? and Agent = '0'").
 
 -define(SELECT_ADDRESS_PROFILE_MY_SQL, "SELECT * FROM address where address = ?").
 -define(SELECT_ADDRESS_PROFILE_RANGE_SQL, "SELECT * FROM address where profile != null and profile != '' order by balance desc LIMIT ? OFFSET ?").
 -define(SELECT_ADDRESS_PROFILE_TOTAL, "SELECT COUNT(*) AS NUM FROM address where profile != null and profile != '' ").
--define(UPDATE_ADDRESS_PROFILE_SQL, "update address set profile = ?, timestamp = ? where address = ? and timestamp <= ?").
+-define(UPDATE_ADDRESS_PROFILE_SQL, "update address set profile = ?, timestamp = ?, last_tx_action = ? where (last_tx_action is null and address = ?) or (address != last_tx_action and address = ? and last_tx_action = ?) or (address != last_tx_action and address = ? and last_tx_action = ?)").
 
 -define(UPDATE_ADDRESS_BLOCKINFO_SQL, "update address set balance = ?, lastblock = ?, timestamp = ? where address = ? and timestamp <= ?").
 
@@ -438,8 +438,8 @@ update_address_agent(AGENT, ADDRESS, TIMESTAMP) ->
 	gen_server:cast(?MODULE, {update_address_agent, AGENT, ADDRESS, TIMESTAMP}),
 	ok.
 
-update_address_profile(PROFILE, ADDRESS, TIMESTAMP) ->
-	gen_server:cast(?MODULE, {update_address_profile, PROFILE, ADDRESS, TIMESTAMP}),
+update_address_profile(PROFILE, TIMESTAMP, CURRENT_BLOCK_HEIGHT, ADDRESS, LAST_TX_ACTION) ->
+	gen_server:cast(?MODULE, {update_address_profile, PROFILE, TIMESTAMP, CURRENT_BLOCK_HEIGHT, ADDRESS, LAST_TX_ACTION}),
 	ok.
 
 update_address_blockinfo(BALANCE, BLOCKHEIGHT, TIMESTAMP, ADDRESS) ->
@@ -1191,7 +1191,7 @@ handle_cast({update_address_agent, AGENT, ADDRESS, TIMESTAMP}, State) ->
 	{Time, ok} = timer:tc(fun() ->
 		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
 
-		ok = ar_sqlite3:bind(Stmt, [AGENT, TIMESTAMP, ADDRESS, TIMESTAMP], ?INSERT_STEP_TIMEOUT),
+		ok = ar_sqlite3:bind(Stmt, [AGENT, TIMESTAMP, ADDRESS], ?INSERT_STEP_TIMEOUT),
 		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
 		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
 
@@ -1201,12 +1201,16 @@ handle_cast({update_address_agent, AGENT, ADDRESS, TIMESTAMP}, State) ->
 	record_query_time(update_address_agent, Time),
 	{noreply, State};
 
-handle_cast({update_address_profile, PROFILE, ADDRESS, TIMESTAMP}, State) ->
+handle_cast({update_address_profile, PROFILE, TIMESTAMP, CURRENT_BLOCK_HEIGHT, ADDRESS, LAST_TX_ACTION}, State) ->
 	#{ conn := Conn, update_address_profile_stmt := Stmt } = State,
 	{Time, ok} = timer:tc(fun() ->
 		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
-
-		ok = ar_sqlite3:bind(Stmt, [PROFILE, TIMESTAMP, ADDRESS, TIMESTAMP], ?INSERT_STEP_TIMEOUT),
+		?LOG_INFO([{update_address_profile______________________________PROFILE, PROFILE}]),
+		?LOG_INFO([{update_address_profile______________________________TIMESTAMP, TIMESTAMP}]),
+		?LOG_INFO([{update_address_profile______________________________CURRENT_BLOCK_HEIGHT, CURRENT_BLOCK_HEIGHT}]),
+		?LOG_INFO([{update_address_profile______________________________ADDRESS, ADDRESS}]),
+		?LOG_INFO([{update_address_profile______________________________LAST_TX_ACTION, LAST_TX_ACTION}]),
+		ok = ar_sqlite3:bind(Stmt, [PROFILE, TIMESTAMP, CURRENT_BLOCK_HEIGHT, ADDRESS, ADDRESS, LAST_TX_ACTION, ADDRESS, CURRENT_BLOCK_HEIGHT], ?INSERT_STEP_TIMEOUT),
 		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
 		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
 

@@ -2519,7 +2519,7 @@ handle_get_tx_unbundle(Hash, Req, PageId, PageRecords) ->
 								{Name, Value}
 							end,
 							TX#tx.tags),
-					?LOG_INFO([{handle_get_tx_unbundle_____________TX, TX}]),
+					% ?LOG_INFO([{handle_get_tx_unbundle_____________TX, TX}]),
 					UnBundleResult = case ar_storage:find_value_in_tags(<<"Bundle-Version">>, Tags) of
 						<<"2.0.0">> ->
 							% Is Bundle
@@ -3257,6 +3257,7 @@ handle_get_address_agent_records(PageId, PageSize) ->
 handle_get_my_profile(Address, Req) ->
 	case ar_arql_db:select_address_profile_my(Address) of
 		AddressRecords ->
+			?LOG_INFO([{handle_get_my_profile____AddressRecords, AddressRecords}]),
 			AgentProfileList = get_address_detail_by_record(AddressRecords),
 			case length(AgentProfileList) of
 				1 ->

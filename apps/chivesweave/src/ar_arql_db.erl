@@ -20,7 +20,7 @@
 		select_transaction_group_label_address/1,
 		select_folder_address/1,
 		update_tx_label/5, update_tx_folder/5, update_tx_star/5, update_tx_public/5, update_tx_bundletxparse/2,
-		update_address_referee/3, update_address_agent/3, update_address_profile/5, 
+		update_address_referee/2, update_address_agent/3, update_address_profile/5, 
 		update_address_blockinfo/4
 		]).
 
@@ -430,8 +430,8 @@ update_tx_bundletxparse(BundleTxParse, TXID) ->
 	gen_server:cast(?MODULE, {update_tx_bundletxparse, BundleTxParse, TXID}),
 	ok.
 
-update_address_referee(REFEREE, ADDRESS, TIMESTAMP) ->
-	gen_server:cast(?MODULE, {update_address_referee, REFEREE, ADDRESS, TIMESTAMP}),
+update_address_referee(REFEREE, ADDRESS) ->
+	gen_server:cast(?MODULE, {update_address_referee, REFEREE, ADDRESS}),
 	ok.
 
 update_address_agent(AGENT, ADDRESS, TIMESTAMP) ->
@@ -1171,12 +1171,12 @@ handle_cast({update_tx_bundletxparse, BUNDLETXPARSE, TXID}, State) ->
 	record_query_time(update_tx_bundletxparse, Time),
 	{noreply, State};
 
-handle_cast({update_address_referee, REFEREE, ADDRESS, TIMESTAMP}, State) ->
+handle_cast({update_address_referee, REFEREE, ADDRESS}, State) ->
 	#{ conn := Conn, update_address_referee_stmt := Stmt } = State,
 	{Time, ok} = timer:tc(fun() ->
 		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
 
-		ok = ar_sqlite3:bind(Stmt, [REFEREE, ADDRESS, TIMESTAMP], ?INSERT_STEP_TIMEOUT),
+		ok = ar_sqlite3:bind(Stmt, [REFEREE, ADDRESS], ?INSERT_STEP_TIMEOUT),
 		done = ar_sqlite3:step(Stmt, ?INSERT_STEP_TIMEOUT),
 		ok = ar_sqlite3:reset(Stmt, ?INSERT_STEP_TIMEOUT),
 

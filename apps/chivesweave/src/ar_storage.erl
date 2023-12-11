@@ -2821,7 +2821,7 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 																	?LOG_INFO([{handle_get_tx_unbundle______________________________Referee, EntityTarget}]),
 																	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(EntityTarget) of
 																		{ok, RefereeAddressOK} ->
-																			ar_arql_db:update_address_referee(ar_util:encode(RefereeAddressOK), FromAddress, BlockTimestamp)
+																			ar_arql_db:update_address_referee(ar_util:encode(RefereeAddressOK), FromAddress)
 																	end;																
 																_ -> ok
 															end;

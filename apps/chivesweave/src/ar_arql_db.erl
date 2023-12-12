@@ -1682,8 +1682,8 @@ full_block_to_fields(FullBlock) ->
 			AppInstance = ar_storage:find_value_in_tags(<<"App-Instance">>, TagsMap),
 			BundleFormat = ar_storage:find_value_in_tags(<<"Bundle-Format">>, TagsMap),
 			EntityType = case BundleFormat of 
-							"binary" -> 
-								"Bundle";
+							<<"binary">> -> 
+								<<"Bundle">>;
 							_ -> 
 								EntityTypeItem = ar_storage:find_value_in_tags(<<"Entity-Type">>, TagsMap),
 								case byte_size(EntityTypeItem) > 0 of
@@ -1698,6 +1698,8 @@ full_block_to_fields(FullBlock) ->
 										end
 								end
 						end,
+			?LOG_INFO([{contentType__________________________________, ContentType}]),
+			?LOG_INFO([{bundleFormat__________________________________, EntityType}]),
 			Bundleid = <<"">>,
 			Item_star = <<"">>,
 			Item_label = <<"">>,
@@ -1793,8 +1795,8 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 	AppInstance = ar_storage:find_value_in_tags(<<"App-Instance">>, TagsMap),
 	BundleFormat = ar_storage:find_value_in_tags(<<"Bundle-Format">>, TagsMap),
 	EntityType = case BundleFormat of 
-					"binary" -> 
-						"Bundle";
+					<<"binary">> -> 
+						<<"Bundle">>;
 					_ -> 
 						EntityTypeItem = ar_storage:find_value_in_tags(<<"Entity-Type">>, TagsMap),
 						case byte_size(EntityTypeItem) > 0 of
@@ -1809,6 +1811,8 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 								end
 						end
 				end,
+	?LOG_INFO([{contentType__________________________________, ContentType}]),
+	?LOG_INFO([{bundleFormat__________________________________, EntityType}]),
 	Bundleid = <<"">>,
 	Item_star = <<"">>,
 	Item_label = <<"">>,

@@ -116,7 +116,7 @@ CREATE TABLE tx (
 	entity_type TEXT,
 	app_name TEXT,
 	app_version TEXT,
-	agent_name TEXT,
+	app_instance TEXT,
 	item_node_label TEXT,
 	item_node_group TEXT,
 	item_node_star TEXT,
@@ -153,7 +153,7 @@ CREATE INDEX idx_tx_is_public ON tx (is_public);
 CREATE INDEX idx_tx_entity_type ON tx (entity_type);
 CREATE INDEX idx_tx_app_name ON tx (app_name);
 CREATE INDEX idx_tx_app_version ON tx (app_version);
-CREATE INDEX idx_tx_agent_name ON tx (agent_name);
+CREATE INDEX idx_tx_app_instance ON tx (app_instance);
 
 CREATE INDEX idx_tx_item_label ON tx (item_label);
 CREATE INDEX idx_tx_item_star ON tx (item_star);
@@ -196,7 +196,7 @@ DROP INDEX idx_tx_bundleid;
 DROP INDEX idx_tx_item_name;
 DROP INDEX idx_tx_content_type;
 DROP INDEX idx_tx_app_name;
-DROP INDEX idx_tx_agent_name;
+DROP INDEX idx_tx_app_instance;
 
 DROP INDEX idx_tx_item_label;
 DROP INDEX idx_tx_item_star;
@@ -1544,7 +1544,7 @@ tx_map([
 	EntityType,
 	AppName,
 	AppVersion,
-	AgentName,
+	AppInstance,
 	Item_node_label,
 	Item_node_group,
 	Item_node_star,
@@ -1582,7 +1582,7 @@ tx_map([
 	entity_type => EntityType,
 	app_name => AppName,
 	app_version => AppVersion,
-	agent_name => AgentName,
+	app_instance => AppInstance,
 	item_node_label => Item_node_label,
 	item_node_group => Item_node_group,
 	item_node_star => Item_node_star,
@@ -1679,7 +1679,7 @@ full_block_to_fields(FullBlock) ->
 			% EntityType = ar_storage:find_value_in_tags(<<"Entity-Type">>, TagsMap),
 			AppName = ar_storage:find_value_in_tags(<<"App-Name">>, TagsMap),
 			AppVersion = ar_storage:find_value_in_tags(<<"App-Version">>, TagsMap),
-			AgentName = ar_storage:find_value_in_tags(<<"Agent-Name">>, TagsMap),
+			AppInstance = ar_storage:find_value_in_tags(<<"App-Instance">>, TagsMap),
 			BundleFormat = ar_storage:find_value_in_tags(<<"Bundle-Format">>, TagsMap),
 			EntityType = case BundleFormat of 
 							"binary" -> 
@@ -1741,7 +1741,7 @@ full_block_to_fields(FullBlock) ->
 				EntityType,
 				AppName,
 				AppVersion,
-				AgentName,
+				AppInstance,
 				Item_node_label,
 				Item_node_group,
 				Item_node_star,
@@ -1790,7 +1790,7 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 	% EntityType = ar_storage:find_value_in_tags(<<"Entity-Type">>, TagsMap),
 	AppName = ar_storage:find_value_in_tags(<<"App-Name">>, TagsMap),
 	AppVersion = ar_storage:find_value_in_tags(<<"App-Version">>, TagsMap),
-	AgentName = ar_storage:find_value_in_tags(<<"Agent-Name">>, TagsMap),
+	AppInstance = ar_storage:find_value_in_tags(<<"App-Instance">>, TagsMap),
 	BundleFormat = ar_storage:find_value_in_tags(<<"Bundle-Format">>, TagsMap),
 	EntityType = case BundleFormat of 
 					"binary" -> 
@@ -1852,7 +1852,7 @@ tx_to_fields(BH, TX, Timestamp, Height) ->
 		EntityType,
 		AppName,
 		AppVersion,
-		AgentName,
+		AppInstance,
 		Item_node_label,
 		Item_node_group,
 		Item_node_star,

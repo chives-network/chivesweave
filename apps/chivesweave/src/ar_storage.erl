@@ -2809,8 +2809,10 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 																	ar_arql_db:update_restore_folder(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);	
 																<<"Profile">> -> 
 																	?LOG_INFO([{handle_get_tx_unbundle______________________________Profile, DataItemId}]),
-																	% ?LOG_INFO([{handle_get_tx_unbundle______________________________BlockTimestamp, BlockTimestamp}]),
-																	% ?LOG_INFO([{handle_get_tx_unbundle______________________________FromAddress, FromAddress}]),
+																	?LOG_INFO([{handle_get_tx_unbundle______________________________BlockTimestamp, BlockTimestamp}]),
+																	?LOG_INFO([{handle_get_tx_unbundle______________________________BlockHeight, BlockHeight}]),
+																	?LOG_INFO([{handle_get_tx_unbundle______________________________FromAddress, FromAddress}]),
+																	?LOG_INFO([{handle_get_tx_unbundle______________________________LastTxChange, LastTxChange}]),
 																	ar_arql_db:update_address_profile(DataItemId, BlockTimestamp, BlockHeight, FromAddress, LastTxChange);
 																<<"Agent">> -> 
 																	?LOG_INFO([{handle_get_tx_unbundle______________________________Agent, EntityTarget}]),

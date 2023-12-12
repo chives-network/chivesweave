@@ -3119,6 +3119,7 @@ get_address_detail_by_record(AddressRecords) ->
 			#{agent := Agent} = AgentResult,
 			#{balance := Balance} = AgentResult,
 			#{referee := Referee} = AgentResult,
+			#{last_tx_action := LastTxAction} = AgentResult,
 			AgentResultMap = 	case ar_util:safe_decode(Profile) of
 									{error, invalid} ->
 										[];
@@ -3148,7 +3149,8 @@ get_address_detail_by_record(AddressRecords) ->
 																		<<"Block">> => Block,
 																		<<"AgentLevel">> => Agent,
 																		<<"Balance">> => Balance,
-																		<<"Referee">> => Referee
+																		<<"Referee">> => Referee,
+																		<<"LastTxAction">> => LastTxAction
 																},
 																AddressResult;
 															_ ->

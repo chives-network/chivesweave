@@ -3070,6 +3070,31 @@ handle_parsebundle_get_list(Addr) ->
 			{200, #{}, ar_serialize:jsonify(ParseResultList)}
 	end.
 
+update_address_balance(AddressRecords) ->
+	NewAddressRecords = lists:map(
+		fun(AddressRecord) ->
+			#{id := Address} = AddressRecord,
+			#{lastblock := Lastblock} = AddressRecord,
+			#{timestamp := Timestamp} = AddressRecord,
+			case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(Address) of
+				{ok, AddressOK} ->
+					case ar_node:get_balance(AddressOK) of
+						node_unavailable ->
+							ok;
+						AddressBalance ->
+							% ?LOG_INFO([{update_address_balance______________________________AddressBalance, AddressBalance}]),
+							AddressTxs = ar_storage:get_address_txs(Address),
+							% ?LOG_INFO([{update_address_balance______________________________AddressTxs, AddressTxs}]),
+							ar_arql_db:insert_address(Address, integer_to_binary(AddressBalance div 100000000), Lastblock, Timestamp, AddressTxs),							
+							ok
+					end
+			end,
+			AddressRecord
+		end,
+		AddressRecords
+	),
+	NewAddressRecords.
+
 handle_get_address_records(PageId, PageSize) ->
 	try binary_to_integer(PageSize) of
 		PageSizeInt ->				
@@ -3095,6 +3120,7 @@ handle_get_address_records(PageId, PageSize) ->
 							{404, #{}, []};
 						Res ->
 							% ?LOG_INFO([{handle_get_blocklist_data, Res}]),
+							update_address_balance(Res),
 							AddressResult = #{
 									<<"data">> => Res,
 									<<"total">> => AddressTotal,

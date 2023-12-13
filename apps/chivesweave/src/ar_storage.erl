@@ -25,7 +25,7 @@
 		video_thumbnail_png_to_storage/3,
 		contentTypeToFileType/1,
 		file_to_thumbnail_data/4, file_to_pdf_data/4,
-		find_value_in_tags/2,
+		find_value_in_tags/2, get_address_txs/1,
 		parse_bundle_data/5, read_txs_and_into_parse_bundle_list/1, parse_bundle_tx_from_list/1,
 		office_format_convert_to_docx_storage/3, office_format_convert_to_xlsx_storage/3, office_format_convert_to_pdf_storage/3
 	]).
@@ -1957,6 +1957,16 @@ read_txsrecord_function(TxIdList) ->
 					end
 			end
 		end, TxIdList).
+
+get_address_txs(Addr) ->
+	case ar_kv:get(address_tx_db, Addr) of
+		not_found ->
+			0;
+		{ok, TxIdBinary} ->
+			AllArray = binary_to_term(TxIdBinary),
+			Length = length(AllArray),
+			Length
+	end.
 
 read_txsrecord_by_addr(Addr, PageId, PageRecords) ->
 	try binary_to_integer(PageRecords) of

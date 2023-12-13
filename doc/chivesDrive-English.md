@@ -1,28 +1,38 @@
-# ChivesDrive Decentralized Drive
-     ChivesDrive is a decentralized Drive product. Its main function is to upload your own files to the blockchain. It also supports online preview of common document types. It is also a powerful on-chain data retrieval tool.
+# ChivesDrive Decentralized Cloud Storage
+ChivesDrive is a decentralized cloud storage solution that allows users to upload their files to the blockchain. It also supports online previews for common document types and functions as a powerful on-chain data retrieval tool.
 
-## ChivesDrive Main Functions
-     1 File management:
-         1.1 Upload personal files
-         1.2 Create folder
-         1.3 Move personal files
-         1.4 Mark files as Spam
-         1.5 Mark files for deletion
-         1.6 Search files by file name
-     2 Document preview
-         Supports online preview of Word, Excel, PPT, PDF, Video, Audio, Image and other file types.
-     3 Wallet management
-         Supports functions such as checking balances, sending records, receiving records, external transfers, uploading files, etc.
-     4 personal information
-         You can set my avatar, my Banner, name, Twitter and other information.
+## Key Features of ChivesDrive
+1. **File Management:**
+    1.1 Upload personal files
+    1.2 Create folders
+    1.3 Move personal files
+    1.4 Mark files as Spam
+    1.5 Mark files for deletion
+    1.6 Search files by filename
 
-## ChivesDrive promotion system
-     Agents are mainly used to promote this system. Anyone can choose to become an agent, and then the users you promote receive rewards in the system. Based on this, you can have an additional 5% reward.
-         Ordinary users: You can complete some tasks in the system, such as daily check-in and retweet to earn XWE.
-         Agents: You can view all agents, or you can view the detailed information of a certain agent. The users under each agent's name will be displayed, and the agent's reward record will also be displayed on the chain.
+2. **Document Preview:**
+    - Supports online preview for file types such as Word, Excel, PPT, PDF, Video, Audio, Image, etc.
 
-## ChivesDrive Business Development
-     1 Industry information sharing community
-         Cooperate with third-party websites to store valuable documents on the chain.
-     2 Paid documents for sale
-         Creators can first make some valuable documents public for free, and users can see all documents after paying. This is different from NFT. Creators can sell valuable documents many times, but the owner will not change. , and the sale of NFT means a change of ownership.
+3. **Wallet Management:**
+    - View balance, transaction history, received records, external transfers, upload files, etc.
+
+4. **Profile Settings:**
+    - Customize profile details, including avatar, banner, name, Twitter, etc.
+
+## ChivesDrive Promotion System
+The system primarily utilizes agents to promote its usage. Anyone can choose to become an agent, and for users they refer, rewards are based on their system rewards, with an additional 5% bonus.
+
+- **Regular Users:**
+    - Can earn XWE by completing tasks within the system, such as daily check-ins and retweeting on Twitter.
+
+- **Agents:**
+    - Can view all agents and detailed information about specific agents.
+    - Can see which users are affiliated with each agent.
+    - Agent reward records are also visible on the blockchain.
+
+## ChivesDrive Business Expansion
+1. **Industry Data Sharing Community:**
+    - Collaborate with third-party websites to store valuable documents on the blockchain.
+
+2. **Sale of Paid Documents:**
+    - Creators can release a portion of valuable documents for free initially, and users can access the complete documents after making a payment. This differs from NFTs, as creators can sell valuable documents multiple times without changing ownership, unlike the ownership change associated with NFT sales.

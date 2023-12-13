@@ -2519,7 +2519,7 @@ handle_get_tx_unbundle(Hash, Req, PageId, PageRecords) ->
 								{Name, Value}
 							end,
 							TX#tx.tags),
-					?LOG_INFO([{handle_get_tx_unbundle_____________TX, TX}]),
+					% ?LOG_INFO([{handle_get_tx_unbundle_____________TX, TX}]),
 					UnBundleResult = case ar_storage:find_value_in_tags(<<"Bundle-Version">>, Tags) of
 						<<"2.0.0">> ->
 							% Is Bundle
@@ -3119,6 +3119,7 @@ get_address_detail_by_record(AddressRecords) ->
 			#{agent := Agent} = AgentResult,
 			#{balance := Balance} = AgentResult,
 			#{referee := Referee} = AgentResult,
+			#{last_tx_action := LastTxAction} = AgentResult,
 			AgentResultMap = 	case ar_util:safe_decode(Profile) of
 									{error, invalid} ->
 										[];
@@ -3148,7 +3149,8 @@ get_address_detail_by_record(AddressRecords) ->
 																		<<"Block">> => Block,
 																		<<"AgentLevel">> => Agent,
 																		<<"Balance">> => Balance,
-																		<<"Referee">> => Referee
+																		<<"Referee">> => Referee,
+																		<<"LastTxAction">> => LastTxAction
 																},
 																AddressResult;
 															_ ->
@@ -3257,6 +3259,7 @@ handle_get_address_agent_records(PageId, PageSize) ->
 handle_get_my_profile(Address, Req) ->
 	case ar_arql_db:select_address_profile_my(Address) of
 		AddressRecords ->
+			?LOG_INFO([{handle_get_my_profile____AddressRecords, AddressRecords}]),
 			AgentProfileList = get_address_detail_by_record(AddressRecords),
 			case length(AgentProfileList) of
 				1 ->
@@ -3282,13 +3285,13 @@ handle_get_transaction_bundletx(PageId, PageSize) ->
 						PageIdInt < 0 -> 0;
 						true -> PageIdInt
 					end,
-					TransactionsTotal  = case ar_arql_db:select_transaction_total_bundletxparse(<<"0">>) of
+					TransactionsTotal  = case ar_arql_db:select_transaction_total_bundletxparse(<<"">>) of
 						TotalRes ->
 							TotalRes;
 						_ -> 
 							0
 					end,
-					case ar_arql_db:select_transaction_range_bundletxparse(<<"0">>, PageSizeNew, PageIdNew * PageSizeNew) of
+					case ar_arql_db:select_transaction_range_bundletxparse(<<"">>, PageSizeNew, PageIdNew * PageSizeNew) of
 						not_found ->
 							{404, #{}, []};
 						Res ->

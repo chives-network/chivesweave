@@ -361,12 +361,12 @@ refresh_blacklist(Whitelist) ->
 			error;
 		{ok, Blacklist} ->
 			BlacklistURLs = Config#config.transaction_blacklist_urls,
-			?LOG_INFO([{transaction_blacklist_urls______________BlacklistURLs, {BlacklistURLs}}]),
+			% ?LOG_INFO([{transaction_blacklist_urls______________BlacklistURLs, {BlacklistURLs}}]),
 			case load_from_urls(BlacklistURLs) of
 				error ->
 					error;
 				{ok, Blacklist2} ->
-					?LOG_INFO([{transaction_blacklist_urls______________Blacklist2, {Blacklist2}}]),
+					% ?LOG_INFO([{transaction_blacklist_urls______________Blacklist2, {Blacklist2}}]),
 					refresh_blacklist(Whitelist, sets:union(Blacklist, Blacklist2))
 			end
 	end.
@@ -488,16 +488,15 @@ parse_binary(Binary) ->
 												is_integer(End), End > Start, Start >= 0 ->
 											{true, {End, Start}};
 										_ ->
-											?LOG_WARNING([{event, failed_to_parse_line},
-													{line, Line}]),
+											?LOG_WARNING([{event, failed_to_parse_line},{line, Line}]),
 											false
 									end;
 								_ ->
-									?LOG_WARNING([{event, failed_to_parse_line},
-											{line, Line}]),
+									?LOG_WARNING([{event, failed_to_parse_line},{line, Line}]),
 									false
 							end;
 						{ok, TXID} ->
+							?LOG_WARNING([{block_tx_id, ar_util:encode(TXID)}]),
 							{true, TXID}
 					end
 			end

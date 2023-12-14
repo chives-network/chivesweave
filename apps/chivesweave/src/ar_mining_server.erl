@@ -694,7 +694,7 @@ hashing_thread(SessionRef) ->
 			 %% Clear the message queue from the requests from the outdated mining session.
 			 hashing_thread(SessionRef);
 		{new_mining_session, Ref} ->
-			?LOG_INFO([{sessionRef______new_mining_session________________,SessionRef}]),
+			% ?LOG_INFO([{sessionRef______new_mining_session________________,SessionRef}]),
 			hashing_thread(Ref)
 	end.
 

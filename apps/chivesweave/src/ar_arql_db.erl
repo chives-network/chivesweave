@@ -277,7 +277,7 @@ DROP INDEX idx_address_last_tx_action;
 -define(SELECT_TRANSACTION_RANGE_FILTER_FILENAME_SQL, "SELECT * FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'File' and item_name like ? order by timestamp desc LIMIT ? OFFSET ?").
 -define(SELECT_TRANSACTION_TOTAL_FILTER_FILENAME, "SELECT COUNT(*) AS NUM FROM tx where item_type = ? and is_encrypt = '' and entity_type = 'File' and item_name like ?").
 
--define(SELECT_TRANSACTION_RANGE_BUNDLETXPARSE_SQL, "SELECT * FROM tx where bundletxparse = ? and entity_type = 'Bundle' and block_height>'22812' order by timestamp asc LIMIT ? OFFSET ?").
+-define(SELECT_TRANSACTION_RANGE_BUNDLETXPARSE_SQL, "SELECT * FROM tx where bundletxparse = ? and entity_type = 'Bundle' and block_height>'22812' order by block_height asc LIMIT ? OFFSET ?").
 -define(SELECT_TRANSACTION_TOTAL_BUNDLETXPARSE, "SELECT COUNT(*) AS NUM FROM tx where bundletxparse = ? and entity_type = 'Bundle' and block_height>'22812' ").
 
 %% Explain: where (id = last_tx_action and id = ?) or (id != last_tx_action and id = ? and last_tx_action = ?)
@@ -626,8 +626,6 @@ handle_call({insert_full_block, BlockFields, TxFieldsList, TagFieldsList, Reward
 		ok = ar_sqlite3:bind(InsertBlockStmt, BlockFields, ?INSERT_STEP_TIMEOUT),
 		done = ar_sqlite3:step(InsertBlockStmt, ?INSERT_STEP_TIMEOUT),
 		ok = ar_sqlite3:reset(InsertBlockStmt, ?INSERT_STEP_TIMEOUT),
-		
-		?LOG_INFO([{rewardAddr___________________________________________, RewardAddr}]),
 		
 		ok = case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(ar_util:encode(RewardAddr)) of
 				{ok, RewardAddrOK} ->
@@ -1761,8 +1759,8 @@ full_block_to_fields(FullBlock) ->
 										end
 								end
 						end,
-			?LOG_INFO([{contentType__________________________________, ContentType}]),
-			?LOG_INFO([{bundleFormat__________________________________, EntityType}]),
+			% ?LOG_INFO([{contentType__________________________________, ContentType}]),
+			% ?LOG_INFO([{bundleFormat__________________________________, EntityType}]),
 			Bundleid = <<"">>,
 			Item_star = <<"">>,
 			Item_label = <<"">>,

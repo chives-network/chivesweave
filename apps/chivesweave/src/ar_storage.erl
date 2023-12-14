@@ -1402,7 +1402,7 @@ read_block_from_height_by_number(FromHeight, BlockNumber, PageId) ->
 							case ar_kv:get(explorer_block, list_to_binary(integer_to_list(X))) of 
 								not_found -> [not_found_2]; 
 								{ok, BlockIdBinary} -> 
-									?LOG_INFO([{read_block_from_height_by_number________BlockIdBinary, BlockIdBinary}]),
+									% ?LOG_INFO([{read_block_from_height_by_number________BlockIdBinary, BlockIdBinary}]),
 									BlockIdBinaryResult = binary_to_term(BlockIdBinary),
 									BlockMap = #{
 											<<"id">> => lists:nth(1, BlockIdBinaryResult),

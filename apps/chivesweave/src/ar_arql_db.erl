@@ -241,7 +241,7 @@ DROP INDEX idx_address_last_tx_action;
 
 -define(SELECT_TAGS_BY_TX_ID_SQL, "SELECT * FROM tag WHERE tx_id = ?").
 
--define(INSERT_ADDRESS_SQL, "INSERT OR REPLACE INTO address (address, balance, lastblock, timestamp, txs) VALUES (?, ?, ?, ?, ?)").
+-define(INSERT_ADDRESS_SQL, "INSERT OR IGNORE INTO address (address, balance, lastblock, timestamp, txs) VALUES (?, ?, ?, ?, ?)").
 -define(SELECT_ADDRESS_RANGE_SQL, "SELECT * FROM address order by balance desc LIMIT ? OFFSET ?").
 -define(SELECT_ADDRESS_TOTAL, "SELECT COUNT(*) AS NUM FROM address").
 
@@ -619,7 +619,8 @@ handle_call({insert_full_block, BlockFields, TxFieldsList, TagFieldsList, Reward
 		insert_block_stmt := InsertBlockStmt,
 		insert_tx_stmt := InsertTxStmt,
 		insert_tag_stmt := InsertTagStmt,
-		insert_address_stmt := InsertAddressStmt
+		insert_address_stmt := InsertAddressStmt,
+		update_address_blockinfo_stmt := UpdateAddressBlockinfoStmt
 	} = State,
 	{Time, ok} = timer:tc(fun() ->
 		ok = ar_sqlite3:exec(Conn, "BEGIN TRANSACTION", ?INSERT_STEP_TIMEOUT),
@@ -663,10 +664,10 @@ handle_call({insert_full_block, BlockFields, TxFieldsList, TagFieldsList, Reward
 								ok = ar_sqlite3:bind(InsertAddressStmt, FromAddressFields, ?INSERT_STEP_TIMEOUT),
 								done = ar_sqlite3:step(InsertAddressStmt, ?INSERT_STEP_TIMEOUT),
 								ok = ar_sqlite3:reset(InsertAddressStmt, ?INSERT_STEP_TIMEOUT),
-								% UpdateAddressFields = [integer_to_binary(FromAddressBalance div 100000000), lists:nth(3, BlockFields), lists:nth(4, BlockFields), FromAddress, lists:nth(4, BlockFields)],
-								% ok = ar_sqlite3:bind(UpdateAddressBlockinfoStmt, UpdateAddressFields, ?INSERT_STEP_TIMEOUT),
-								% done = ar_sqlite3:step(UpdateAddressBlockinfoStmt, ?INSERT_STEP_TIMEOUT),
-								% ok = ar_sqlite3:reset(UpdateAddressBlockinfoStmt, ?INSERT_STEP_TIMEOUT)
+								UpdateAddressFields = [integer_to_binary(FromAddressBalance div 100000000), lists:nth(3, BlockFields), lists:nth(4, BlockFields), FromAddress, lists:nth(4, BlockFields)],
+								ok = ar_sqlite3:bind(UpdateAddressBlockinfoStmt, UpdateAddressFields, ?INSERT_STEP_TIMEOUT),
+								done = ar_sqlite3:step(UpdateAddressBlockinfoStmt, ?INSERT_STEP_TIMEOUT),
+								ok = ar_sqlite3:reset(UpdateAddressBlockinfoStmt, ?INSERT_STEP_TIMEOUT),
 								ok
 						end
 				end,

@@ -1951,7 +1951,7 @@ handle(<<"GET">>, [<<"wallet">>, Addr, <<"txs">>, PageId, PageRecords], Req, _Pi
 %% This version all parse all txs
 handle(<<"GET">>, [<<"wallet">>, Addr, <<"parsebundle">>], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
-	case lists:member(serve_wallet_txs, Config#config.enable) of
+	case lists:member(parsebundle, Config#config.enable) of
 		true ->
 			{Status, Headers, Body} = handle_parsebundle_into_list(Addr),
 			{Status, Headers, Body, Req};
@@ -1962,7 +1962,7 @@ handle(<<"GET">>, [<<"wallet">>, Addr, <<"parsebundle">>], Req, _Pid) ->
 %% Get a parse bundle tx list to parse
 handle(<<"GET">>, [<<"wallet">>, Addr, <<"getparsebundlelist">>], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
-	case lists:member(serve_wallet_txs, Config#config.enable) of
+	case lists:member(parsebundle, Config#config.enable) of
 		true ->
 			{Status, Headers, Body} = handle_parsebundle_get_list(Addr),
 			{Status, Headers, Body, Req};
@@ -2228,9 +2228,9 @@ handle(<<"GET">>, [<<Hash:43/binary, MaybeExt/binary>>], Req, Pid) ->
 %% This function will can the "convert" external command. Need run "sudo apt install imagemagick-6.q16"
 handle(<<"GET">>, [<<Hash:43/binary>>, <<"thumbnail">>], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
-	case lists:member(serve_html_data, Config#config.disable) of
+	case lists:member(thumbnail, Config#config.disable) of
 		true ->
-			{421, #{}, <<"Serving HTML data is disabled on this node.">>, Req};
+			{421, #{}, <<"Serving thumbnail is disabled on this node.">>, Req};
 		_ ->
 			case ar_util:safe_decode(Hash) of
 				{error, invalid} ->
@@ -2291,7 +2291,7 @@ handle(<<"GET">>, [<<Hash:43/binary>>, <<"thumbnail">>], Req, _Pid) ->
 %% This function will can the "convert" external command. Need run "sudo apt install imagemagick-6.q16"
 handle(<<"GET">>, [<<Hash:43/binary>>, <<"pdf">>], Req, _Pid) ->
 	{ok, Config} = application:get_env(chivesweave, config),
-	case lists:member(serve_html_data, Config#config.disable) of
+	case lists:member(thumbnail, Config#config.disable) of
 		true ->
 			{421, #{}, <<"Serving HTML data is disabled on this node.">>, Req};
 		_ ->

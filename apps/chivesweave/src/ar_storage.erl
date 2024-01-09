@@ -2778,73 +2778,7 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 													end,
 													TagsList),
 											% ?LOG_INFO([{handle_get_tx_unbundle__________________________________________INSERT_ARQL___TagFieldsList, TagFieldsList}]),
-											ar_arql_db:insert_tx(TXFields, TagFieldsList),
-
-											%% Update File Status
-											EntityType = find_value_in_tags(<<"Entity-Type">>, TagsMap),
-											EntityAction = find_value_in_tags(<<"Entity-Action">>, TagsMap),
-											EntityTarget = find_value_in_tags(<<"Entity-Target">>, TagsMap),
-											FileTxId = find_value_in_tags(<<"File-TxId">>, TagsMap),
-											LastTxChange = find_value_in_tags(<<"Last-Tx-Change">>, TagsMap),
-											BlockTimestamp = maps:get(<<"timestamp">>, BlockStructure),
-											case EntityType of
-												<<"Action">> ->
-													% Do The Action Operation
-													?LOG_INFO([{handle_get_tx_unbundle______________________________FileTxId1, FileTxId}]),
-													case ar_util:safe_decode(FileTxId) of
-														{ok, _} ->
-															?LOG_INFO([{handle_get_tx_unbundle______________________________FileTxId2, FileTxId}]),
-															case EntityAction of
-																<<"Label">> -> 
-																	?LOG_INFO([{handle_get_tx_unbundle______________________________EntityAction, EntityTarget}]),
-																	ar_arql_db:update_tx_label(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);
-																<<"Star">> -> 
-																	% [ITEM_STAR, TIMESTAMP, CURRENT_TXID, FILE_TXID, FILE_TXID, LAST_TX_ACTION]
-																	?LOG_INFO([{handle_get_tx_unbundle______________________________EntityTarget, EntityTarget}]),
-																	ar_arql_db:update_tx_star(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);
-																<<"Folder">> -> 
-																	?LOG_INFO([{handle_get_tx_unbundle______________________________EntityAction, EntityTarget}]),
-																	ar_arql_db:update_tx_folder(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);
-																<<"Public">> -> 
-																	?LOG_INFO([{handle_get_tx_unbundle______________________________EntityAction, EntityTarget}]),
-																	ar_arql_db:update_tx_public(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);
-																<<"RenameFolder">> -> 
-																	?LOG_INFO([{handle_get_tx_unbundle______________________________EntityAction, EntityTarget}]),
-																	ar_arql_db:update_rename_folder(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);
-																<<"DeleteFolder">> -> 
-																	?LOG_INFO([{handle_get_tx_unbundle______________________________EntityAction, EntityTarget}]),
-																	ar_arql_db:update_delete_folder(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);
-																<<"Restorefolder">> -> 
-																	?LOG_INFO([{handle_get_tx_unbundle______________________________EntityAction, EntityTarget}]),
-																	ar_arql_db:update_restore_folder(EntityTarget, BlockTimestamp, BlockHeight, FileTxId, LastTxChange);	
-																<<"Profile">> -> 
-																	?LOG_INFO([{handle_get_tx_unbundle______________________________Profile, DataItemId}]),
-																	?LOG_INFO([{handle_get_tx_unbundle______________________________BlockTimestamp, BlockTimestamp}]),
-																	?LOG_INFO([{handle_get_tx_unbundle______________________________BlockHeight, BlockHeight}]),
-																	?LOG_INFO([{handle_get_tx_unbundle______________________________FromAddress, FromAddress}]),
-																	?LOG_INFO([{handle_get_tx_unbundle______________________________LastTxChange, LastTxChange}]),
-																	ar_arql_db:update_address_profile(DataItemId, BlockTimestamp, BlockHeight, FromAddress, LastTxChange);
-																<<"Agent">> -> 
-																	?LOG_INFO([{handle_get_tx_unbundle______________________________Agent, EntityTarget}]),
-																	% ?LOG_INFO([{handle_get_tx_unbundle______________________________FromAddress, FromAddress}]),
-																	% ?LOG_INFO([{handle_get_tx_unbundle______________________________BlockTimestamp, BlockTimestamp}]),
-																	ar_arql_db:update_address_agent(EntityTarget, FromAddress, BlockTimestamp);
-																<<"Referee">> ->
-																	?LOG_INFO([{handle_get_tx_unbundle______________________________Referee, EntityTarget}]),
-																	case ar_wallet:base64_address_with_optional_checksum_to_decoded_address_safe(EntityTarget) of
-																		{ok, RefereeAddressOK} ->
-																			ar_arql_db:update_address_referee(ar_util:encode(RefereeAddressOK), FromAddress)
-																	end;																
-																_ -> ok
-															end;
-														false ->[]
-													end;
-												<<"Folder">> ->
-													% Not Need Do In Here, In insert_tx function
-													ok;
-												_ ->
-													ok
-											end;
+											ar_arql_db:insert_tx(TXFields, TagFieldsList);
 										false ->
 											ok
 									end;
@@ -2854,7 +2788,7 @@ parse_bundle_data(TxData, TX, PageId, PageRecords, IsReturn) ->
 							
 							%% Compress Image
 							% ?LOG_INFO([{handle_get_tx_unbundle________DataType_DataType____DataType, DataType}]),
-							image_thumbnail_compress_to_storage(DataItemContent, FromAddress, DataItemId),
+							% image_thumbnail_compress_to_storage(DataItemContent, FromAddress, DataItemId),
 
 							%% Write Unbundle data to file
 							filelib:ensure_dir(binary_to_list(filename:join([DataDir, ?UNBUNDLE_DATA_DIR, FromAddress])) ++ "/"),

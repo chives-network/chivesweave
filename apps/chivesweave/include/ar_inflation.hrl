@@ -27,9 +27,6 @@
 -define(FORK_15_HEIGHT, ?FORK_1_6).
 -endif.
 
-%% BLOCK_PER_YEAR macro prior to 1.5.0.0 release.
--define(PRE_15_BLOCK_PER_YEAR, 525600 / (?TARGET_TIME / 60) ).
-
 %% The number of extra tokens to grant for blocks between the 1.5.0.0 release
 %% and the end of year one.
 -define(POST_15_Y1_EXTRA, 0).

@@ -42,17 +42,6 @@ calculate_post_15_y1_extra() ->
 %%% Private functions.
 %%%===================================================================
 
-%% @doc Pre-1.5.0.0 style reward calculation.
-pre_15_calculate(Height) when Height =< ?REWARD_DELAY ->
-	1;
-pre_15_calculate(Height) ->
-	?WINSTON_PER_AR
-		* 0.2
-		* ?GENESIS_TOKENS
-		* math:pow(2, -(Height - ?REWARD_DELAY) / ?PRE_15_BLOCK_PER_YEAR)
-		* math:log(2)
-        / ?PRE_15_BLOCK_PER_YEAR.
-
 calculate_base(Height) ->
 	{Ln2Dividend, Ln2Divisor} = ?LN2,
 	Dividend = Height * Ln2Dividend,

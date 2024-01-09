@@ -22,14 +22,10 @@ calculate(Height) ->
 	calculate2(Height).
 -endif.
 
-calculate2(Height) when Height =< ?FORK_15_HEIGHT ->
-	pre_15_calculate(Height);
-calculate2(Height) when Height =< ?BLOCKS_PER_YEAR ->
-    calculate_base(Height);
 calculate2(Height) ->
-	case Height >= ar_fork:height_2_5() of
+	case Height >= ar_fork:height_2_7_0() of
 		true ->
-			calculate_base(Height);
+			calculate_base_fork_2_7_0(Height);
 		false ->
 			calculate_base(Height)
 	end.
@@ -70,6 +66,25 @@ calculate_base(Height) ->
 		* Ln2Dividend
 		div (
 			10
+			* ?BLOCKS_PER_YEAR
+			* Ln2Divisor
+			* EXDividend
+		).
+
+calculate_base_fork_2_7_0(Height) ->
+	{Ln2Dividend, Ln2Divisor} = ?LN2,
+	Dividend = Height * Ln2Dividend,
+	Divisor = ?BLOCKS_PER_YEAR * Ln2Divisor,
+	Precision = ?INFLATION_NATURAL_EXPONENT_DECIMAL_FRACTION_PRECISION,
+	{EXDividend, EXDivisor} = ar_fraction:natural_exponent({Dividend, Divisor}, Precision),
+	?GENESIS_TOKENS
+		* ?WINSTON_PER_AR
+		* EXDivisor
+		* 1
+		* Ln2Dividend
+		div (
+			10
+			* 0.9
 			* ?BLOCKS_PER_YEAR
 			* Ln2Divisor
 			* EXDividend

@@ -77,7 +77,10 @@ calculate_difficulty(OldDiff, TS, Last, Height, PrevTS) ->
 	Fork_1_9 = ar_fork:height_1_9(),
 	Fork_2_4 = ar_fork:height_2_4(),
 	Fork_2_5 = ar_fork:height_2_5(),
+	Fork_2_7_0 = ar_fork:height_2_7_0(),
 	case Height of
+		_ when Height >= Fork_2_7_0 ->
+			calculate_difficulty_2_7_0(OldDiff, TS, Last, Height);
 		_ when Height >= 1010 ->
 			calculate_difficulty(OldDiff, TS, Last, Height);
 		_ when Height > Fork_2_5 ->
@@ -136,6 +139,31 @@ calculate_difficulty(OldDiff, TS, Last, Height) ->
 			MaxDiff = ?MAX_DIFF,
 			MinDiff = min_difficulty(Height),
 			DiffInverse = (MaxDiff - OldDiff) * ActualTime div TargetTime,
+			between(
+				MaxDiff - DiffInverse,
+				MinDiff,
+				MaxDiff - 1
+			)
+	end.
+
+calculate_difficulty_2_7_0_factor(ActualTime, TargetTime) ->
+	case ActualTime > TargetTime of
+		true -> 0.8;
+		false -> 1.2
+	end.
+	
+calculate_difficulty_2_7_0(OldDiff, TS, Last, Height) ->
+	TargetTime = ?RETARGET_BLOCKS * ?TARGET_TIME,
+	ActualTime = max(TS - Last, ar_block:get_max_timestamp_deviation()),
+	Difficulty_2_7_0_factor = calculate_difficulty_2_7_0_factor(ActualTime, TargetTime),
+	case ActualTime < ?RETARGET_TOLERANCE_UPPER_BOUND
+			andalso ActualTime > ?RETARGET_TOLERANCE_LOWER_BOUND of
+		true ->
+			OldDiff;
+		false ->
+			MaxDiff = ?MAX_DIFF,
+			MinDiff = min_difficulty(Height),
+			DiffInverse = (MaxDiff - OldDiff) * ActualTime div TargetTime * Difficulty_2_7_0_factor,
 			between(
 				MaxDiff - DiffInverse,
 				MinDiff,

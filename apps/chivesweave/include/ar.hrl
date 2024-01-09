@@ -64,7 +64,7 @@
 -define(DEFAULT_DIFF, 6).
 
 -ifndef(TARGET_TIME).
--define(TARGET_TIME, 120).
+-define(TARGET_TIME, 30).
 -endif.
 
 -ifndef(RETARGET_BLOCKS).
@@ -74,12 +74,12 @@
 %% We only do retarget if the time it took to mine ?RETARGET_BLOCKS is bigger than
 %% or equal to ?RETARGET_TOLERANCE_UPPER_BOUND or smaller than or equal to
 %% ?RETARGET_TOLERANCE_LOWER_BOUND.
--define(RETARGET_TOLERANCE_UPPER_BOUND, ((?TARGET_TIME * ?RETARGET_BLOCKS) + ?TARGET_TIME)).
+%% -define(RETARGET_TOLERANCE_UPPER_BOUND, ((?TARGET_TIME * ?RETARGET_BLOCKS) + ?TARGET_TIME)).
 
 %% We only do retarget if the time it took to mine ?RETARGET_BLOCKS is bigger than
 %% or equal to ?RETARGET_TOLERANCE_UPPER_BOUND or smaller than or equal to
 %% ?RETARGET_TOLERANCE_LOWER_BOUND.
--define(RETARGET_TOLERANCE_LOWER_BOUND, ((?TARGET_TIME * ?RETARGET_BLOCKS) - ?TARGET_TIME)).
+%% -define(RETARGET_TOLERANCE_LOWER_BOUND, ((?TARGET_TIME * ?RETARGET_BLOCKS) - ?TARGET_TIME)).
 
 %% We only do retarget if the time it took to mine ?RETARGET_BLOCKS is more than
 %% 1.1 times bigger or smaller than ?TARGET_TIME * ?RETARGET_BLOCKS. Was used before
@@ -292,7 +292,7 @@
 -define(RANDOMX_KEY_SWAP_FREQ, 2000).
 -define(RANDOMX_MIN_KEY_GEN_AHEAD, (30 + ?STORE_BLOCKS_BEHIND_CURRENT)).
 -define(RANDOMX_MAX_KEY_GEN_AHEAD, (90 + ?STORE_BLOCKS_BEHIND_CURRENT)).
--define(RANDOMX_STATE_POLL_INTERVAL, ?TARGET_TIME).
+-define(RANDOMX_STATE_POLL_INTERVAL, 120).
 -define(RANDOMX_KEEP_KEY, ?STORE_BLOCKS_BEHIND_CURRENT).
 -endif.
 

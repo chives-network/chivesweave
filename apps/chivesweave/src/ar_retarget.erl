@@ -129,10 +129,11 @@ switch_to_linear_diff_pre_fork_2_5(Diff) ->
 %%%===================================================================
 
 calculate_difficulty(OldDiff, TS, Last, Height) ->
-	TargetTime = ?RETARGET_BLOCKS * ?TARGET_TIME,
+	Target_Time = calculate_target_time(Height),
+	TargetTime = ?RETARGET_BLOCKS * Target_Time,
 	ActualTime = max(TS - Last, ar_block:get_max_timestamp_deviation()),
-	case ActualTime < ?RETARGET_TOLERANCE_UPPER_BOUND
-			andalso ActualTime > ?RETARGET_TOLERANCE_LOWER_BOUND of
+	case ActualTime < (?RETARGET_BLOCKS * Target_Time + Target_Time)
+			andalso ActualTime > (?RETARGET_BLOCKS * Target_Time - Target_Time) of
 		true ->
 			OldDiff;
 		false ->
@@ -151,13 +152,21 @@ calculate_difficulty_2_7_0_factor(ActualTime, TargetTime) ->
 		true -> 0.8;
 		false -> 1.2
 	end.
-	
+
+calculate_target_time(Height) ->
+	Fork_2_7_0 = ar_fork:height_2_7_0(),
+	case Height >= Fork_2_7_0 of
+		true -> 30;
+		false -> 120
+	end.
+
 calculate_difficulty_2_7_0(OldDiff, TS, Last, Height) ->
-	TargetTime = ?RETARGET_BLOCKS * ?TARGET_TIME,
+	Target_Time = calculate_target_time(Height),
+	TargetTime = ?RETARGET_BLOCKS * Target_Time,
 	ActualTime = max(TS - Last, ar_block:get_max_timestamp_deviation()),
 	Difficulty_2_7_0_factor = calculate_difficulty_2_7_0_factor(ActualTime, TargetTime),
-	case ActualTime < ?RETARGET_TOLERANCE_UPPER_BOUND
-			andalso ActualTime > ?RETARGET_TOLERANCE_LOWER_BOUND of
+	case ActualTime < (?RETARGET_BLOCKS * Target_Time + Target_Time)
+			andalso ActualTime > (?RETARGET_BLOCKS * Target_Time - Target_Time) of
 		true ->
 			OldDiff;
 		false ->
@@ -176,7 +185,8 @@ calculate_difficulty_at_2_5(OldDiff, TS, Last, Height, PrevTS) ->
 			?DIFF_DROP_2_5).
 
 calculate_difficulty_with_drop(OldDiff, TS, Last, Height, PrevTS, InitialCoeff, Coeff) ->
-	TargetTime = ?RETARGET_BLOCKS * ?TARGET_TIME,
+	Target_Time = calculate_target_time(Height),
+	TargetTime = ?RETARGET_BLOCKS * Target_Time,
 	ActualTime = max(TS - Last, ar_block:get_max_timestamp_deviation()),
 	Step = 10 * 60,
 	%% Drop the difficulty InitialCoeff times right away, then drop extra Coeff times
@@ -189,7 +199,8 @@ calculate_difficulty_with_drop(OldDiff, TS, Last, Height, PrevTS, InitialCoeff, 
 	between(MaxDiff - DiffInverse, MinDiff, MaxDiff - 1).
 
 calculate_difficulty_after_2_4_before_2_5(OldDiff, TS, Last, Height) ->
-	TargetTime = ?RETARGET_BLOCKS * ?TARGET_TIME,
+	Target_Time = calculate_target_time(Height),
+	TargetTime = ?RETARGET_BLOCKS * Target_Time,
 	ActualTime = TS - Last,
 	TimeDelta = ActualTime / TargetTime,
 	case abs(1 - TimeDelta) < ?RETARGET_TOLERANCE of
@@ -207,7 +218,8 @@ calculate_difficulty_after_2_4_before_2_5(OldDiff, TS, Last, Height) ->
 	end.
 
 calculate_difficulty_at_2_4(OldDiff, TS, Last, Height) ->
-	TargetTime = ?RETARGET_BLOCKS * ?TARGET_TIME,
+	Target_Time = calculate_target_time(Height),
+	TargetTime = ?RETARGET_BLOCKS * Target_Time,
 	ActualTime = TS - Last,
 	%% Make the difficulty drop 10 times faster than usual. The difficulty
 	%% after SPoRA is estimated to be around 10-100 times lower. In the worst
@@ -225,7 +237,8 @@ calculate_difficulty_at_2_4(OldDiff, TS, Last, Height) ->
 	).
 
 calculate_difficulty_at_and_after_1_9_before_2_4(OldDiff, TS, Last, Height) ->
-	TargetTime = ?RETARGET_BLOCKS * ?TARGET_TIME,
+	Target_Time = calculate_target_time(Height),
+	TargetTime = ?RETARGET_BLOCKS * Target_Time,
 	ActualTime = TS - Last,
 	TimeDelta = ActualTime / TargetTime,
 	case abs(1 - TimeDelta) < ?RETARGET_TOLERANCE of
@@ -248,7 +261,8 @@ calculate_difficulty_at_and_after_1_9_before_2_4(OldDiff, TS, Last, Height) ->
 	end.
 
 calculate_difficulty_after_1_8_before_1_9(OldDiff, TS, Last, Height) ->
-	TargetTime = ?RETARGET_BLOCKS * ?TARGET_TIME,
+	Target_Time = calculate_target_time(Height),
+	TargetTime = ?RETARGET_BLOCKS * Target_Time,
 	ActualTime = TS - Last,
 	TimeDelta = ActualTime / TargetTime,
 	case abs(1 - TimeDelta) < ?RETARGET_TOLERANCE of
@@ -276,7 +290,8 @@ switch_to_randomx_fork_diff(OldDiff) ->
 -endif.
 
 calculate_difficulty_before_1_8(OldDiff, TS, Last, Height) ->
-	TargetTime = ?RETARGET_BLOCKS * ?TARGET_TIME,
+	Target_Time = calculate_target_time(Height),
+	TargetTime = ?RETARGET_BLOCKS * Target_Time,
 	ActualTime = TS - Last,
 	Diff = erlang:max(
 		if
@@ -373,15 +388,15 @@ calculate_difficulty_linear_test_() ->
 
 test_calculate_difficulty_linear() ->
 	Diff = switch_to_linear_diff(27),
-	TargetTime = ?RETARGET_BLOCKS * ?TARGET_TIME,
+	TargetTime = ?RETARGET_BLOCKS * 120,
 	Timestamp = os:system_time(seconds),
 	%% The change is smaller than retarget tolerance.
-	Retarget1 = Timestamp - TargetTime - ?TARGET_TIME + 1,
+	Retarget1 = Timestamp - TargetTime - 120 + 1,
 	?assertEqual(
 		Diff,
 		calculate_difficulty(Diff, Timestamp, Retarget1, 1)
 	),
-	Retarget2 = Timestamp - TargetTime + ?TARGET_TIME - 1,
+	Retarget2 = Timestamp - TargetTime + 120 - 1,
 	?assertEqual(
 		Diff,
 		calculate_difficulty(Diff, Timestamp, Retarget2, 1)

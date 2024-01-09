@@ -624,7 +624,7 @@ get_packing_threshold(B, SearchSpaceUpperBound) ->
 shift_packing_2_5_threshold(0) ->
 	0;
 shift_packing_2_5_threshold(Threshold) ->
-	Shift = (?DATA_CHUNK_SIZE) * (?PACKING_2_5_THRESHOLD_CHUNKS_PER_SECOND) * (?TARGET_TIME),
+	Shift = (?DATA_CHUNK_SIZE) * (?PACKING_2_5_THRESHOLD_CHUNKS_PER_SECOND) * (120),
 	max(0, Threshold - Shift).
 
 validate_reward_history_hash(H, RewardHistory) ->

@@ -639,9 +639,9 @@ get_gb_cost_per_block_at_datetime(DT, Height) ->
 	case Height >= ar_fork:height_2_5() of
 		true ->
 			{Dividend, Divisor} = get_gb_cost_per_year_at_datetime(DT, Height),
-			{Dividend, Divisor * ?BLOCKS_PER_YEAR};
+			{Dividend, Divisor * 120 * 24 * 365};
 		false ->
-			get_gb_cost_per_year_at_datetime(DT, Height) / ?BLOCKS_PER_YEAR
+			get_gb_cost_per_year_at_datetime(DT, Height) / 120 * 24 * 365
 	end.
 
 %% @doc Return the cost in USD of storing 1 GB per year. Estmimated from empirical data.

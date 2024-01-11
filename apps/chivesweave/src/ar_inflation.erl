@@ -36,7 +36,7 @@ calculate_post_15_y1_extra() ->
     Pre15 = erlang:trunc(sum_rewards(fun calculate/1, 0, ?FORK_15_HEIGHT)),
     Base = erlang:trunc(sum_rewards(fun calculate_base/1, 0, ?FORK_15_HEIGHT)),
     Post15Diff = Base - Pre15,
-    erlang:trunc(Post15Diff / (?BLOCKS_PER_YEAR - ?FORK_15_HEIGHT)).
+    erlang:trunc(Post15Diff / (30 * 24 * 365 - ?FORK_15_HEIGHT)).
 
 %%%===================================================================
 %%% Private functions.
@@ -45,7 +45,7 @@ calculate_post_15_y1_extra() ->
 calculate_base(Height) ->
 	{Ln2Dividend, Ln2Divisor} = ?LN2,
 	Dividend = Height * Ln2Dividend,
-	Divisor = ?BLOCKS_PER_YEAR * Ln2Divisor,
+	Divisor = 30 * 24 * 365 * Ln2Divisor,
 	Precision = ?INFLATION_NATURAL_EXPONENT_DECIMAL_FRACTION_PRECISION,
 	{EXDividend, EXDivisor} = ar_fraction:natural_exponent({Dividend, Divisor}, Precision),
 	?GENESIS_TOKENS
@@ -55,7 +55,7 @@ calculate_base(Height) ->
 		* Ln2Dividend
 		div (
 			10
-			* ?BLOCKS_PER_YEAR
+			* 30 * 24 * 365
 			* Ln2Divisor
 			* EXDividend
 		).
@@ -63,18 +63,18 @@ calculate_base(Height) ->
 calculate_base_fork_2_7_0(Height) ->
 	{Ln2Dividend, Ln2Divisor} = ?LN2,
 	Dividend = Height * Ln2Dividend,
-	Divisor = ?BLOCKS_PER_YEAR * Ln2Divisor,
+	Divisor = 120 * 24 * 365 * Ln2Divisor,
 	Precision = ?INFLATION_NATURAL_EXPONENT_DECIMAL_FRACTION_PRECISION,
 	{EXDividend, EXDivisor} = ar_fraction:natural_exponent({Dividend, Divisor}, Precision),
 	?GENESIS_TOKENS
 		* ?WINSTON_PER_AR
 		* EXDivisor
-		* 1
 		* Ln2Dividend
+		* 12
 		div (
 			10
-			* 0.9
-			* ?BLOCKS_PER_YEAR
+			* 10
+			* 120 * 24 * 365
 			* Ln2Divisor
 			* EXDividend
 		).

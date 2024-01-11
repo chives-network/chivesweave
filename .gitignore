@@ -30,4 +30,5 @@ metrics_master
 metrics_slave
 release/output
 mainnet_data_dir
+mainnet_data_dir2
 _build

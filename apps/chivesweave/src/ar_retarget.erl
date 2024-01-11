@@ -56,8 +56,6 @@ is_retarget_block(Block) ->
 	?IS_RETARGET_BLOCK(Block).
 
 maybe_retarget(Height, CurDiff, TS, LastRetargetTS, PrevTS) ->
-	?LOG_INFO([{calculate_difficulty_2_7_0_Height_________________________________, Height}]),
-	?LOG_INFO([{calculate_difficulty_2_7_0_maybe_retarget_________________________, ar_retarget:is_retarget_height(Height)}]),
 	case ar_retarget:is_retarget_height(Height) of
 		true ->
 			calculate_difficulty(CurDiff, TS, LastRetargetTS, Height, PrevTS);
@@ -168,9 +166,9 @@ calculate_difficulty_2_7_0(OldDiff, TS, Last, Height) ->
 	TargetTime = ?RETARGET_BLOCKS * Target_Time,
 	ActualTime = max(TS - Last, ar_block:get_max_timestamp_deviation()),
 	Difficulty_2_7_0_factor = calculate_difficulty_2_7_0_factor(ActualTime, TargetTime),
-	?LOG_INFO([{calculate_difficulty_2_7_0_TargetTime, TargetTime}]),
+	%% ?LOG_INFO([{calculate_difficulty_2_7_0_TargetTime, TargetTime}]),
 	?LOG_INFO([{calculate_difficulty_2_7_0_ActualTime, ActualTime}]),
-	?LOG_INFO([{calculate_difficulty_2_7_0_Difficulty_2_7_0_factor, Difficulty_2_7_0_factor}]),
+	%% ?LOG_INFO([{calculate_difficulty_2_7_0_Difficulty_2_7_0_factor, Difficulty_2_7_0_factor}]),
 	case ActualTime < (?RETARGET_BLOCKS * Target_Time + Target_Time)
 			andalso ActualTime > (?RETARGET_BLOCKS * Target_Time - Target_Time) of
 		true ->
@@ -179,9 +177,9 @@ calculate_difficulty_2_7_0(OldDiff, TS, Last, Height) ->
 			MaxDiff = ?MAX_DIFF,
 			MinDiff = min_difficulty(Height),
 			DiffInverse = (MaxDiff - OldDiff) * ActualTime * Difficulty_2_7_0_factor div (TargetTime * 10),
-			?LOG_INFO([{calculate_difficulty_2_7_0_MaxDiff, MaxDiff}]),
-			?LOG_INFO([{calculate_difficulty_2_7_0_MinDiff, MinDiff}]),
-			?LOG_INFO([{calculate_difficulty_2_7_0_DiffInverse, DiffInverse}]),
+			%% ?LOG_INFO([{calculate_difficulty_2_7_0_MaxDiff, MaxDiff}]),
+			%% ?LOG_INFO([{calculate_difficulty_2_7_0_MinDiff, MinDiff}]),
+			%% ?LOG_INFO([{calculate_difficulty_2_7_0_DiffInverse, DiffInverse}]),
 			between(
 				MaxDiff - DiffInverse,
 				MinDiff,

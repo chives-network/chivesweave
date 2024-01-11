@@ -4377,7 +4377,8 @@ return_info(Req) ->
 							erlang:process_info(whereis(ar_node_worker), message_queue_len)
 						)
 					},
-					{node_state_latency, (Time + Time2) div 2}
+					{node_state_latency, (Time + Time2) div 2},
+					{type, <<"miningnode">>}
 				]
 			}
 		),

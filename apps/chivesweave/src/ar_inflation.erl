@@ -70,7 +70,7 @@ calculate_base_fork_2_7_0(Height) ->
 		* ?WINSTON_PER_AR
 		* EXDivisor
 		* Ln2Dividend
-		* 12
+		* 10
 		div (
 			10
 			* 10

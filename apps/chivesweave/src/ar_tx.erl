@@ -555,15 +555,13 @@ is_tx_fee_sufficient(Args) ->
 
 get_tx_fee(Args) ->
 	{DataSize, PricePerGiBMinute, KryderPlusRateMultiplier, Addr, Accounts, Height} = Args,
-	Fork_2_6_8 = ar_fork:height_2_6_8(),
 	Args2 = {DataSize, PricePerGiBMinute, KryderPlusRateMultiplier, Addr, Accounts, Height},
-	TransitionStart_2_6_8 = Fork_2_6_8 + ?PRICE_2_6_8_TRANSITION_START,
-	case Height >= TransitionStart_2_6_8 of
+	case Height >= ar_fork:height_2_7_0() of
 		false ->
 			%% Pre-2.6.8 transition period. Use a static fee-based pricing + new account fee.
 			get_static_2_6_8_tx_fee(DataSize, Addr, Accounts);
 		true ->
-			get_static_2_6_8_tx_fee(DataSize, Addr, Accounts)
+			get_static_2_7_0_tx_fee(DataSize, Addr, Accounts)
 	end.
 
 get_static_2_6_8_tx_fee(DataSize, Addr, Accounts) ->
@@ -573,6 +571,18 @@ get_static_2_6_8_tx_fee(DataSize, Addr, Accounts) ->
 			UploadFee;
 		false ->
 			NewAccountFee = (?STATIC_2_6_8_FEE_WINSTON div ?GiB) *
+					?NEW_ACCOUNT_FEE_DATA_SIZE_EQUIVALENT,
+			UploadFee + NewAccountFee
+	end.
+
+
+get_static_2_7_0_tx_fee(DataSize, Addr, Accounts) ->
+	UploadFee = (?STATIC_2_6_8_FEE_WINSTON * 10 div ?GiB) * (DataSize + ?TX_SIZE_BASE),
+	case Addr == <<>> orelse maps:is_key(Addr, Accounts) of
+		true ->
+			UploadFee;
+		false ->
+			NewAccountFee = (?STATIC_2_6_8_FEE_WINSTON * 10 div ?GiB) *
 					?NEW_ACCOUNT_FEE_DATA_SIZE_EQUIVALENT,
 			UploadFee + NewAccountFee
 	end.

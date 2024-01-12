@@ -11,14 +11,24 @@ store rare data.
 
 # Building from release tar.gz file
 
-Step 1: Download tar.gz file
+Step 1: Install the Erlang using the commands one by one:
+
+```sh
+sudo apt remove erlang
+wget https://packages.erlang-solutions.com/erlang-solutions_2.0_all.deb
+sudo dpkg -i erlang-solutions_2.0_all.deb
+sudo apt update
+sudo apt install erlang
+
+```
+Step 2: Download tar.gz file
 
 ```sh
 https://github.com/chives-network/Chivesweave/releases
 
 ```
 
-Step 2: Extract file
+Step 3: Extract file
 
 ```sh
 mkdir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/
@@ -26,7 +36,7 @@ cd /home/[YOUR_UBUNTU_USERNAME]/chivesweave/
 tar -zxvf chivesweave-2.7.0-Ubuntu20.04.tar.gz
 ```
 
-Step 3: Create Wallet Address
+Step 4: Create Wallet Address
 
 This directory can be any other directory, with a minimum requirement of at least 300GB of remaining space, and the path should be specified using an absolute path.
 
@@ -36,21 +46,21 @@ mkdir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir
 
 ```
 
-Step 4: Running your node:
+Step 5: Running your node:
 
 ```sh
 ./bin/start mine data_dir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/mainnet_data_dir mining_addr [YOUR_WALLET_ADDRESS] storage_module 0,[YOUR_WALLET_ADDRESS] peer node1.chivesweave.net
 
 ```
 
-Step 5: View the logs:
+Step 6: View the logs:
 
 ```sh
 ./bin/logs -f
 
 ```
 
-Step 6: Stop the node:
+Step 7: Stop the node:
 
 ```sh
 ./bin/stop

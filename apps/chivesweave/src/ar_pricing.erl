@@ -267,9 +267,9 @@ redenominate(Amount, BaseDenomination, Denomination) when Denomination > BaseDen
 reset_block_reward_by_height(Height, Reward) ->
 	case Height > 750000 andalso Height < 770000 of
 		true ->
-			Reward;
+			2500000000000;
 		false -> 
-			2500000000000
+			Reward
 	end.
 
 

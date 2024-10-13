@@ -33,7 +33,7 @@ Step 3: Extract file
 ```sh
 mkdir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/
 cd /home/[YOUR_UBUNTU_USERNAME]/chivesweave/
-tar -zxvf chivesweave-2.7.0-Ubuntu20.04.tar.gz
+tar -zxvf chivesweave-2.7.1-Ubuntu20.04.tar.gz
 ```
 
 Step 4: Create Wallet Address
@@ -103,7 +103,7 @@ sudo apt install erlang
 
 ```
 
-Step 2: Download the repo:
+Step 2: Download the repo: need add '--recursive'
 
 ```sh
 git clone --recursive https://github.com/chives-network/chivesweave

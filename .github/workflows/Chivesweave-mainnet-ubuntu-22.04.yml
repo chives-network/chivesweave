@@ -29,5 +29,5 @@ jobs:
       - name: Upload Packing Files
         uses: actions/upload-artifact@v3
         with:
-          name: chivesweave-2.7.0-ubuntu-22.04.tar.gz
+          name: chivesweave-2.7.1-ubuntu-22.04.tar.gz
           path: ${{ github.workspace }}/_build/mainnet/rel/chivesweave/

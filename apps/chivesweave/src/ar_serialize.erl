@@ -25,6 +25,7 @@
 
 -include_lib("chivesweave/include/ar.hrl").
 -include_lib("chivesweave/include/ar_vdf.hrl").
+-include_lib("chivesweave/include/ar_pricing.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 %%%===================================================================
@@ -241,7 +242,7 @@ block_to_json_struct(
 				JSONElements6 =
 					[{hash_preimage, ar_util:encode(B#block.hash_preimage)},
 							{recall_byte, integer_to_binary(B#block.recall_byte)},
-							{reward, integer_to_binary(B#block.reward)},
+							{reward, integer_to_binary(ar_pricing:reset_block_reward_by_height(B#block.height, B#block.reward))},
 							{previous_solution_hash,
 									ar_util:encode(B#block.previous_solution_hash)},
 							{partition_number, B#block.partition_number},

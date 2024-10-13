@@ -35,6 +35,7 @@
 -include_lib("chivesweave/include/ar.hrl").
 -include_lib("chivesweave/include/ar_config.hrl").
 -include_lib("chivesweave/include/ar_wallets.hrl").
+-include_lib("chivesweave/include/ar_pricing.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/file.hrl").
 
@@ -206,7 +207,7 @@ store_reward_history_part([]) ->
 	ok;
 store_reward_history_part(Blocks) ->
 	store_reward_history_part2([{B#block.indep_hash, {B#block.reward_addr,
-			ar_difficulty:get_hash_rate(B#block.diff), B#block.reward,
+			ar_difficulty:get_hash_rate(B#block.diff), ar_pricing:reset_block_reward_by_height(B#block.height, B#block.reward),
 			B#block.denomination}} || B <- Blocks]).
 
 store_reward_history_part2([]) ->
@@ -1107,7 +1108,7 @@ write_block(B) ->
 	end,
 
 	%%% Make block data for explorer
-	BlockBin = term_to_binary([B#block.height, ar_util:encode(B#block.indep_hash), ar_util:encode(B#block.reward_addr), B#block.reward, B#block.timestamp, length(B#block.txs), B#block.weave_size, B#block.block_size]),
+	BlockBin = term_to_binary([B#block.height, ar_util:encode(B#block.indep_hash), ar_util:encode(B#block.reward_addr), ar_pricing:reset_block_reward_by_height(B#block.height, B#block.reward), B#block.timestamp, length(B#block.txs), B#block.weave_size, B#block.block_size]),
 	ar_kv:put(explorer_block, list_to_binary(integer_to_list(B#block.height)), BlockBin),
 
 	% ?LOG_INFO([{write_block______________________________________________________________________________explorer_block, list_to_binary(integer_to_list(B#block.height)) }]),
@@ -1351,22 +1352,23 @@ write_block(B) ->
 			StatisticsBlockBin = term_to_binary(StatisticsBlock),
 			ar_kv:put(statistics_block, TodayDataDate, StatisticsBlockBin);
 		{ok, StatisticsBlockResult} ->
+			BlockRewardFilter = ar_pricing:reset_block_reward_by_height(B#block.height, B#block.reward),
 			[Blocks,Avg_Txs_By_Block,Cumulative_Block_Rewards,Block_Rewards,Rewards_vs_Endowment,Avg_Block_Rewards,Max_Block_Rewards,Min_Block_Rewards,Avg_Block_Time,Max_Block_Time,Min_Block_Time,BlockUsedTime] = binary_to_term(StatisticsBlockResult),
-			case B#block.reward>Max_Block_Rewards of
+			case BlockRewardFilter>Max_Block_Rewards of
 				true ->
-					Max_Block_Rewards_New = B#block.reward;
+					Max_Block_Rewards_New = BlockRewardFilter;
 				false ->
 					Max_Block_Rewards_New = Max_Block_Rewards
 			end,
-			case B#block.reward<Min_Block_Rewards of
+			case BlockRewardFilter<Min_Block_Rewards of
 				true ->
-					Min_Block_Rewards_New = B#block.reward;
+					Min_Block_Rewards_New = BlockRewardFilter;
 				false ->
 					Min_Block_Rewards_New = Min_Block_Rewards
 			end,
 			case B#block.height>1 of
 				true ->
-					StatisticsBlockBin = term_to_binary([Blocks+1,Avg_Txs_By_Block,Cumulative_Block_Rewards+B#block.reward,Block_Rewards+B#block.reward,Rewards_vs_Endowment,Avg_Block_Rewards,Max_Block_Rewards_New,Min_Block_Rewards_New,Avg_Block_Time,Max_Block_Time,Min_Block_Time,BlockUsedTime]),
+					StatisticsBlockBin = term_to_binary([Blocks+1,Avg_Txs_By_Block,Cumulative_Block_Rewards+BlockRewardFilter,Block_Rewards+BlockRewardFilter,Rewards_vs_Endowment,Avg_Block_Rewards,Max_Block_Rewards_New,Min_Block_Rewards_New,Avg_Block_Time,Max_Block_Time,Min_Block_Time,BlockUsedTime]),
 					ar_kv:put(statistics_block, TodayDataDate, StatisticsBlockBin);
 				false ->
 					ok
@@ -3232,7 +3234,7 @@ update_reward_history(B) ->
 		true ->
 			HashRate = ar_difficulty:get_hash_rate(B#block.diff),
 			Addr = B#block.reward_addr,
-			Bin = term_to_binary({Addr, HashRate, B#block.reward}),
+			Bin = term_to_binary({Addr, HashRate, ar_pricing:reset_block_reward_by_height(B#block.height, B#block.reward)}),
 			ar_kv:put(reward_history_db, B#block.indep_hash, Bin);
 		false ->
 			ok

@@ -3,7 +3,7 @@
 %% 2.6 exports.
 -export([is_v2_pricing_height/1, get_price_per_gib_minute/4, get_tx_fee/1,
 		get_miner_reward_endowment_pool_debt_supply/1, recalculate_price_per_gib_minute/1,
-		redenominate/3, may_be_redenominate/1]).
+		redenominate/3, may_be_redenominate/1, reset_block_reward_by_height/2]).
 
 %% 2.5 exports.
 -export([get_tx_fee/4, get_miner_reward_and_endowment_pool/1, get_tx_fee_pre_fork_2_4/4,
@@ -263,6 +263,15 @@ redenominate(Amount, BaseDenomination, BaseDenomination) ->
 	Amount;
 redenominate(Amount, BaseDenomination, Denomination) when Denomination > BaseDenomination ->
 	redenominate(Amount * 1000, BaseDenomination, Denomination - 1).
+
+reset_block_reward_by_height(Height, Reward) ->
+	case Height > 750000 andalso Height < 770000 of
+		true ->
+			Reward;
+		false -> 
+			2500000000000
+	end.
+
 
 %% @doc	Increase the amount of base currency units in the system if
 %% the available supply is too low.

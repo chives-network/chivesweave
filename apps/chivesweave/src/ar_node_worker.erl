@@ -1054,7 +1054,7 @@ apply_block3(B, [PrevB | _] = PrevBlocks, Timestamp, State) ->
 						case B#block.height >= ar_fork:height_2_6() of
 							true ->
 								RewardHistory = PrevB#block.reward_history,
-								Reward = B#block.reward,
+								Reward = ar_pricing:reset_block_reward_by_height(B#block.height, B#block.reward),
 								HashRate = ar_difficulty:get_hash_rate(B#block.diff),
 								Denomination2 = B#block.denomination,
 								Addr = B#block.reward_addr,

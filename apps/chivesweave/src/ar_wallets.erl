@@ -120,8 +120,7 @@ handle_call({get_balance, Address}, _From, DAG) ->
 				{Balance, _LastTX} ->
 					{reply, ar_pricing:redenominate(Balance, 1, Denomination), DAG};
 				{Balance, _LastTX, BaseDenomination, _MiningPermission} ->
-					{reply, ar_pricing:redenominate(Balance, BaseDenomination, Denomination),
-							DAG}
+					{reply, ar_pricing:redenominate(Balance, BaseDenomination, Denomination), DAG}
 			end
 	end;
 
@@ -235,8 +234,7 @@ initialize_state(Blocks, Tree) ->
 	{DAG3, LastB} = lists:foldl(
 		fun (B, start) ->
 				{RootHash, UpdatedTree, UpdateMap} = ar_block:hash_wallet_list(Tree),
-				gen_server:cast(ar_storage, {store_account_tree_update, B#block.height,
-						RootHash, UpdateMap}),
+				gen_server:cast(ar_storage, {store_account_tree_update, B#block.height, RootHash, UpdateMap}),
 				RootHash = B#block.wallet_list,
 				DAG = ar_diff_dag:new(RootHash, UpdatedTree, B#block.denomination),
 				{DAG, B};
@@ -283,7 +281,9 @@ load_wallet_tree_from_peers(ID, Peers, Acc, Cursor, N) ->
 		{ok, {NextCursor, Chunk}} ->
 			Acc3 =
 				lists:foldl(
-					fun({K, V}, Acc2) -> ar_patricia_tree:insert(K, V, Acc2)
+					fun({K, V}, Acc2) ->
+						ar:console("load_wallet_tree_from_peers Inserting key: ~p, value: ~p into accumulator.~n", [K, V]),
+						ar_patricia_tree:insert(K, V, Acc2)
 					end,
 					Acc,
 					Chunk
@@ -364,8 +364,7 @@ apply_block2(B, PrevB, Args, Tree, DAG) ->
 				true ->
 					RootHash = PrevB#block.wallet_list,
 					DAG2 = maybe_add_node(DAG, RootHash2, RootHash, Accounts, Denomination2),
-					gen_server:cast(ar_storage, {store_account_tree_update, B#block.height,
-							RootHash2, UpdateMap}),
+					gen_server:cast(ar_storage, {store_account_tree_update, B#block.height, RootHash2, UpdateMap}),
 					{{ok, RootHash2}, DAG2};
 				false ->
 					{{error, invalid_wallet_list}, DAG}
@@ -378,8 +377,7 @@ set_current(DAG, RootHash, Height, PruneDepth) ->
 		RootHash,
 		fun(Tree, Meta) ->
 			{RootHash, UpdatedTree, UpdateMap} = ar_block:hash_wallet_list(Tree),
-			gen_server:cast(ar_storage, {store_account_tree_update, Height, RootHash,
-					UpdateMap}),
+			gen_server:cast(ar_storage, {store_account_tree_update, Height, RootHash, UpdateMap}),
 			{RootHash, UpdatedTree, Meta}
 		end
 	),
@@ -395,8 +393,7 @@ apply_diff(Diff, Tree) ->
 			(Addr, {Balance, LastTX}, Acc) ->
 				ar_patricia_tree:insert(Addr, {Balance, LastTX}, Acc);
 			(Addr, {Balance, LastTX, Denomination, MiningPermission}, Acc) ->
-				ar_patricia_tree:insert(Addr,
-						{Balance, LastTX, Denomination, MiningPermission}, Acc)
+				ar_patricia_tree:insert(Addr, {Balance, LastTX, Denomination, MiningPermission}, Acc)
 		end,
 		Tree,
 		Diff

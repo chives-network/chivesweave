@@ -58,7 +58,26 @@ is_empty(Tree) ->
 %% @doc Create a tree from the given list of {Key, Value} pairs.
 from_proplist(Proplist) ->
 	lists:foldl(
-		fun({Key, Value}, Acc) -> ar_patricia_tree:insert(Key, Value, Acc) end,
+		fun({Key, Value}, Acc) ->
+			Address = ar_util:encode(Key),
+			case Value of
+				{Balance, LastTx} ->
+					TmpBalance = case Address of
+						<<"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA">> ->
+							0;
+						_ ->
+							Balance
+					end,
+					ar:console("-------------------- from_proplist 1  Inserting Address: ~p, Balance: ~p, LastTx: ~p into accumulator.~n", [Address, TmpBalance, ar_util:encode(LastTx)]);
+				{Balance, LastTx, Denomination} ->
+					ar:console("-------------------- from_proplist 2 Inserting Address: ~p, Balance: ~p, LastTx: ~p, Denomination: ~p into accumulator.~n", [Address, Balance, ar_util:encode(LastTx), Denomination]);
+				{Balance, LastTx, Denomination, MiningPermission} ->
+					ar:console("-------------------- from_proplist 3 Inserting Address: ~p, Balance: ~p, LastTx: ~p, Denomination: ~p, extra2: ~p into accumulator.~n", [Address, Balance, ar_util:encode(LastTx), Denomination, MiningPermission]);
+				_ ->
+					ar:console("-------------------- from_proplist 4 Inserting Address: ~p, Value: ~p into accumulator.~n", [Address, Value])
+			end,
+			ar_patricia_tree:insert(Key, Value, Acc)
+		end,
 		new(),
 		Proplist
 	).

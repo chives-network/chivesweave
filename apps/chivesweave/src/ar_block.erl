@@ -742,15 +742,13 @@ test_wallet_list_performance(Length, Denominations) ->
 							default ->
 								ar_patricia_tree:insert(A, {B, LastTX}, Acc);
 							new ->
-								ar_patricia_tree:insert(A, {B, LastTX,
-										1 + rand:uniform(10)}, Acc);
+								ar_patricia_tree:insert(A, {B, LastTX, 1 + rand:uniform(10)}, Acc);
 							mixed ->
 								case rand:uniform(2) == 1 of
 									true ->
 										ar_patricia_tree:insert(A, {B, LastTX}, Acc);
 									false ->
-										ar_patricia_tree:insert(A, {B, LastTX,
-												1 + rand:uniform(10)}, Acc)
+										ar_patricia_tree:insert(A, {B, LastTX, 1 + rand:uniform(10)}, Acc)
 								end
 						end
 					end,

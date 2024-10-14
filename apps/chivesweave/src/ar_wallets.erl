@@ -118,9 +118,11 @@ handle_call({get_balance, Address}, _From, DAG) ->
 			Denomination = ar_diff_dag:get_sink_metadata(DAG),
 			case Entry of
 				{Balance, _LastTX} ->
-					{reply, ar_pricing:redenominate(Balance, 1, Denomination), DAG};
+					TmpBalance = chives_adjust_wallet_balance_by_accident_20241010(Address, Balance),
+					{reply, ar_pricing:redenominate(TmpBalance, 1, Denomination), DAG};
 				{Balance, _LastTX, BaseDenomination, _MiningPermission} ->
-					{reply, ar_pricing:redenominate(Balance, BaseDenomination, Denomination), DAG}
+					TmpBalance = chives_adjust_wallet_balance_by_accident_20241010(Address, Balance),
+					{reply, ar_pricing:redenominate(TmpBalance, BaseDenomination, Denomination), DAG}
 			end
 	end;
 
@@ -136,10 +138,11 @@ handle_call({get_balance, RootHash, Address}, _From, DAG) ->
 					Denomination = ar_diff_dag:get_metadata(DAG, RootHash),
 					case Entry of
 						{Balance, _LastTX} ->
-							{reply, ar_pricing:redenominate(Balance, 1, Denomination), DAG};
+							TmpBalance = chives_adjust_wallet_balance_by_accident_20241010(Address, Balance),
+							{reply, ar_pricing:redenominate(TmpBalance, 1, Denomination), DAG};
 						{Balance, _LastTX, BaseDenomination, _MiningPermission} ->
-							{reply, ar_pricing:redenominate(Balance, BaseDenomination,
-									Denomination), DAG}
+							TmpBalance = chives_adjust_wallet_balance_by_accident_20241010(Address, Balance),
+							{reply, ar_pricing:redenominate(TmpBalance, BaseDenomination, Denomination), DAG}
 					end
 			end
 	end;
@@ -202,6 +205,15 @@ terminate(Reason, _State) ->
 %%%===================================================================
 %%% Private functions.
 %%%===================================================================
+
+chives_adjust_wallet_balance_by_accident_20241010(Address, Balance) ->
+	AdjustBalance = case ar_util:encode(Address) of
+					<<"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA">> ->
+						0;
+					_ ->
+						Balance
+				 end,
+	AdjustBalance.
 
 find_local_account_tree(Blocks, SearchDepth) ->
 	find_local_account_tree(Blocks, SearchDepth, 0).

@@ -60,8 +60,12 @@ get_block_index() ->
 %% @doc Return the current tip block. Assume the node has joined the network and
 %% initialized the state.
 get_current_block() ->
-	[{_, Current}] = ets:lookup(node_state, current),
-	ar_block_cache:get(block_cache, Current).
+	case ets:lookup(node_state, current) of
+		[{_, Current}] ->
+			ar_block_cache:get(block_cache, Current);
+		_ ->
+			[]
+	end.
 
 get_block_index_and_height() ->
 	Props =

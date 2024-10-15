@@ -4345,6 +4345,8 @@ return_info(Req) ->
 	{Time2, Height} =
 		timer:tc(fun() -> ar_node:get_height() end),
 	[{_, BlockCount}] = ets:lookup(ar_header_sync, synced_blocks),
+	{ok, Config} = application:get_env(chivesweave, config),
+	MiningAddr = Config#config.mining_addr,
 	{200, #{},
 		ar_serialize:jsonify(
 			{
@@ -4378,7 +4380,8 @@ return_info(Req) ->
 						)
 					},
 					{node_state_latency, (Time + Time2) div 2},
-					{type, <<"miningnode">>}
+					{type, <<"miningnode">>},
+					{mining_address, ar_util:encode(MiningAddr)}
 				]
 			}
 		),

@@ -181,7 +181,7 @@ get_block(Peers, H, Retries) ->
 						{event, failed_to_fetch_joining_block},
 						{block, ar_util:encode(H)}
 					]),
-					timer:sleep(1000),
+					timer:sleep(2000),
 					get_block(Peers, H, Retries - 1);
 				false ->
 					ar:console(
@@ -192,7 +192,7 @@ get_block(Peers, H, Retries) ->
 						{event, failed_to_fetch_joining_block},
 						{block, ar_util:encode(H)}
 					]),
-					timer:sleep(1000),
+					timer:sleep(2000),
 					erlang:halt()
 			end
 	end.

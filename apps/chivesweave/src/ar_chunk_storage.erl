@@ -172,8 +172,7 @@ run_defragmentation() ->
 		false ->
 			ok;
 		true ->
-			ar:console("Defragmentation threshold: ~B bytes.~n",
-					   [Config#config.defragmentation_trigger_threshold]),
+			ar:console("Defragmentation threshold: ~B bytes.~n", [Config#config.defragmentation_trigger_threshold]),
 			DefragModules = modules_to_defrag(Config),
 			Sizes = read_chunks_sizes(Config#config.data_dir),
 			Files = files_to_defrag(DefragModules,

@@ -84,6 +84,9 @@ Step 7: Stop the node:
 - HDD and SDD both are support.
 - Friendly for Chia and File miners.
 
+- AMD 7950 can mining almost 100 ~ 120 xwe every 6 hours. 
+- Can setup two VM to mining, total get 200 ~ 240 xwe every 6 hours.
+
 To install the dependencies on Ubuntu 22 (recommended), run:
 
 ```sh

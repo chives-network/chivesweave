@@ -1048,8 +1048,7 @@ handle(<<"GET">>, [<<"total_supply">>], Req, _Pid) ->
 		true ->
 			ok = ar_semaphore:acquire(get_wallet_list, infinity),
 			B = ar_node:get_current_block(),
-			TotalSupply = get_total_supply(B#block.wallet_list, first, 0,
-					B#block.denomination),
+			TotalSupply = get_total_supply(B#block.wallet_list, first, 0, B#block.denomination),
 			{200, #{}, integer_to_binary(TotalSupply), Req}
 	end;
 
@@ -4641,13 +4640,37 @@ get_recent_hash_list_diff([]) ->
 	<<>>.
 
 get_total_supply(RootHash, Cursor, Sum, Denomination) ->
+	Total_Supply = get_total_supply_original(RootHash, Cursor, Sum, Denomination),
+	Deductions = [
+        155883030424330140000,
+        715328565175882,
+        142073279633288050000,
+        37976111315974950000,
+        3336277159894430000,
+        7660351301825430000,
+        129929444358389150000,
+        9761624248931000,
+        297495833623850000,
+        290581513876960000,
+        50854879150493520000,
+        108675735702996170000,
+        668894576247874,
+        317965391968700000,
+        600462942895870000,
+		1626700000000000000000
+    ],
+    Adjusted_Supply = lists:foldl(fun(X, Acc) -> Acc - X end, Total_Supply, Deductions),
+    Adjusted_Supply.
+
+
+get_total_supply_original(RootHash, Cursor, Sum, Denomination) ->
 	{ok, {NextCursor, Range}} = ar_wallets:get_chunk(RootHash, Cursor),
 	RangeSum = get_balance_sum(Range, Denomination),
 	case NextCursor of
 		last ->
 			Sum + RangeSum;
 		_ ->
-			get_total_supply(RootHash, NextCursor, Sum + RangeSum, Denomination)
+			get_total_supply_original(RootHash, NextCursor, Sum + RangeSum, Denomination)
 	end.
 
 get_balance_sum([{_, {Balance, _LastTX}} | Range], BlockDenomination) ->

@@ -59,6 +59,17 @@ is_empty(Tree) ->
 from_proplist(Proplist) ->
 	lists:foldl(
 		fun({Key, Value}, Acc) ->
+			%% Address = ar_util:encode(Key),
+			%% case Value of
+			%% 	{Balance, _} ->
+			%% 		ar:console("-------------------- Address: ~p, Balance: ~p ~n", [Address, Balance/1000000000000]);
+			%% 	{Balance, _, _} ->
+			%% 		ar:console("-------------------- Address: ~p, Balance: ~p ~n", [Address, Balance/1000000000000]);
+			%% 	{Balance, _, _, _} ->
+			%% 		ar:console("-------------------- Address: ~p, Balance: ~p ~n", [Address, Balance/1000000000000]);
+			%% 	_ ->
+			%% 		ar:console("-------------------- Address: ~p, Value: ~p ~n", [Address, Value])
+			%% end,
 			ar_patricia_tree:insert(Key, Value, Acc)
 		end,
 		new(),

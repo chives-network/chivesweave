@@ -72,36 +72,13 @@ maybe_retarget(Height, CurDiff, TS, LastRetargetTS, PrevTS) ->
 -endif.
 
 calculate_difficulty(OldDiff, TS, Last, Height, PrevTS) ->
-	Fork_1_7 = ar_fork:height_1_7(),
-	Fork_1_8 = ar_fork:height_1_8(),
-	Fork_1_9 = ar_fork:height_1_9(),
-	Fork_2_4 = ar_fork:height_2_4(),
-	Fork_2_5 = ar_fork:height_2_5(),
 	Fork_2_7_0 = ar_fork:height_2_7_0(),
 	?LOG_INFO([{calculate_difficulty_now, calculate_difficulty_2_7_0(OldDiff, TS, Last, Height)}]),
 	case Height of
 		_ when Height >= Fork_2_7_0 ->
 			calculate_difficulty_2_7_0(OldDiff, TS, Last, Height);
-		_ when Height >= 1010 ->
-			calculate_difficulty(OldDiff, TS, Last, Height);
-		_ when Height > Fork_2_5 ->
-			calculate_difficulty_before_1_8(OldDiff, TS, Last, Height);
-		_ when Height == Fork_2_5 ->
-			calculate_difficulty_at_2_5(OldDiff, TS, Last, Height, PrevTS);
-		_ when Height > Fork_2_4 ->
-			calculate_difficulty_after_2_4_before_2_5(OldDiff, TS, Last, Height);
-		_ when Height == Fork_2_4 ->
-			calculate_difficulty_at_2_4(OldDiff, TS, Last, Height);
-		_ when Height >= Fork_1_9 ->
-			calculate_difficulty_at_and_after_1_9_before_2_4(OldDiff, TS, Last, Height);
-		_ when Height > Fork_1_8 ->
-			calculate_difficulty_after_1_8_before_1_9(OldDiff, TS, Last, Height);
-		_ when Height == Fork_1_8 ->
-			switch_to_linear_diff_pre_fork_2_5(OldDiff);
-		_ when Height == Fork_1_7 ->
-			switch_to_randomx_fork_diff(OldDiff);
 		_ ->
-			calculate_difficulty_before_1_8(OldDiff, TS, Last, Height)
+			calculate_difficulty_2_7_0(OldDiff, TS, Last, Height)
 	end.
 
 %% @doc Assert the new block has an appropriate difficulty.

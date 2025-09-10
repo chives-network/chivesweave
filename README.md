@@ -33,7 +33,7 @@ Step 3: Extract file
 ```sh
 mkdir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/
 cd /home/[YOUR_UBUNTU_USERNAME]/chivesweave/
-tar -zxvf chivesweave-2.7.2-Ubuntu20.04.tar.gz
+tar -zxvf chivesweave-2.7.3-Ubuntu20.04.tar.gz
 ```
 
 Step 4: Create Wallet Address

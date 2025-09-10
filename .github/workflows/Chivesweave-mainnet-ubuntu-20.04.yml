@@ -27,7 +27,7 @@ jobs:
           ./rebar3 as mainnet tar
       
       - name: Upload Packing Files
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: chivesweave-2.7.2-ubuntu-20.04.tar.gz
+          name: chivesweave-2.7.3-ubuntu-20.04.tar.gz
           path: ${{ github.workspace }}/_build/mainnet/rel/chivesweave/

@@ -111,26 +111,26 @@ height_2_6_8() ->
 
 -ifdef(FORKS_RESET).
 height_2_7_0() ->
-	65000.
+	1.
 -else.
 	-ifdef(TESTNET).
 		height_2_7_0() ->
-			65000.
+			1.
 	-else.
 		height_2_7_0() ->
-			65000. % Targeting 2023-05-30 16:00 UTC
+			1. % Targeting 2023-05-30 16:00 UTC
 	-endif.
 -endif.
 
 -ifdef(FORKS_RESET).
 height_2_7() ->
-	26280000.
+	1.
 -else.
 	-ifdef(TESTNET).
 		height_2_7() ->
-			26280000.
+			1.
 	-else.
 		height_2_7() ->
-			26280000. % Targeting 2023-10-04 14:00 UTC
+			1. % Targeting 2023-10-04 14:00 UTC
 	-endif.
 -endif.

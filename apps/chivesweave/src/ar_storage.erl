@@ -255,7 +255,7 @@ store_block_time_history_part2([{H, El} | History]) ->
 			{error, not_found}
 	end.
 
--if(?NETWORK_NAME == "chivesweave.mainnet2").
+-if(?NETWORK_NAME == "chivesweave.mainnet.1").
 write_full_block(BShadow, TXs) ->
 	case update_confirmation_index(BShadow#block{ txs = TXs }) of
 		ok ->

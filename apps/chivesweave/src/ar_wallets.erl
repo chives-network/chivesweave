@@ -210,36 +210,6 @@ chives_adjust_wallet_balance_by_accident_20241010(Address, Balance) ->
 	AdjustBalance = case ar_util:encode(Address) of
 						<<"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA">> ->
 							0;
-						<<"wkAHb9QpxDN9OT1qpCr9rxIUcvoI6RBj--p4ciQMg4w">> ->
-							max(Balance - 155883030424330140000, 0);
-						<<"0EXTRneE-QlIUsRMBNkxXoHRouPB8eBl-XyN1TvX8aI">> ->
-							max(Balance - 715328565175882, 0);
-						<<"1KSKFqzBs5oNnOG24e7DSUMXxTZs-clfffv70yaAtW8">> ->
-							max(Balance - 142073279633288050000, 0);
-						<<"3khBteBa6V9li3cUCBNTrN8bv7KvmEaNAe8mx7hTXSo">> ->
-							max(Balance - 37976111315974950000, 0);
-						<<"5HIfNbNd3tYDoJxtQfWGeqC6WFak8L59RJk130202Cc">> ->
-							max(Balance - 3336277159894430000, 0);
-						<<"990NO2AOrPvN9XwOxpDzNYcVTkkRGDPnBJnFFZCgZ-E">> ->
-							max(Balance - 7660351301825430000, 0);
-						<<"9P8x4T0GTOvDFnYRfDlBoD7n5mX_FdINkCXGzpXmTzs">> ->
-							max(Balance - 129929444358389150000, 0);
-						<<"Dicp6_jrtYKXB0EBg5eM7UdY4D1w2c-OjL1Wo85yyEI">> ->
-							max(Balance - 9761624248931000, 0);
-						<<"EuzlxhRMX8hzADVgGKMFQJPIz12j-cijyo1bYi6Ej0c">> ->
-							max(Balance - 297495833623850000, 0);
-						<<"KHVTvI9EtH9tCTxQ6HNyWzlltOOLzOLt8fMA6S2eo_k">> ->
-							max(Balance - 290581513876960000, 0);
-						<<"Ut5SswKxjwRruq0TPVwanZ8ZtiJBODAAk4Ay7pDSHnk">> ->
-							max(Balance - 50854879150493520000, 0);
-						<<"raE9RDB4t3PjN-eCvANieTEKWjqVls0IK136Nf3Hklc">> ->
-							max(Balance - 108675735702996170000, 0);
-						<<"tRZokw4X1dSV_ZerXcpZD4LoOH_uQF3EbNnf7OXcJm4">> ->
-							max(Balance - 668894576247874, 0);
-						<<"tdyvDOWqP4MibDHqJd-6VnGmKvu8VQi7VKbxwRZGCto">> ->
-							max(Balance - 317965391968700000, 0);
-						<<"Xx7ywdn5RyjEoIgNKcZ-Myg9JZ0HCM7pPfxuCRuPzLs">> ->
-							max(Balance - 600462942895870000, 0);
 						_ ->
 							Balance
 					end,

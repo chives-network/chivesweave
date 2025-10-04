@@ -7,7 +7,7 @@
 -include_lib("chivesweave/include/ar.hrl").
 
 execute(Req, Env) ->
-	case cowboy_req:header(<<"x-network">>, Req, <<"chivesweave.mainnet2">>) of
+	case cowboy_req:header(<<"x-network">>, Req, <<"chivesweave.mainnet.1">>) of
 		<<?NETWORK_NAME>> ->
 			maybe_add_peer(ar_http_util:arweave_peer(Req), Req),
 			{ok, Req, Env};

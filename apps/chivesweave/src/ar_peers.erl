@@ -168,7 +168,7 @@ get_peer_performances(Peers) ->
 		#{},
 		Peers).
 
--if(?NETWORK_NAME == "chivesweave.mainnet2").
+-if(?NETWORK_NAME == "chivesweave.mainnet.1").
 resolve_peers([]) ->
 	[];
 resolve_peers([RawPeer | Peers]) ->

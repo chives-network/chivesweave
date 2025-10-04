@@ -1,6 +1,6 @@
 {application, chivesweave, [
 	{description, "Chivesweave"},
-	{vsn, "2.7.3"},
+	{vsn, "2.7.4"},
 	{mod, {ar, []}},
 	{applications, [
 		kernel,

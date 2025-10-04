@@ -12,7 +12,7 @@
 	-ifdef(DEBUG).
 		-define(NETWORK_NAME, "chivesweave.localtest").
 	-else.
-		-define(NETWORK_NAME, "chivesweave.mainnet2").
+		-define(NETWORK_NAME, "chivesweave.mainnet.1").
 	-endif.
 -endif.
 
@@ -21,7 +21,7 @@
 -define(CLIENT_VERSION, 5).
 
 %% The current build number -- incremented for every release.
--define(RELEASE_NUMBER, 67).
+-define(RELEASE_NUMBER, 68).
 
 -define(DEFAULT_REQUEST_HEADERS,
 	[
@@ -171,10 +171,10 @@
 
 %% How many times to retry fetching the block index from each of
 %% the peers before giving up.
--define(REJOIN_RETRIES, 3).
+-define(REJOIN_RETRIES, 5).
 
 %% Maximum allowed number of accepted requests per minute per IP.
--define(DEFAULT_REQUESTS_PER_MINUTE_LIMIT, 900).
+-define(DEFAULT_REQUESTS_PER_MINUTE_LIMIT, 1800).
 
 %% Number of seconds an IP address should be completely banned from doing
 %% HTTP requests after posting an invalid block.

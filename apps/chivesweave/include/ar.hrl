@@ -12,16 +12,16 @@
 	-ifdef(DEBUG).
 		-define(NETWORK_NAME, "chivesweave.localtest").
 	-else.
-		-define(NETWORK_NAME, "chivesweave.mainnet2").
+		-define(NETWORK_NAME, "chivesweave.mainnet.1").
 	-endif.
 -endif.
 
 %% The current release number of the chivesweave client software.
 %% @deprecated Not used apart from being included in the /info response.
--define(CLIENT_VERSION, 5).
+-define(CLIENT_VERSION, 6).
 
 %% The current build number -- incremented for every release.
--define(RELEASE_NUMBER, 67).
+-define(RELEASE_NUMBER, 68).
 
 -define(DEFAULT_REQUEST_HEADERS,
 	[

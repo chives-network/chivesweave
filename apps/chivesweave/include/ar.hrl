@@ -174,7 +174,7 @@
 -define(REJOIN_RETRIES, 3).
 
 %% Maximum allowed number of accepted requests per minute per IP.
--define(DEFAULT_REQUESTS_PER_MINUTE_LIMIT, 900).
+-define(DEFAULT_REQUESTS_PER_MINUTE_LIMIT, 1800).
 
 %% Number of seconds an IP address should be completely banned from doing
 %% HTTP requests after posting an invalid block.

@@ -124,13 +124,13 @@ height_2_7_0() ->
 
 -ifdef(FORKS_RESET).
 height_2_7() ->
-	20.
+	262800000000.
 -else.
 	-ifdef(TESTNET).
 		height_2_7() ->
-			20.
+			262800000000.
 	-else.
 		height_2_7() ->
-			20. % Targeting 2023-10-04 14:00 UTC
+			262800000000. % Targeting 2023-10-04 14:00 UTC
 	-endif.
 -endif.

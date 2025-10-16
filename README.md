@@ -15,7 +15,7 @@ Step 1: Install the Erlang using the commands one by one:
 
 ```sh
 sudo apt remove erlang
-wget https://121.132.32.166/erlang-solutions_2.0_all.deb
+wget https://www.chivesweave.org/erlang-solutions_2.0_all.deb
 sudo dpkg -i erlang-solutions_2.0_all.deb
 sudo apt update
 sudo apt install erlang
@@ -99,7 +99,7 @@ Step 1: Install the Erlang using the commands one by one:
 
 ```sh
 sudo apt remove erlang
-wget https://121.132.32.166/erlang-solutions_2.0_all.deb
+wget https://www.chivesweave.org/erlang-solutions_2.0_all.deb
 sudo dpkg -i erlang-solutions_2.0_all.deb
 sudo apt update
 sudo apt install erlang
